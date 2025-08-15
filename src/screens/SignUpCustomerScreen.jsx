@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from "react";
 import {
+  SafeAreaView,
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   TextInput,
   Modal,
@@ -12,149 +12,108 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../theme/colors";
 import AuthHeader from "../components/AuthHeader";
-import InputField from "../components/InputField"; // already in your project
+import InputField from "../components/InputField";
 import PrimaryButton from "../components/PrimaryButton";
-import OutlineButton from "../components/OutlineButton";
-import SocialButton from "../components/SocialButton";
 import { COUNTRIES } from "../constants/countries";
 import { codeToFlag } from "../utils/flag";
-import { useAuth } from "../auth/AuthProvider";
 
 const METHOD = { EMAIL: "email", PHONE: "phone" };
 
-export default function LoginScreen({ navigation }) {
-  const [method, setMethod] = useState(METHOD.EMAIL); // default: Email (matches 1st mock)
+export default function SignUpCustomerScreen({ navigation }) {
+  const [method, setMethod] = useState(METHOD.EMAIL);
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [countryOpen, setCountryOpen] = useState(false);
-  const auth = useAuth();
 
-  // Default Afghanistan like your Figma mock
   const defaultAf = useMemo(
     () => COUNTRIES.find((c) => c.code === "AF") || COUNTRIES[0],
     []
   );
   const [country, setCountry] = useState(defaultAf);
 
-  const sendOtp = async () => {
-    try {
-      if (method === "email") {
-        await auth.sendOtp({ channel: "email", value: email });
-        navigation.navigate("OtpVerification", {
-          channel: "email",
-          target: email,
-        });
-      } else {
-        // combine with AFG (or chosen) country code UI you already added
-        await auth.sendOtp({ channel: "phone", value: phone });
-        navigation.navigate("OtpVerification", {
-          channel: "phone",
-          target: phone,
-        });
-      }
-    } catch (e) {
-      // simple UI-only error; replace with toast if you prefer
-      alert(
-        "Demo user not found. Try:\n• customer@arh.demo (OTP 1111)\n• merchant@arh.demo (OTP 2222)"
-      );
-    }
+  const gotoOtp = () => {
+    const target = method === METHOD.EMAIL ? email : phone;
+    if (!target) return;
+    navigation.navigate("OtpVerification", {
+      channel: method,
+      target,
+      mode: "signup_customer", // IMPORTANT: OTP will route to success (not Tabs)
+    });
   };
 
-  const goRegisterCustomer = () => navigation.navigate("SignUpCustomer"); // choose role there later
-  const goRegisterMerchant = () =>
-    navigation.navigate("SignUpMerchant", { presetRole: "merchant" });
-
   return (
-    <SafeAreaView style={styles.safeArea}>
-      {/* Gradient title per Figma */}
-      <AuthHeader
-        title={"Sign in to your\nAccount"}
-        onBack={() => navigation.goBack()}
-      />
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
+      <AuthHeader title="Register" onBack={() => navigation.goBack()} />
 
       <View style={styles.container}>
-        {/* Toggle: Email / Phone */}
+        <Text style={styles.sectionTitle}>Create your account</Text>
+
+        {/* Toggle (Email / Phone) */}
         <View style={styles.methodRow}>
-          <SegmentChip
-            active={method === METHOD.EMAIL}
+          <Chip
             label="Email"
+            active={method === METHOD.EMAIL}
             onPress={() => setMethod(METHOD.EMAIL)}
           />
           <View style={{ width: 10 }} />
-          <SegmentChip
-            active={method === METHOD.PHONE}
+          <Chip
             label="Phone"
+            active={method === METHOD.PHONE}
             onPress={() => setMethod(METHOD.PHONE)}
           />
         </View>
 
-        {/* INPUTS */}
         {method === METHOD.EMAIL ? (
           <InputField
             value={email}
             onChangeText={setEmail}
-            placeholder="Email Address"
+            placeholder="Enter Your Email Address"
             keyboardType="email-address"
             rightIcon={
               <Ionicons name="mail-outline" size={18} color="#A9A9A9" />
             }
           />
         ) : (
-          <PhoneField
-            value={phone}
-            onChangeText={setPhone}
-            country={country}
-            onOpenPicker={() => setCountryOpen(true)}
-          />
+          <View style={styles.phoneWrap}>
+            <View style={styles.phoneInputCell}>
+              <TextInput
+                value={phone}
+                onChangeText={setPhone}
+                placeholder="Enter Your Phone Number"
+                placeholderTextColor="#B8B8B8"
+                keyboardType="phone-pad"
+                style={styles.phoneInput}
+              />
+            </View>
+            <TouchableOpacity
+              style={styles.phoneCountryCell}
+              onPress={() => setCountryOpen(true)}
+              activeOpacity={0.85}
+            >
+              <Text style={{ fontSize: 16, marginRight: 6 }}>
+                {codeToFlag(country?.code || "AF")}
+              </Text>
+              <Text style={styles.phoneCountryCode}>
+                {(country?.code || "AFG").toUpperCase()}
+              </Text>
+              <Ionicons
+                name="chevron-down"
+                size={16}
+                color="#7A7A7A"
+                style={{ marginLeft: 6 }}
+              />
+            </TouchableOpacity>
+          </View>
         )}
 
-        {/* Inline link (fix copy): “Create a customer account →” */}
-        <TouchableOpacity
-          onPress={goRegisterCustomer}
-          style={{ paddingVertical: 8 }}
-        >
-          <Text style={styles.inlineLink}>
-            Create an account if you don't have one →
-          </Text>
-        </TouchableOpacity>
-
-        {/* Primary */}
         <PrimaryButton
-          label="Login"
-          onPress={sendOtp}
-          style={{ marginTop: 30, marginBottom: 14 }}
+          label="Continue"
+          onPress={gotoOtp}
+          style={{ marginTop: 20 }}
         />
-
-        {/* Merchant CTA (outline) */}
-        <OutlineButton
-          label="Register As a Merchant"
-          onPress={goRegisterMerchant}
-        />
-
-        {/* Divider */}
-        <View style={styles.dividerRow}>
-          <View style={styles.divider} />
-          <Text style={styles.dividerText}>Or Continue with</Text>
-          <View style={styles.divider} />
-        </View>
-
-        {/* Socials */}
-        <View style={styles.socialRow}>
-          <SocialButton
-            label="Google"
-            icon={<Ionicons name="logo-google" size={20} color="#4285F4" />}
-            onPress={() => {}}
-          />
-          <View style={{ width: 16 }} />
-          <SocialButton
-            label="Facebook"
-            icon={<Ionicons name="logo-facebook" size={22} color="#1877F2" />}
-            onPress={() => {}}
-          />
-        </View>
       </View>
 
-      {/* Country picker (simple modal list; UI-only) */}
+      {/* Country modal */}
       <Modal
         visible={countryOpen}
         transparent
@@ -210,8 +169,7 @@ export default function LoginScreen({ navigation }) {
   );
 }
 
-/** Small, crisp segment chip */
-function SegmentChip({ active, label, onPress }) {
+function Chip({ label, active, onPress }) {
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -225,52 +183,20 @@ function SegmentChip({ active, label, onPress }) {
   );
 }
 
-/** Phone field to mirror your Figma (split input + AFG picker cell) */
-function PhoneField({ value, onChangeText, country, onOpenPicker }) {
-  return (
-    <View style={styles.phoneWrap}>
-      <View style={styles.phoneInputCell}>
-        <TextInput
-          value={value}
-          onChangeText={onChangeText}
-          placeholder="Phone Number"
-          placeholderTextColor="#B8B8B8"
-          keyboardType="phone-pad"
-          style={styles.phoneInput}
-        />
-      </View>
-      <TouchableOpacity
-        style={styles.phoneCountryCell}
-        activeOpacity={0.85}
-        onPress={onOpenPicker}
-      >
-        <Text style={{ fontSize: 16, marginRight: 6 }}>
-          {codeToFlag(country?.code || "AF")}
-        </Text>
-        <Text style={styles.phoneCountryCode}>
-          {(country?.code || "AFG").toUpperCase()}
-        </Text>
-        <Ionicons
-          name="chevron-down"
-          size={16}
-          color="#7A7A7A"
-          style={{ marginLeft: 6 }}
-        />
-      </TouchableOpacity>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.white },
   container: {
     flex: 1,
     paddingHorizontal: 24,
     paddingTop: 18,
     backgroundColor: Colors.white,
   },
-
-  methodRow: { flexDirection: "row", marginBottom: 30 },
+  sectionTitle: {
+    fontSize: 14,
+    color: Colors.textPrimary,
+    marginBottom: 10,
+    fontWeight: "600",
+  },
+  methodRow: { flexDirection: "row", marginBottom: 14 },
 
   chip: {
     paddingHorizontal: 14,
@@ -288,23 +214,6 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 13, color: Colors.textSecondary, fontWeight: "600" },
   chipTextActive: { color: Colors.primary },
 
-  inlineLink: { fontSize: 13, color: "#E59A12", fontWeight: "600" },
-
-  dividerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 30,
-    marginBottom: 30,
-  },
-  divider: { flex: 1, height: 1, backgroundColor: Colors.divider },
-  dividerText: { marginHorizontal: 12, color: "#9E9E9E", fontSize: 13 },
-  socialRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    marginBottom: 24,
-  },
-
-  // Phone field
   phoneWrap: {
     flexDirection: "row",
     height: 48,
@@ -313,7 +222,6 @@ const styles = StyleSheet.create({
     borderColor: "#E6E6E6",
     overflow: "hidden",
     backgroundColor: "#fff",
-    marginBottom: 8,
   },
   phoneInputCell: { flex: 1, justifyContent: "center", paddingHorizontal: 14 },
   phoneInput: { fontSize: 14, color: Colors.textPrimary },
@@ -332,7 +240,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  // Country picker modal
   modalBackdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.25)",
@@ -344,9 +251,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 14,
     maxHeight: "70%",
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
     elevation: 4,
   },
   modalHeader: {

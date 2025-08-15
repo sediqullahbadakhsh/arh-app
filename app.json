@@ -13,7 +13,11 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Allow ARH to use your camera to capture verification photos.",
+        "NSPhotoLibraryAddUsageDescription": "Allow ARH to save photos for your application."
+      }
     },
     "android": {
       "adaptiveIcon": {
