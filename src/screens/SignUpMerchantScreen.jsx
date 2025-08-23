@@ -21,6 +21,7 @@ import InputField from "../components/InputField";
 import PrimaryButton from "../components/PrimaryButton";
 import { COUNTRIES } from "../constants/countries";
 import { codeToFlag } from "../utils/flag";
+import { merchantSignup } from "../services/merchantApi";
 
 const PROVINCES = ["Kabul", "Herat", "Kandahar", "Nangarhar"];
 const DISTRICTS = ["District 1", "District 2", "District 3"];
@@ -57,16 +58,38 @@ export default function SignUpMerchantScreen({ navigation }) {
   const next = () => setStep((s) => Math.min(2, s + 1));
   const back = () => setStep((s) => Math.max(0, s - 1));
 
-  const submit = () => {
-    navigation.replace("SignupResult", {
-      type: "merchant",
-      title: "Transfer To Primary Wallet",
-      message:
-        "Your application document has been successfully submitted we’ll notify you on your email.",
-      cta: "Go Back",
-    });
+  const submit = async () => {
+    try {
+      const payload = {
+        username: email?.split("@")[0] || "merchant",
+        email,
+        mobileNumber: phone.replace(/[^\d]/g, ""),
+        user_type: "merchant",
+        status: "active",
+        profile_picture: null, // fill with base64 if you want
+        country: "4",
+        province: "4",
+        district: "2",
+        address,
+        alternativeContact: null,
+        messageLanguage: "english",
+        accountType: "merchant",
+        registrationType: "direct",
+        businessType: "1",
+        parentAgentId: null,
+      };
+      await merchantSignup(payload);
+      navigation.replace("SignupResult", {
+        type: "merchant",
+        title: "Application Submitted",
+        message:
+          "Your application has been submitted. We’ll email you updates.",
+        cta: "Go Back",
+      });
+    } catch (e) {
+      alert(e.message);
+    }
   };
-
   // ---- Camera / File pickers ----
   const takePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();

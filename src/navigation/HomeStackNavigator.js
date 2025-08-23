@@ -7,47 +7,29 @@ import TodoScreen from "../screens/TodoScreen";
 import NotificationsScreen from "../screens/NotificationsScreen";
 import { SERVICES } from "../constants/services";
 import ProductSelectScreen from "../screens/topup/ProductSelectScreen";
-import TopupFormScreen from "../screens/topup/TopupFormScreen";
-import PaymentMethodScreen from "../screens/topup/PaymentMethodScreen";
-import TopupResultScreen from "../screens/topup/TopupResultScreen";
-import ContactPickerScreen from "../screens/ContactPickerScreen";
-import DataCountryScreen from "../screens/databundle/DataCountryScreen";
-import DataProductScreen from "../screens/databundle/DataProductScreen";
-import DataPhoneScreen from "../screens/databundle/DataPhoneScreen";
 import { useAuth } from "../auth/AuthProvider";
+import GameCoinsScreen from "../screens/GameCoinsScreen";
+import TopupFlowScreen from "../screens/TopupFlowScreen";
+import DataFlowScreen from "../screens/DataFlowScreen";
+import StockTransferScreen from "../screens/StockTransferScreen";
 
 const Stack = createNativeStackNavigator();
 
 export default function HomeStackNavigator() {
   const { user } = useAuth();
   const HomeEntry =
-    user?.role === "merchant" ? HomeMerchantScreen : HomeConsumerScreen;
+    user?.role === "b2b" ? HomeMerchantScreen : HomeConsumerScreen;
 
+  console.log(user, "userser");
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="HomeMain" component={HomeEntry} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
       <Stack.Screen name="TopupProducts" component={ProductSelectScreen} />
-      <Stack.Screen name="TopupForm" component={TopupFormScreen} />
-      <Stack.Screen name="TopupPayment" component={PaymentMethodScreen} />
-      <Stack.Screen name="TopupResult" component={TopupResultScreen} />
-      <Stack.Screen name="ContactPicker" component={ContactPickerScreen} />
-      <Stack.Screen name="DataCountry" component={DataCountryScreen} />
-      <Stack.Screen name="DataProducts" component={DataProductScreen} />
-      <Stack.Screen name="DataPhone" component={DataPhoneScreen} />
-      <Stack.Screen
-        name="DataPayment"
-        component={PaymentMethodScreen}
-        initialParams={{
-          titleOverride: "Internet",
-          resultRouteName: "DataResult",
-        }}
-      />
-      <Stack.Screen
-        name="DataResult"
-        component={TopupResultScreen}
-        initialParams={{ titleOverride: "Internet" }}
-      />
+      <Stack.Screen name="Data" component={DataFlowScreen} />
+      <Stack.Screen name="GameCoins" component={GameCoinsScreen} />
+      <Stack.Screen name="Topup" component={TopupFlowScreen} />
+      <Stack.Screen name="StockTransfer" component={StockTransferScreen} />
       {SERVICES.filter(
         (s) => !["MobileTopup", "DataBundle"].includes(s.key)
       ).map((s) => (
