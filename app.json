@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "arh-app",
-    "slug": "arh-app",
+    "name": "arh",
+    "slug": "arh",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -20,6 +20,8 @@
       }
     },
     "android": {
+      "package": "com.sediqullah.badakhsh.arh",
+      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -28,6 +30,11 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "d8a0d4bc-904f-45cc-820b-797026150d81"
+      }
     }
   }
 }

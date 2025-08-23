@@ -6,15 +6,15 @@ import HomeStackNavigator from "./HomeStackNavigator";
 import TransactionsScreen from "../screens/TransactionsScreen";
 import ContactsScreen from "../screens/ContactsScreen";
 import ProfileScreen from "../screens/ProfileScreen";
-import TopupTabScreen from "../screens/TopupTabScreen";
-import WalletScreen from "../screens/WalletScreen";
-import AgentScreen from "../screens/AgentScreen";
-import ReportScreen from "../screens/ReportScreen";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../theme/colors";
 import { useAccess } from "../acl/AccessProvider";
 import { useAuth } from "../auth/AuthProvider";
 import { ACTIONS, SCREENS } from "../acl/permissions";
+import TopupFlowScreen from "../screens/TopupFlowScreen";
+import WalletStackNavigator from "./WalletStackNavigator";
+import ReportStackNavigator from "./ReportStackNavigator";
+import AgentStackNavigator from "./AgentStackNavigator";
 
 const Tab = createBottomTabNavigator();
 
@@ -50,7 +50,7 @@ export default function TabNavigator() {
       name: "TopupTab",
       label: "Top-up",
       icon: "flash",
-      component: TopupTabScreen,
+      component: TopupFlowScreen,
       show: true,
     }, // placeholder
     {
@@ -81,21 +81,21 @@ export default function TabNavigator() {
       name: "Wallet",
       label: "Wallet",
       icon: "wallet",
-      component: WalletScreen,
+      component: WalletStackNavigator,
       show: true,
     },
     {
       name: "Agent",
       label: "Agent",
       icon: "people-circle",
-      component: AgentScreen,
+      component: AgentStackNavigator,
       show: true,
     },
     {
       name: "Report",
       label: "Report",
       icon: "stats-chart",
-      component: ReportScreen,
+      component: ReportStackNavigator,
       show: true,
     },
     {
@@ -107,7 +107,7 @@ export default function TabNavigator() {
     },
   ];
 
-  const tabs = (role === "b2b" ? TABS_B2B : TABS_B2C).filter((t) => t.show);
+  const tabs = role === "b2b" ? TABS_B2B : TABS_B2C;
 
   if (tabs.length === 0) return null;
 
