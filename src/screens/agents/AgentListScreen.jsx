@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   SafeAreaView,
   View,
@@ -12,12 +12,26 @@ import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../theme/colors";
 import { DUMMY_AGENTS } from "../../constants/agents";
 import ServiceHeader from "../../components/ServiceHeader";
+import { useUser } from "../../context/userContext";
+import { getChildUsers } from "../../services/merchantApi";
 
 const FILTERS = ["All", "Active", "Inactive"];
 
 export default function AgentListScreen({ navigation }) {
+  const {user} = useUser()
   const [filter, setFilter] = useState("All");
   const [q, setQ] = useState("");
+  const [childUser, setChildUsers] = useState([])
+
+  useEffect(()=>{
+const getDownlineAgents = async()=>{
+  const res = await getChildUsers(user?.id)
+  setChildUsers(res?.data)
+  console.log("💖💖💖",res?.data[0]?.user )
+}
+
+getDownlineAgents()
+  },[])
 
   const data = useMemo(() => {
     const base =
@@ -39,13 +53,13 @@ export default function AgentListScreen({ navigation }) {
     return (
       <View style={styles.card}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.name}>{name}</Text>
-          <Text style={styles.meta}>{item.location}</Text>
+          <Text style={styles.name}>{item?.user?.username}</Text>
+          <Text style={styles.meta}>{item?.address}</Text>
           <View
             style={{ flexDirection: "row", alignItems: "center", marginTop: 6 }}
           >
-            <StatusPill status={item.status} />
-            <Text style={styles.code}>{item.code}</Text>
+            <StatusPill status={item?.user?.status} />
+            <Text style={styles.code}>{item?.user?.email}</Text>
           </View>
         </View>
         <TouchableOpacity
@@ -105,7 +119,7 @@ export default function AgentListScreen({ navigation }) {
         </View>
 
         <FlatList
-          data={data}
+          data={childUser}
           keyExtractor={(it) => it.id}
           renderItem={renderItem}
           ItemSeparatorComponent={() => <View style={{ height: 10 }} />}

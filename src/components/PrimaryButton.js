@@ -20,6 +20,7 @@ const styles = StyleSheet.create({
     label: {
         color: Colors.white,
         fontSize: 16,
-        fontWeight: '600',
+      
+        fontFamily: "dmsansRegular"
     },
 });

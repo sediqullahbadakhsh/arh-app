@@ -13,11 +13,13 @@ import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { Colors } from "../theme/colors";
 import * as ImagePicker from "expo-image-picker";
 import { useAuth } from "../auth/AuthProvider";
+import { useUser } from "../context/userContext";
 
 export default function ProfileScreen({ navigation }) {
+  const {user} = useUser()
   const [avatar, setAvatar] = useState(null);
   const { logout } = useAuth();
-  const userName = "Test User";
+  const userName = user?.username;
 
   const handleEditAvatar = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();

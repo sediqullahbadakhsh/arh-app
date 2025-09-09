@@ -1,17 +1,28 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { SafeAreaView, View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
 import { Colors } from '../../theme/colors';
 import ServiceHeader from '../../components/ServiceHeader';
 import { COUNTRIES } from '../../constants/dataBundles';
 import { codeToFlag } from '../../utils/flag';
+import { getCountries } from '../../services/merchantApi';
 
 export default function DataCountryScreen({ navigation }) {
+    const [countries, setCountries]  = useState([])
     const goNext = (country) => navigation.navigate('DataProducts', { country });
+
+    useEffect(()=>{
+        const getAllCountries = async()=>{
+            const res = await getCountries()
+            setCountries(res?.data)
+        }
+
+        getAllCountries()
+    },[])
 
     const renderItem = ({ item }) => (
         <TouchableOpacity style={styles.row} onPress={() => goNext(item)}>
-            <Text style={styles.flag}>{codeToFlag(item.code)}</Text>
-            <Text style={styles.name}>{item.name}</Text>
+            <Text style={styles.flag}>{codeToFlag(item.countryCode)}</Text>
+            <Text style={styles.name}>{item.countryName}</Text>
         </TouchableOpacity>
     );
 
@@ -21,8 +32,8 @@ export default function DataCountryScreen({ navigation }) {
             <View style={styles.container}>
                 <Text style={styles.label}>Select Country</Text>
                 <FlatList
-                    data={COUNTRIES}
-                    keyExtractor={(item) => item.code}
+                    data={countries}
+                    keyExtractor={(item) => item.countryCode}
                     renderItem={renderItem}
                     ItemSeparatorComponent={() => <View style={styles.separator} />}
                     showsVerticalScrollIndicator={false}

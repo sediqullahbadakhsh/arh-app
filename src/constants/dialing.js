@@ -35,11 +35,11 @@ export function guessOperator(cc, digits = "") {
     const p2 = v.slice(0, 2);
     // Demo mapping — adjust to your real tables when ready
     if (["70", "71"].includes(p2)) return { name: "AWCC", color: "#D32F2F" };
-    if (["72", "73"].includes(p2))
+    if (["78", "73"].includes(p2))
       return { name: "Etisalat", color: "#2E7D32" };
-    if (["74", "75"].includes(p2)) return { name: "MTN", color: "#F7A600" };
-    if (["76", "77"].includes(p2)) return { name: "Roshan", color: "#C2185B" };
-    if (["78", "79"].includes(p2)) return { name: "Salaam", color: "#1565C0" };
+    if (["77", "76"].includes(p2)) return { name: "MTN", color: "#F7A600" };
+    if (["79", "72"].includes(p2)) return { name: "Roshan", color: "#C2185B" };
+    if (["74"].includes(p2)) return { name: "Salaam", color: "#1565C0" };
   }
   return null;
 }

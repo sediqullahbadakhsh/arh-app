@@ -9,7 +9,7 @@ export default function ServiceHeader({ title, onBack }) {
     return (
         <View>
             <LinearGradient
-                colors={['#D70000', '#E52421', '#F0533F']}
+                colors={["#9F0901", "#E20E02"]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={[styles.gradient, { paddingTop: insets.top + 16 }]}
@@ -18,6 +18,13 @@ export default function ServiceHeader({ title, onBack }) {
                     <Ionicons name="arrow-back" size={24} color="#fff" />
                 </TouchableOpacity>
                 <Text style={styles.title}>{title}</Text>
+                 <View style={{position: "absolute",  top:15, right: -186, backgroundColor: "#FFFFFF0A", height: 80, width: "100%",transform: [{ rotate: "130deg" }], // Rotate 45 degrees
+                            justifyContent: "center",
+                            alignItems: "center",}}></View>
+                            
+                                  <View style={{position: "absolute",  top:15, right: -300, backgroundColor: "#FFFFFF14", height: 120, width: "100%",transform: [{ rotate: "130deg" }], // Rotate 45 degrees
+                            justifyContent: "center",
+                            alignItems: "center",}}></View>
             </LinearGradient>
             <View style={styles.roundedTop} />
         </View>

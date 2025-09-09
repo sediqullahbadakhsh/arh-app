@@ -1,5 +1,5 @@
 export const REPORT_TYPES = {
-  TOPUP: "topup",
+  STATEMENT: "Statement",
   DATA: "data",
   STOCK_TRANSFER: "stock_transfer",
   STOCK_REVERSE: "stock_reverse",

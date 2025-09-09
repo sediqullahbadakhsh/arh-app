@@ -1,5 +1,5 @@
 // src/screens/WalletScreen.jsx
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   SafeAreaView,
   View,
@@ -15,6 +15,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../theme/colors";
 import DotIndicators from "../components/DotIndicators";
 import ServiceHeader from "../components/ServiceHeader";
+import { getStockInOut, getUserWallets } from "../services/merchantApi";
+import { useUser } from "../context/userContext";
+import { formatDateTime } from "../utils/formatDate";
 
 const { width } = Dimensions.get("window");
 
@@ -56,7 +59,11 @@ const TX = [
 
 export default function WalletScreen({ navigation }) {
   const [index, setIndex] = useState(0);
+
+  const {user, setUser} = useUser()
   const flatRef = useRef(null);
+  const [wallets, setWallets] = useState([])
+  const [tx, setTx] = useState([])
 
   const onViewableItemsChanged = useRef(({ viewableItems }) => {
     if (viewableItems?.length) setIndex(viewableItems[0].index);
@@ -68,6 +75,46 @@ export default function WalletScreen({ navigation }) {
     () => WALLETS[index]?.key === "commission",
     [index]
   );
+
+    useEffect(()=>{
+
+    console.log("💖💖💖💖 before: ")
+    const getStock = async()=>{
+       const stockRes = await getStockInOut()
+       console.log("💖💖💖💖: ", stockRes)
+    }
+
+    getStock()
+  },[])
+
+  useEffect(()=>{
+    const getWalletsInfo = async()=>{
+      const res = await getUserWallets(user?.id)
+      const commissionWallet = {...res?.comissionWallet,key: "commission", label: "Commission Wallet",}
+      const primaryWallet = {...res?.primaryWallet,key: "primary", label: "Primary Wallet" }
+      const data = [primaryWallet,commissionWallet]
+
+      
+    
+
+setWallets(data)
+    }
+
+
+    getWalletsInfo()
+  },[])
+
+  useEffect(()=>{
+
+    console.log("💖💖💖💖 before: ")
+    const getStock = async()=>{
+       const stockRes = await getStockInOut()
+       setTx(stockRes?.data)
+       console.log("💖💖💖💖: ", "later")
+    }
+
+    getStock()
+  },[])
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
@@ -97,7 +144,7 @@ export default function WalletScreen({ navigation }) {
       <View style={{ marginTop: 10 }}>
         <FlatList
           ref={flatRef}
-          data={WALLETS}
+          data={wallets}
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
@@ -162,7 +209,7 @@ export default function WalletScreen({ navigation }) {
       {/* Recent transactions */}
       <View style={styles.recentContainer}>
         <Text style={styles.recentTitle}>Recent Transactions</Text>
-        {TX.map((t) => (
+        {tx.map((t) => (
           <View key={t.id} style={styles.txRow}>
             <View style={styles.txLeft}>
               <View style={styles.txIconWrap}>
@@ -173,19 +220,19 @@ export default function WalletScreen({ navigation }) {
                 />
               </View>
               <View>
-                <Text style={styles.txTitle}>{t.title}</Text>
+                <Text style={styles.txTitle}>From {t.from_wallet_id}</Text>
                 <Text style={styles.txSub}>
-                  {t.date} • {t.wallet}
+                  {formatDateTime(t.createdAt)} • {t.to_wallet_id || "Activate Bundle"}
                 </Text>
               </View>
             </View>
             <Text
               style={[
                 styles.txAmount,
-                { color: t.amount >= 0 ? "#0BA360" : Colors.primary },
+                { color: t.type == "IN" ? "#0BA360" : Colors.primary },
               ]}
             >
-              {t.amount >= 0 ? "+" : ""}
+              {t.type == "OUT" ? "-" : "+"}
               {formatAF(Math.abs(t.amount))} AF
             </Text>
           </View>

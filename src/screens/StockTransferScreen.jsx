@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   SafeAreaView,
   View,
@@ -11,6 +11,7 @@ import {
   ScrollView,
   Platform,
   KeyboardAvoidingView,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../theme/colors";
@@ -18,17 +19,34 @@ import ServiceHeader from "../components/ServiceHeader";
 import PrimaryButton from "../components/PrimaryButton";
 import DotIndicators from "../components/DotIndicators";
 import { AGENTS } from "../constants/agents";
+import { getAgentDownlineAgents, transferStockToDownlineAgent } from "../services/merchantApi";
+import { useUser } from "../context/userContext";
 
 const STEPS = { FORM: 0, CONFIRM: 1, DONE: 2 };
 
 export default function StockTransferScreen({ navigation }) {
   const [step, setStep] = useState(STEPS.FORM);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const { user, setUser } = useUser();
 
   // form state
-  const [agent, setAgent] = useState();
+  const [agent, setAgent] = useState(null);
+  const [agents, setAgents] = useState([]);
   const [amountText, setAmountText] = useState(""); // AFN (no suffix)
-  const [rateText, setRateText] = useState("1"); // percent
+  const [rateText, setRateText] = useState(""); // percent
+
+useEffect(()=>{
+  const getAgentChildUsers = async()=>{
+    const res = await getAgentDownlineAgents(user?.id)
+    // const res = JSON.parse(ress)
+    console.log("this is downline agents ✌✌🤦‍♂️🤦‍♂️✌:", res?.data)
+    setAgents(res?.data)
+  }
+
+  getAgentChildUsers()
+},[])
+
+
 
   // parsed & computed
   const amount = useMemo(
@@ -51,6 +69,32 @@ export default function StockTransferScreen({ navigation }) {
     else if (step === STEPS.CONFIRM) setStep(STEPS.DONE);
   };
 
+  const transferStock = async()=>{
+   try {
+     const payload = {
+      agentId: agent?.user?.id,
+      amount: Number(amountText),
+      total_amount: total
+    }
+console.log("this is transfer stock payload: ", payload)
+    const res = await transferStockToDownlineAgent(payload)
+    console.log("this is transfer stock response: ", res)
+    goNext()
+    
+   } catch (error) {
+    console.log("this is transfer stock error: ", error)
+    const message =
+    error.response?.data?.error || // server error message
+    error.message ||               // network error
+    "Failed to Transfer Stock";
+
+  console.log("this is transfer stock error:", message);
+  Alert.alert("OTP", message);
+
+    
+   }
+  }
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
       <ServiceHeader title="Stock Transfer" onBack={goBack} />
@@ -68,9 +112,9 @@ export default function StockTransferScreen({ navigation }) {
           </View>
           <Text style={styles.title}>Stock Transfer Successful!</Text>
 
-          <Row k="Agent" v={`${agent.name} (${agent.phone})`} />
-          <Row k="Transaction ID" v={txId} />
-          <Row k="Date" v={new Date().toLocaleString()} />
+          <Row k="Agent: " v={`${agent?.user?.username} (${agent?.user?.mobileNumber})`} />
+          <Row k="Transaction ID: " v={txId} />
+          <Row k="Date: " v={new Date().toLocaleString()} />
 
           <View style={styles.totalBox}>
             <Text style={styles.totalLabel}>Total Amount</Text>
@@ -102,7 +146,7 @@ export default function StockTransferScreen({ navigation }) {
                   onPress={() => setPickerOpen(true)}
                 >
                   <Text style={styles.dropdownText}>
-                    {agent ? `${agent.name} (${agent.phone})` : "Choose agent"}
+                    {agent ? `${agent?.user?.username} (${agent?.user?.mobileNumber})` : "Choose agent"}
                   </Text>
                   <Ionicons name="chevron-down" size={18} color="#000" />
                 </TouchableOpacity>
@@ -119,17 +163,19 @@ export default function StockTransferScreen({ navigation }) {
 
                 <Text style={styles.label}>Commission Rate</Text>
                 <TextInput
-                  value={rateText}
-                  onChangeText={(t) => setRateText(sanitizeNumeric(t))}
+                  // value={  agent?.commission_rate ? rateText  :agent?.commission_rate ?    "Commission Rate is not set for the user" : ""}
+                  value={  String(rateText)}
+                  // onChangeText={(t) => setRateText(sanitizeNumeric(t))}
                   keyboardType="numeric"
-                  placeholder="3"
+                  placeholder="Commission Percentage"
                   placeholderTextColor="#9E9E9E"
                   style={styles.input}
+                  // editable={false}
                 />
 
                 <Text style={styles.label}>Total Amount</Text>
                 <View style={[styles.input, styles.inputDisabled]}>
-                  <Text style={{ color: Colors.textPrimary }}>
+                  <Text style={{ color: Colors.textPrimary, display:"flex", justifyContent:"center" }}>
                     {fmtAFN(total)}
                   </Text>
                 </View>
@@ -153,15 +199,15 @@ export default function StockTransferScreen({ navigation }) {
                   Are you sure you want to confirm this transfer?
                 </Text>
                 <View style={styles.card}>
-                  <Row k="Agent" v={`${agent.name} (${agent.phone})`} />
+                  <Row k="Agent" v={`${agent?.user?.username} (${agent?.user?.mobileNumber})`} />
                   <Row k="Amount" v={fmtAFN(amount)} />
-                  <Row k="Commission Rate" v={`${stripTrailingZeros(rate)}%`} />
+                  <Row k="Commission Rate" v={`${stripTrailingZeros(agent?.commission_rate || 0)}%`} />
                   <Row k="Total Amount" v={fmtAFN(total)} boldTop />
                 </View>
 
                 <PrimaryButton
                   label="Confirm"
-                  onPress={goNext}
+                  onPress={transferStock}
                   style={{ marginTop: 24 }}
                 />
                 <PrimaryButton
@@ -195,7 +241,7 @@ export default function StockTransferScreen({ navigation }) {
             </View>
 
             <FlatList
-              data={AGENTS}
+              data={agents}
               keyExtractor={(it) => it.id}
               ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
               renderItem={({ item }) => (
@@ -203,6 +249,7 @@ export default function StockTransferScreen({ navigation }) {
                   style={styles.modalRow}
                   onPress={() => {
                     setAgent(item);
+                    setRateText(item?.commission_rate)
                     setPickerOpen(false);
                   }}
                   activeOpacity={0.85}
@@ -214,7 +261,7 @@ export default function StockTransferScreen({ navigation }) {
                     style={{ marginRight: 8 }}
                   />
                   <Text style={{ flex: 1, color: Colors.textPrimary }}>
-                    {item.name} ({item.phone})
+                    {item.user?.username} ({item.user?.mobileNumber})
                   </Text>
                   {item.id === agent?.id && (
                     <Ionicons

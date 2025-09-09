@@ -20,8 +20,8 @@ const styles = StyleSheet.create({
         borderColor: Colors.primary,
     },
     label: {
-        color: Colors.primary,
+        color: "#E20E02",
         fontSize: 16,
-        fontWeight: '600',
+        // fontWeight: '600',
     },
 });
