@@ -77,7 +77,9 @@ export default function OtpVerificationScreen({ route, navigation }) {
 
     try {
       if (mode === "login") {
-        await auth.loginOtpVerify({ identifier: target, otp: code });
+       const res =  await auth.loginOtpVerify({ identifier: target, otp: code });
+       console.log("this is customer login response",res)
+
         navigation.replace("Tabs");
       } else if (mode === "signup_customer") {
         await auth.signupCustomerVerifyOtp({ identifier: target, otp: code });

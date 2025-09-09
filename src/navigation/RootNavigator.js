@@ -61,18 +61,25 @@ import ContactPickerScreen from "../screens/ContactPickerScreen";
 import SignUpChooser from "../screens/SignUpChooser";
 import PasswordLoginScreen from "../screens/PasswordLoginScreen";
 import { useAuth } from "../auth/AuthProvider";
+import { useUser } from "../context/userContext";
+import { Text } from "react-native";
 
 const Stack = createNativeStackNavigator();
 
 export default function RootNavigator() {
   const { authed, initializing } = useAuth();
+  const { user, loading } = useUser();
 
   if (initializing) return null;
-
+  if (loading) {
+    return <Text>loading...</Text>; // show loading or splash
+  }
   return (
     <Stack.Navigator
       screenOptions={{ headerShown: false }}
       initialRouteName={authed ? "Tabs" : "Welcome"}
+
+      
     >
       {authed ? (
         <>

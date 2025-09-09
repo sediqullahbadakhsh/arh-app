@@ -13,9 +13,11 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../theme/colors";
 import ServiceButton from "../components/ServiceButton";
+import { useUser } from "../context/userContext";
 
 export default function HomeConsumerScreen({ navigation }) {
-  const userName = "Test User"; // mock
+  const {user} = useUser()
+  const userName = user?.username; // mock
 
   const goToNotifications = () => navigation.navigate("Notifications");
   const goToAllTransactions = () => navigation.navigate("Transactions");

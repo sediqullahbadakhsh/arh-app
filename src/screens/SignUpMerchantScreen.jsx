@@ -1,5 +1,5 @@
 // src/screens/SignUpMerchantScreen.jsx
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   SafeAreaView,
   View,
@@ -21,11 +21,11 @@ import InputField from "../components/InputField";
 import PrimaryButton from "../components/PrimaryButton";
 import { COUNTRIES } from "../constants/countries";
 import { codeToFlag } from "../utils/flag";
-import { merchantSignup } from "../services/merchantApi";
+import { getCountries, getDistricts, getProvinces, merchantSignup } from "../services/merchantApi";
 
 const PROVINCES = ["Kabul", "Herat", "Kandahar", "Nangarhar"];
 const DISTRICTS = ["District 1", "District 2", "District 3"];
-const LANGS = ["English", "Dari", "Pashto"];
+const LANGS = ["english", "dari", "pashto"];
 
 const GAP = 1;
 
@@ -44,11 +44,18 @@ export default function SignUpMerchantScreen({ navigation }) {
     () => COUNTRIES.find((c) => c.code === "AF") || COUNTRIES[0],
     []
   );
+  const [countries, setCountries] = useState([])
+  const [provinces, setProvinces] = useState([])
+  const [districts, setDistricts] = useState([])
   const [country, setCountry] = useState(defaultAf);
   const [province, setProvince] = useState("");
   const [district, setDistrict] = useState("");
+  const [firstName, setFirstName] = useState("")
+  const [lastName, setLastName] = useState("")
   const [address, setAddress] = useState("");
-  const [lang, setLang] = useState("");
+  const [mobileNumber, setMobileNumber] = useState("");
+  const [alternativeContact, setAlternaticeContact] = useState("");
+  const [messageLanguage, setMessageLanguage] = useState("")
   const [picker, setPicker] = useState({ open: false, type: null });
 
   // Step 3 (KYC)
@@ -57,25 +64,58 @@ export default function SignUpMerchantScreen({ navigation }) {
 
   const next = () => setStep((s) => Math.min(2, s + 1));
   const back = () => setStep((s) => Math.max(0, s - 1));
+console.log("👀 AgentCreateScreen rendered!");
+  useEffect(()=>{
+    const getAllCountries = async()=>{
+      const res = await getCountries()
+      setCountries(res?.data)
+      console.log(res, "✔✔✔")
+    }
+
+    getAllCountries()
+  },[])
+  useEffect(()=>{
+    if(country?.id){
+ const getAllProvinces = async()=>{
+      const res = await getProvinces(country?.id)
+      setProvinces(res?.data)
+      console.log(res, "✔✔✔")
+    }
+
+    getAllProvinces()
+    }
+   
+  },[country?.id])
+  useEffect(()=>{
+    if(province?.id){
+ const getAllDistricts = async()=>{
+      const res = await getDistricts(province?.id)
+      setDistricts(res?.data)
+      console.log(res, "✔✔✔")
+    }
+
+    getAllDistricts()
+    }
+   
+  },[province?.id])
 
   const submit = async () => {
     try {
       const payload = {
-        username: email?.split("@")[0] || "merchant",
+        username: `${firstName} ${lastName}`,
         email,
-        mobileNumber: phone.replace(/[^\d]/g, ""),
-        user_type: "merchant",
+        mobileNumber: mobileNumber,
+        user_type: "agent",
         status: "active",
         profile_picture: null, // fill with base64 if you want
-        country: "4",
-        province: "4",
-        district: "2",
+        country: country?.id,
+        province: province?.id,
+        district: district?.id,
         address,
-        alternativeContact: null,
-        messageLanguage: "english",
+        alternativeContact,
+        messageLanguage,
         accountType: "merchant",
         registrationType: "direct",
-        businessType: "1",
         parentAgentId: null,
       };
       await merchantSignup(payload);
@@ -148,34 +188,37 @@ export default function SignUpMerchantScreen({ navigation }) {
 
             <LabeledInput
               label="First Name"
-              value={first}
-              onChangeText={setFirst}
+              value={firstName}
+              onChangeText={setFirstName}
               placeholder="Enter First Name"
             />
             <LabeledInput
               label="Last Name"
-              value={last}
-              onChangeText={setLast}
+              value={lastName}
+              onChangeText={setLastName}
               placeholder="Enter Last Name"
             />
-            <LabeledInput
-              label="Father Name"
-              value={father}
-              onChangeText={setFather}
-              placeholder="Enter Father Name"
-            />
-            <LabeledInput
+
+             <LabeledInput
               label="Email"
               value={email}
               onChangeText={setEmail}
               placeholder="Enter Your Email Address"
               keyboardType="email-address"
             />
+
             <LabeledInput
-              label="Phone Number"
-              value={phone}
-              onChangeText={setPhone}
-              placeholder="Enter Your Phone Number"
+              label="Mobile Number"
+              value={mobileNumber}
+              onChangeText={setMobileNumber}
+              placeholder="Enter Mobile Number"
+            />
+           
+            <LabeledInput
+              label="Alternative Contact"
+              value={alternativeContact}
+              onChangeText={setAlternaticeContact}
+              placeholder="Enter Alternative Contact"
               keyboardType="phone-pad"
             />
 
@@ -194,22 +237,22 @@ export default function SignUpMerchantScreen({ navigation }) {
 
             <DropField
               label="Country"
-              value={country?.name || "Select Country"}
+              value={country?.countryName || "Select Country"}
               onPress={() => setPicker({ open: true, type: "country" })}
               leftIcon={
                 <Text style={{ fontSize: 18 }}>
-                  {codeToFlag(country?.code || "AF")}
+                  {codeToFlag(country?.countryCode)}
                 </Text>
               }
             />
             <DropField
               label="Province"
-              value={province || "Select Province"}
+              value={province?.provinceName || "Select Province"}
               onPress={() => setPicker({ open: true, type: "province" })}
             />
             <DropField
               label="District"
-              value={district || "Select District"}
+              value={district?.districtName || "Select District"}
               onPress={() => setPicker({ open: true, type: "district" })}
             />
             <LabeledInput
@@ -219,8 +262,8 @@ export default function SignUpMerchantScreen({ navigation }) {
               placeholder="Enter Full Address"
             />
             <DropField
-              label="Select Language"
-              value={lang || "Select Language"}
+              label="Select Message Language"
+              value={messageLanguage || "Select Language"}
               onPress={() => setPicker({ open: true, type: "lang" })}
             />
 
@@ -295,9 +338,11 @@ export default function SignUpMerchantScreen({ navigation }) {
 
       {/* Picker modal */}
       <Modal
-        transparent
+         transparent
         visible={picker.open}
         animationType="fade"
+        statusBarTranslucent
+        presentationStyle="overFullScreen"
         onRequestClose={() => setPicker({ open: false })}
       >
         <View style={styles.modalBackdrop}>
@@ -314,8 +359,8 @@ export default function SignUpMerchantScreen({ navigation }) {
 
             {picker.type === "country" && (
               <FlatList
-                data={COUNTRIES}
-                keyExtractor={(it) => it.code}
+                data={countries}
+                keyExtractor={(it) => it.countryCode}
                 ItemSeparatorComponent={() => <View style={{ height: GAP }} />}
                 renderItem={({ item }) => (
                   <TouchableOpacity
@@ -327,7 +372,7 @@ export default function SignUpMerchantScreen({ navigation }) {
                     activeOpacity={0.85}
                   >
                     <Text style={{ fontSize: 18, marginRight: 8 }}>
-                      {codeToFlag(item.code)}
+                      {codeToFlag(item.countryCode)}
                     </Text>
                     <Text
                       style={{
@@ -336,7 +381,7 @@ export default function SignUpMerchantScreen({ navigation }) {
                         color: Colors.textPrimary,
                       }}
                     >
-                      {item.name}
+                      {item.countryName}
                     </Text>
                     {item.code === country?.code && (
                       <Ionicons
@@ -352,8 +397,8 @@ export default function SignUpMerchantScreen({ navigation }) {
 
             {picker.type === "province" && (
               <FlatList
-                data={PROVINCES}
-                keyExtractor={(it) => it}
+                data={provinces}
+                keyExtractor={(it) => it?.id}
                 ItemSeparatorComponent={() => <View style={{ height: GAP }} />}
                 renderItem={({ item }) => (
                   <TouchableOpacity
@@ -371,7 +416,7 @@ export default function SignUpMerchantScreen({ navigation }) {
                         color: Colors.textPrimary,
                       }}
                     >
-                      {item}
+                      {item?.provinceName}
                     </Text>
                     {item === province && (
                       <Ionicons
@@ -387,8 +432,8 @@ export default function SignUpMerchantScreen({ navigation }) {
 
             {picker.type === "district" && (
               <FlatList
-                data={DISTRICTS}
-                keyExtractor={(it) => it}
+                data={districts}
+                keyExtractor={(it) => it?.id}
                 ItemSeparatorComponent={() => <View style={{ height: GAP }} />}
                 renderItem={({ item }) => (
                   <TouchableOpacity
@@ -406,7 +451,7 @@ export default function SignUpMerchantScreen({ navigation }) {
                         color: Colors.textPrimary,
                       }}
                     >
-                      {item}
+                      {item?.districtName}
                     </Text>
                     {item === district && (
                       <Ionicons
@@ -429,7 +474,7 @@ export default function SignUpMerchantScreen({ navigation }) {
                   <TouchableOpacity
                     style={styles.modalRow}
                     onPress={() => {
-                      setLang(item);
+                      setMessageLanguage(item);
                       setPicker({ open: false });
                     }}
                     activeOpacity={0.85}
@@ -443,7 +488,7 @@ export default function SignUpMerchantScreen({ navigation }) {
                     >
                       {item}
                     </Text>
-                    {item === lang && (
+                    {item === messageLanguage && (
                       <Ionicons
                         name="checkmark-circle"
                         color={Colors.primary}
@@ -556,6 +601,40 @@ const styles = StyleSheet.create({
     gap: GAP,
     backgroundColor: Colors.white,
   },
+    modalRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    borderRadius: 8,
+    backgroundColor: "#fff",
+  },
+    modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.25)",
+    justifyContent: "center",
+    padding: 24,
+  },
+  modalCard: {
+    width: "100%",
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    padding: 14,
+    maxHeight: "70%",
+    // nice shadow
+    elevation: 6,
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  modalTitle: { fontSize: 16, fontWeight: "700", color: Colors.textPrimary },
 
   // Stepper
   stepperWrap: {

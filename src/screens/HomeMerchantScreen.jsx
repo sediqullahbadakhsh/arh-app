@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   SafeAreaView,
   View,
@@ -12,9 +12,29 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../theme/colors";
 import ServiceButton from "../components/ServiceButton";
+import { useUser } from "../context/userContext";
+import { getRecentOrdersOfAgent } from "../services/merchantApi";
+import { formatDateTime } from "../utils/formatDate";
+import { capitalizeFirstLetter } from "../utils/capitalizeFirstLetter";
 
 export default function HomeMerchantScreen({ navigation }) {
   const userName = "Test Merchant"; // dummy
+  const { user, setUser } = useUser();
+  const [recentTransaction, setRecentTransactions] = useState([])
+
+
+
+  useEffect(()=>{
+    const getRecentTransactions = async()=>{
+      const res = await getRecentOrdersOfAgent()
+      console.log(res, "recent Transactions")
+      setRecentTransactions(res?.data || [])
+    }
+
+    getRecentTransactions()
+  },[])
+
+  console.log(user, "this is userInfo from user context")
 
   // keep it to the 4 tiles we want for B2B
   const services = useMemo(
@@ -22,7 +42,7 @@ export default function HomeMerchantScreen({ navigation }) {
       {
         key: "StockTransfer",
         label: "Stock Transfer",
-        icon: "swap-horizontal",
+        icon: "swap-horizontal", 
       },
       {
         key: "MobileTopup",
@@ -94,19 +114,26 @@ export default function HomeMerchantScreen({ navigation }) {
 
       {/* Header */}
       <LinearGradient
-        colors={["#D70000", "#E52421", "#F0533F"]}
+        colors={["#9F0901", "#E20E02"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.header}
       >
         <Text style={styles.greeting}>Hi,</Text>
-        <Text style={styles.userName}>{userName}</Text>
+        <Text style={styles.userName}>{user?.username || "N/A"}</Text>
 
         <View style={styles.headerIcons}>
           <TouchableOpacity onPress={goToNotifications} style={styles.iconBtn}>
             <Ionicons name="notifications-outline" size={22} color="#fff" />
           </TouchableOpacity>
         </View>
+             <View style={{position: "absolute",  top:15, right: -186, backgroundColor: "#FFFFFF0A", height: 80, width: "100%",transform: [{ rotate: "130deg" }], // Rotate 45 degrees
+            justifyContent: "center",
+            alignItems: "center",}}></View>
+            
+                  <View style={{position: "absolute",  top:15, right: -300, backgroundColor: "#FFFFFF14", height: 120, width: "100%",transform: [{ rotate: "130deg" }], // Rotate 45 degrees
+            justifyContent: "center",
+            alignItems: "center",}}></View>
       </LinearGradient>
 
       {/* Content */}
@@ -132,20 +159,20 @@ export default function HomeMerchantScreen({ navigation }) {
             <Text style={styles.recentTitle}>Recent Transactions</Text>
           </View>
 
-          {recentTx.map((tx) => (
+          {recentTransaction.map((tx) => (
             <View key={tx.id} style={styles.txRow}>
               <View style={styles.txLeft}>
                 <View style={styles.txIconWrap}>
-                  <Ionicons name={tx.icon} size={20} color={Colors.primary} />
+                  <Ionicons name={tx.type == "recharge" ? "phone-portrait-outline" : "wifi-outline"} size={20} color={Colors.primary} />
                 </View>
                 <View>
-                  <Text style={styles.txTitle}>{tx.type}</Text>
-                  <Text style={styles.txSub}>{tx.date}</Text>
+                  <Text style={styles.txTitle}>{capitalizeFirstLetter(tx?.type)}</Text>
+                  <Text style={styles.txSub}>{formatDateTime(tx?.createdAt)}</Text>
                 </View>
               </View>
               <View style={styles.txRight}>
-                <Text style={styles.txAmount}>{tx.amount}</Text>
-                <Text style={styles.txPhone}>{tx.phone}</Text>
+                <Text style={styles.txAmount}>{`${Number(tx?.amount).toFixed(2)} ${tx?.currency}`}</Text>
+                <Text style={styles.txPhone}>{`(+93) ${tx?.receiver}`}</Text>
               </View>
             </View>
           ))}

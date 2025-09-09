@@ -5,7 +5,7 @@ export const authStart = (identifier) =>
   api.post("/start", { identifier }).then((r) => r.data);
 
 export const loginWithPassword = ({ identifier, password }) =>
-  api.post("/login/password", { identifier, password }).then((r) => r.data);
+  api.post("/login", { identifier, password }).then((r) => r.data);
 
 export const loginOtpGenerate = (identifier) =>
   api.post("/login/otp/generate", { identifier }).then((r) => r.data);
@@ -18,3 +18,7 @@ export const signupOtpGenerate = ({ email }) =>
 
 export const signupOtpVerify = ({ otp }) =>
   api.post("/customer/verify-otp", { otp }).then((r) => r.data);
+
+
+export const profile = () =>
+  api.get("/profile").then((r) => r.data);

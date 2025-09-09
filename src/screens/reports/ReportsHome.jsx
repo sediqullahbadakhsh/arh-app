@@ -12,12 +12,12 @@ import ServiceHeader from "../../components/ServiceHeader";
 import { REPORT_TYPES, REPORT_META } from "../../constants/reports";
 
 const ORDER = [
-  "TOPUP",
-  "DATA",
-  "STOCK_TRANSFER",
-  "STOCK_REVERSE",
-  "ROLLBACK",
-  "DOWNLINE",
+  "Statement",
+  // "DATA",
+  // "STOCK_TRANSFER",
+  // "STOCK_REVERSE",
+  // "ROLLBACK",
+  // "DOWNLINE",
 ];
 
 export default function ReportsHome({ navigation }) {

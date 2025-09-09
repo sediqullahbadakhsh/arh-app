@@ -7,18 +7,24 @@ export default function AgentViewScreen({ navigation, route }) {
   const { agent } = route.params || {};
   if (!agent) return null;
 
+  console.log("this is agent information: ", agent)
+
   const name = `${agent.firstName} ${agent.lastName}`;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
       <ServiceHeader title="Agent Details" onBack={() => navigation.goBack()} />
       <View style={styles.container}>
-        <Row k="Name" v={name} />
-        <Row k="Agent Code" v={agent.code} />
-        <Row k="Status" v={agent.status === "active" ? "Active" : "Inactive"} />
-        <Row k="Phone" v={agent.phone} />
-        <Row k="Email" v={agent.email} />
-        <Row k="Location" v={agent.location} />
+        <Row k="username" v={agent?.user?.username} />
+        <Row k="Status" v={agent.user?.status === "active" ? "Active" : "Inactive"} />
+        <Row k="Phone" v={agent.user?.mobileNumber} />
+        <Row k="Email" v={agent.user?.email} />
+        <Row k="Alternative Contact" v={agent.alternativeContact} />
+        <Row k="Commission Rate" v={agent.commission_rate == null ? "Not Set Yet" : agent?.commission_rate} />
+        <Row k="Country" v={agent.countryDetails?.countryName?.en} />
+        <Row k="Province" v={agent.provinceDetails?.provinceName?.en} />
+        <Row k="District" v={agent.districtDetails?.districtName?.en} />
+        <Row k="Location" v={agent.address} />
       </View>
     </SafeAreaView>
   );

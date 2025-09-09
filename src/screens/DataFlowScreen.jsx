@@ -25,6 +25,7 @@ import { USD_TO_AFN } from "../constants/rates";
 import { codeToFlag } from "../utils/flag";
 import { DIAL_CODES, guessOperator } from "../constants/dialing";
 import { useAuth } from "../auth/AuthProvider";
+import { getCountries } from "../services/merchantApi";
 
 const STEPS = { COUNTRY: 0, NUMBER: 1, PRODUCT: 2 };
 const PAY_STEP = 3; // only used for B2C
@@ -39,12 +40,13 @@ export default function DataFlowScreen({ navigation }) {
 
   const [success, setSuccess] = useState(null);
   const [step, setStep] = useState(0);
+  const [defaultAf, setDefaultAf] = useState(null)
 
   // Country
-  const defaultAf = useMemo(
-    () => ALL_COUNTRIES.find((c) => c.code === "AF") || ALL_COUNTRIES[0],
-    []
-  );
+  // const defaultAf = useMemo(
+  //   () => ALL_COUNTRIES.find((c) => c.code === "AF") || ALL_COUNTRIES[0],
+  //   []
+  // );
   const [country, setCountry] = useState(defaultAf);
   const [countryOpen, setCountryOpen] = useState(false);
 
@@ -52,7 +54,7 @@ export default function DataFlowScreen({ navigation }) {
   const [localNumber, setLocalNumber] = useState("");
   const dial = DIAL_CODES[country?.code] || "";
   const operator = guessOperator(country?.code, localNumber.replace(/\D/g, ""));
-
+const [countries, setCountries] = useState([])
   // Products
   const allBundles = DATA_BUNDLES[country?.code] || [];
   const [category, setCategory] = useState(BUNDLE_CATEGORIES[0]);
@@ -82,6 +84,17 @@ export default function DataFlowScreen({ navigation }) {
   const [exp, setExp] = useState("");
   const [paypalEmail, setPaypalEmail] = useState("");
 
+  useEffect(()=>{
+    const getAllCountries = async()=>{
+      const res = await getCountries()
+      setCountries(res?.data)
+      const afgCountry = res?.data.find((c)=>c?.countryCode == "AF")
+      setCountry(afgCountry)
+      
+    }
+
+    getAllCountries()
+  },[])
   // Guards
   const canNext =
     (step === STEPS.COUNTRY && !!country) ||
@@ -309,8 +322,8 @@ export default function DataFlowScreen({ navigation }) {
               </TouchableOpacity>
             </View>
             <FlatList
-              data={ALL_COUNTRIES}
-              keyExtractor={(it) => it.code}
+              data={countries}
+              keyExtractor={(it) => it.countryCode}
               ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
               renderItem={({ item }) => (
                 <TouchableOpacity
@@ -322,17 +335,17 @@ export default function DataFlowScreen({ navigation }) {
                   activeOpacity={0.85}
                 >
                   <Text style={{ fontSize: 18, marginRight: 8 }}>
-                    {codeToFlag(item.code)}
+                    {codeToFlag(item.countryCode)}
                   </Text>
                   <Text
                     style={{ flex: 1, fontSize: 15, color: Colors.textPrimary }}
                   >
-                    {item.name}
+                    {item.countryName}
                   </Text>
                   <Text style={{ marginRight: 6, color: "#7A7A7A" }}>
-                    {DIAL_CODES[item.code] || ""}
+                    {DIAL_CODES[item.countryCode] || ""}
                   </Text>
-                  {item.code === country?.code && (
+                  {item.countryCode === country?.countryCode && (
                     <Ionicons
                       name="checkmark-circle"
                       color={Colors.primary}
@@ -362,10 +375,10 @@ function StepCountry({ country, onOpen }) {
       >
         <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
           <Text style={{ fontSize: 18, marginRight: 8 }}>
-            {codeToFlag(country?.code || "AF")}
+            {codeToFlag(country?.countryCode || "AF")}
           </Text>
           <Text style={{ color: Colors.textPrimary, fontSize: 14 }}>
-            {country?.name}
+            {country?.countryName}
           </Text>
         </View>
         <Ionicons name="chevron-down" size={18} color="#7A7A7A" />
@@ -401,7 +414,7 @@ function StepNumber({
       <View style={styles.phoneRow}>
         <View style={styles.phonePrefix}>
           <Text style={{ fontSize: 18, marginRight: 6 }}>
-            {codeToFlag(country?.code)}
+            {codeToFlag(country?.countryCode)}
           </Text>
           <Text style={{ fontWeight: "700", color: Colors.textPrimary }}>
             {dial}

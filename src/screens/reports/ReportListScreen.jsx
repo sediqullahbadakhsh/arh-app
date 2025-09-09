@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   SafeAreaView,
   View,
@@ -13,6 +13,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../theme/colors";
 import ServiceHeader from "../../components/ServiceHeader";
 import { DUMMY_REPORTS, REPORT_META } from "../../constants/reports";
+import { getStatementReport } from "../../services/merchantApi";
+import { formatDateTime } from "../../utils/formatDate";
 
 export default function ReportListScreen({ navigation, route }) {
   const type = route.params?.type;
@@ -22,13 +24,15 @@ export default function ReportListScreen({ navigation, route }) {
   const [open, setOpen] = useState(false);
   const [row, setRow] = useState(null);
 
+  const [statements, setStatements] = useState([])
+
   const openRow = (item) => {
     setRow(item);
     setOpen(true);
   };
   const close = () => setOpen(false);
 
-  const shareRow = async () => {
+  const shareRow = async () => {         
     if (!row) return;
     const message = Object.entries(row)
       .map(([k, v]) => `${labelize(k)}: ${v}`)
@@ -37,6 +41,16 @@ export default function ReportListScreen({ navigation, route }) {
       await Share.share({ message });
     } catch {}
   };
+
+  useEffect(()=>{
+    const getStatement = async()=>{
+      const res = await getStatementReport()
+      console.log("💖💖💖: ", res)
+      setStatements(res?.data)
+    }
+
+    getStatement()
+  },[])
 
   const renderItem = ({ item }) => (
     <TouchableOpacity
@@ -53,8 +67,8 @@ export default function ReportListScreen({ navigation, route }) {
           />
         </View>
         <View>
-          <Text style={styles.titleLine}>{item.ref || item.id}</Text>
-          <Text style={styles.sub}>{item.date}</Text>
+          <Text style={styles.titleLine}>{item.transactionId || item.id}</Text>
+          <Text style={styles.sub}>{formatDateTime(item.createdAt)} - {item?.transactionType}</Text>
         </View>
       </View>
       <Ionicons name="chevron-forward" size={18} color="#C0C0C0" />
@@ -63,10 +77,10 @@ export default function ReportListScreen({ navigation, route }) {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
-      <ServiceHeader title={meta.title} onBack={() => navigation.goBack()} />
+      <ServiceHeader title={"Statement Report"} onBack={() => navigation.goBack()} />
       <View style={styles.container}>
         <FlatList
-          data={data}
+          data={statements}
           keyExtractor={(it) => it.id}
           renderItem={renderItem}
           ItemSeparatorComponent={() => <View style={styles.sep} />}
@@ -84,7 +98,7 @@ export default function ReportListScreen({ navigation, route }) {
         <View style={styles.backdrop}>
           <View style={styles.modal}>
             <View style={styles.modalHead}>
-              <Text style={styles.modalTitle}>{meta.title} Detail</Text>
+              <Text style={styles.modalTitle}>Statement Report Detail</Text>
               <View style={{ flexDirection: "row", alignItems: "center" }}>
                 <TouchableOpacity
                   onPress={shareRow}

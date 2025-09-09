@@ -144,7 +144,7 @@ export default function OnboardingScreen({ navigation }) {
 const HERO_HEIGHT = 240;
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
+  root: { flex: 1, paddingBottom: "10%" },
   slideInner: {
     flex: 1,
     paddingHorizontal: 24,
@@ -166,21 +166,23 @@ const styles = StyleSheet.create({
 
   title: {
     marginTop: 52,
-    fontSize: 16,
-    fontWeight: "700",
-    color: Colors.textPrimary,
+    fontSize: 18,
+    // fontWeight: "500",
+    fontFamily: "dmsansMedium",
+    color: Colors.textTitle,
     textAlign: "center",
   },
   subtitle: {
-    marginTop: 6,
-    fontSize: 13,
-    color: Colors.textSecondary,
+    marginTop: 20,
+    fontSize: 16,
+    color: Colors.textSubtitle,
     textAlign: "center",
+    fontFamily: "dmsansRegular",
     lineHeight: 18,
     paddingHorizontal: 6,
   },
 
-  dots: { alignItems: "center", marginTop: 10 },
+  dots: { alignItems: "center", marginTop: 10, marginBottom: 20 },
 
   bottomBar: {
     paddingHorizontal: 24,
@@ -190,7 +192,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   textBtn: { paddingHorizontal: 8, paddingVertical: 8 },
-  textBtnLabel: { color: Colors.textSecondary, fontSize: 14 },
+  textBtnLabel: { color: Colors.textDark, fontSize: 18 },
 
   primaryBtn: {
     height: 50,

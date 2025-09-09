@@ -26,6 +26,7 @@ const styles = StyleSheet.create({
     label: {
         fontSize: 15,
         color: Colors.textPrimary,
-        fontWeight: '500',
+        // fontWeight: '500',
+        fontFamily: "dmsansMedium"
     },
 });

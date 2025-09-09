@@ -2,7 +2,7 @@ import React from 'react';
 import { View, TextInput, StyleSheet, TouchableOpacity } from 'react-native';
 import { Colors } from '../theme/colors';
 
-export default function InputField({
+export default function RoundedInput({
     value,
     onChangeText,
     placeholder,
@@ -19,7 +19,7 @@ export default function InputField({
                 value={value}
                 onChangeText={onChangeText}
                 placeholder={placeholder}
-                placeholderTextColor="#BDBDBD"
+                placeholderTextColor="#646464"
                 keyboardType={keyboardType}
                 secureTextEntry={secureTextEntry}
                 autoCapitalize="none"
@@ -38,15 +38,20 @@ const styles = StyleSheet.create({
     container: { width: '100%', marginBottom: 16 },
     input: {
         width: '100%',
-        height: 48,
-        borderRadius: 6,
+        height: 55,
+        borderRadius: 100,
         borderWidth: 1,
-        borderColor: '#E0E0E0',
-        backgroundColor: Colors.pageBackColor || '#FFFFFF',
+        borderColor: '#E4E7EC',
+        backgroundColor: '#FFFFFF',
         paddingHorizontal: 16,
         paddingRight: 44,
+        lineHeight:24,
         fontSize: 14,
         color: Colors.textPrimary,
+        fontFamily: "dmsansRegular",
     },
-    iconRight: { position: 'absolute', right: 14, top: 12 },
+    iconRight: {  position: 'absolute',
+    right: 20,
+    top: '50%',
+    transform: [{ translateY: -10 }], },
 });

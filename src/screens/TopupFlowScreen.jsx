@@ -12,6 +12,7 @@ import {
   ScrollView,
   Platform,
   KeyboardAvoidingView,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../theme/colors";
@@ -26,6 +27,8 @@ import { USD_TO_AFN } from "../constants/rates";
 import { codeToFlag } from "../utils/flag";
 import { DIAL_CODES, guessOperator } from "../constants/dialing";
 import { useAuth } from "../auth/AuthProvider";
+import { getCountries, makeRecharge } from "../services/merchantApi";
+import { getSetaraganMnoId } from "../utils/getCompanyIdForSetaragan";
 
 const BASE_STEPS = { COUNTRY: 0, NUMBER: 1, AMOUNT: 2, PAY: 3 };
 
@@ -34,13 +37,25 @@ export default function TopupFlowScreen({ navigation }) {
   const isB2B = (user?.role || "").toLowerCase().includes("b2b");
   const stepsCount = isB2B ? 3 : 4; // dots
   const lastStep = isB2B ? BASE_STEPS.AMOUNT : BASE_STEPS.PAY;
-
+const [countries, setCountries] = useState([])
   const [step, setStep] = useState(0);
   const [success, setSuccess] = useState(null); // show inline success
 
+  useEffect(()=>{
+    const getAllCountries = async()=>{
+      const res = await getCountries()
+      console.log(res, "this is countries response💖💖😢💖💖")
+      setCountries(res?.data)
+      const afgCountry = res.data.find((c)=> c.countryCode === "AF" )
+      setCountry(afgCountry)
+    }
+
+    getAllCountries()
+  },[])
+
   // Country
   const defaultAf = useMemo(
-    () => COUNTRIES.find((c) => c.code === "AF") || COUNTRIES[0],
+    () => countries.find((c) => c.countryCode === "AF") || countries[0],
     []
   );
   const [country, setCountry] = useState(defaultAf);
@@ -48,8 +63,8 @@ export default function TopupFlowScreen({ navigation }) {
 
   // Number
   const [localNumber, setLocalNumber] = useState("");
-  const dial = DIAL_CODES[country?.code] || "";
-  const operator = guessOperator(country?.code, localNumber.replace(/\D/g, ""));
+  const dial = DIAL_CODES[country?.countryCode] || "";
+  const operator = guessOperator(country?.countryCode, localNumber.replace(/\D/g, ""));
 
   // Amount / product
   const [product, setProduct] = useState(null);
@@ -89,15 +104,15 @@ export default function TopupFlowScreen({ navigation }) {
     if (!canNext) return;
 
     // If this is the final step (B2B: AMOUNT; B2C: PAY) -> show inline success
-    if (step === lastStep) {
-      setSuccess({
-        mobile: `${dial} ${formatLocal(localNumber)}`,
-        amountUsd: usd,
-        txId: "#9Q87656B",
-        date: new Date().toISOString(),
-      });
-      return;
-    }
+    // if (step === lastStep) {
+    //   setSuccess({
+    //     mobile: `${dial} ${formatLocal(localNumber)}`,
+    //     amountUsd: usd,
+    //     txId: "#9Q87656B",
+    //     date: new Date().toISOString(),
+    //   });
+    //   return;
+    // }
     setStep(step + 1);
   };
 
@@ -106,7 +121,54 @@ export default function TopupFlowScreen({ navigation }) {
   // reset number when country changes
   useEffect(() => {
     setLocalNumber("");
-  }, [country?.code]);
+  }, [country?.countryCode]);
+
+  const recharge = async()=>{
+    try {
+
+      const operatorId = getSetaraganMnoId(localNumber)
+
+      if(!operatorId){
+        Alert.alert("Invalid Number", "the number you have added is not matching with any mobile network in afghanistan")
+        return
+      }
+      const payload = {
+        amount: afn,
+        companyId: "",
+        countryId: country?.id,
+        currency: "AFN",
+        operator: operatorId,
+        productId: 2,
+        receiver: localNumber,
+        source: "agent_stock"
+      }
+
+      const res = await makeRecharge(payload)
+       setSuccess({
+        mobile: `${dial} ${formatLocal(localNumber)}`,
+        amountUsd: usd,
+        txId: res?.txnNumber,
+        date: new Date().toISOString(),
+      });
+      goNext()
+
+      // const res = await 
+      
+    } catch (error) {
+      console.log("this is Recharge error: ", error)
+          const message =
+          error.response?.data?.error || // server error message
+          error.message ||               // network error
+          "Failed to Recharge";
+      
+        console.log("this is recharge error:", message);
+        Alert.alert("Failed To Recharge", message);
+      
+    }
+  }
+
+
+  
 
   // ---------- UI ----------
   return (
@@ -203,11 +265,12 @@ export default function TopupFlowScreen({ navigation }) {
                 country={country}
                 value={localNumber}
                 onChange={setLocalNumber}
+                localNumber={localNumber}
                 operator={operator}
                 onEditCountry={() => jumpTo(BASE_STEPS.COUNTRY)}
                 openContacts={() =>
                   navigation.navigate("ContactPicker", {
-                    cc: country?.code,
+                    cc: country?.countryCode,
                     onSelect: (num) =>
                       setLocalNumber(String(num).replace(/\D/g, "")),
                   })
@@ -262,7 +325,7 @@ export default function TopupFlowScreen({ navigation }) {
                     : "Pay & Top-up"
                   : "Continue"
               }
-              onPress={goNext}
+              onPress={step === lastStep ? recharge : goNext}
               style={{ marginTop: 24, opacity: canNext ? 1 : 0.5 }}
             />
             {step > 0 && (
@@ -295,8 +358,8 @@ export default function TopupFlowScreen({ navigation }) {
               </TouchableOpacity>
             </View>
             <FlatList
-              data={COUNTRIES}
-              keyExtractor={(it) => it.code}
+              data={countries}
+              keyExtractor={(it) => it.countryCode}
               ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
               renderItem={({ item }) => (
                 <TouchableOpacity
@@ -308,17 +371,17 @@ export default function TopupFlowScreen({ navigation }) {
                   activeOpacity={0.85}
                 >
                   <Text style={{ fontSize: 18, marginRight: 8 }}>
-                    {codeToFlag(item.code)}
+                    {codeToFlag(item.countryCode)}
                   </Text>
                   <Text
                     style={{ flex: 1, fontSize: 15, color: Colors.textPrimary }}
                   >
-                    {item.name}
+                    {item.countryName}
                   </Text>
                   <Text style={{ marginRight: 6, color: "#7A7A7A" }}>
-                    {DIAL_CODES[item.code] || ""}
+                    {DIAL_CODES[item.countryCode] || ""}
                   </Text>
-                  {item.code === country?.code && (
+                  {item.countryCode === country?.countryCode && (
                     <Ionicons
                       name="checkmark-circle"
                       color={Colors.primary}
@@ -348,10 +411,10 @@ function StepCountry({ country, onOpen }) {
       >
         <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
           <Text style={{ fontSize: 18, marginRight: 8 }}>
-            {codeToFlag(country?.code || "AF")}
+            {codeToFlag(country?.countryCode)}
           </Text>
           <Text style={{ color: Colors.textPrimary, fontSize: 14 }}>
-            {country?.name}
+            {country?.countryName}
           </Text>
         </View>
         <Ionicons name="chevron-down" size={18} color="#7A7A7A" />
@@ -365,6 +428,7 @@ function StepNumber({
   country,
   value,
   onChange,
+  localNumber,
   operator,
   onEditCountry,
   openContacts,
@@ -388,7 +452,7 @@ function StepNumber({
       <View style={styles.phoneRow}>
         <View style={styles.phonePrefix}>
           <Text style={{ fontSize: 18, marginRight: 6 }}>
-            {codeToFlag(country?.code)}
+            {codeToFlag(country?.countryCode)}
           </Text>
           <Text style={{ fontWeight: "700", color: Colors.textPrimary }}>
             {dial}
@@ -396,7 +460,18 @@ function StepNumber({
         </View>
         <TextInput
           value={formatted}
-          onChangeText={(t) => onChange(t.replace(/\D/g, "").slice(0, 9))}
+          onChangeText={(t) => {
+            const trimmed = localNumber.trim()
+            if(t.startsWith("0") && trimmed.length == 0){
+                Alert.alert(
+      "Invalid Number",
+      "Please start your phone number with 7 instead of 0, as the 0 is already included in your country code."
+    );
+   const  numeric = trimmed.replace(/^0+/, "");
+    onChange(numeric)
+    return 
+            }
+            onChange(t.replace(/\D/g, "").slice(0, 9))}}
           keyboardType="number-pad"
           placeholder="700-000-000"
           placeholderTextColor="#B8B8B8"
