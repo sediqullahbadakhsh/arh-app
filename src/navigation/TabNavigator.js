@@ -15,6 +15,7 @@ import TopupFlowScreen from "../screens/TopupFlowScreen";
 import WalletStackNavigator from "./WalletStackNavigator";
 import ReportStackNavigator from "./ReportStackNavigator";
 import AgentStackNavigator from "./AgentStackNavigator";
+import ProfileStackNavigator from "./ProfileStackNavigator";
 
 const Tab = createBottomTabNavigator();
 
@@ -102,7 +103,7 @@ export default function TabNavigator() {
       name: "Profile",
       label: "Profile",
       icon: "person",
-      component: ProfileScreen,
+      component: ProfileStackNavigator,
       show: can(() => canUse(SCREENS?.PROFILE)),
     },
   ];
