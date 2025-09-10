@@ -37,13 +37,15 @@ export default function ProfileScreen({ navigation }) {
     }
   };
 
-  const goStatement = () =>
-    navigation.navigate("ServiceTodo", { title: "Statement" });
-  const goManage = () =>
-    navigation.navigate("ServiceTodo", { title: "Manage Wallet" });
-  const goSettings = () =>
-    navigation.navigate("ServiceTodo", { title: "Settings" });
-  const goMore = () => navigation.navigate("ServiceTodo", { title: "More" });
+  const goProfileDetails = () =>
+    navigation.navigate("profileDetails", { title: "Profile Details" });
+  const goManageLanguage = () =>
+    navigation.navigate("languageScreen", { title: "Manage Language" });
+  const goSecurity = () =>
+    navigation.navigate("securityScreen", { title: "Security" });
+  const goAboutApp = () => navigation.navigate("aboutAppScreen", { title: "About App" });
+  const goContactUs = () => navigation.navigate("contactUsScreen", { title: "Contact Us" });
+  const goAboutUs = () => navigation.navigate("AboutUsScreen", { title: "About Us" });
 
   const handleLogout = async () => {
     try {
@@ -59,7 +61,7 @@ export default function ProfileScreen({ navigation }) {
     <SafeAreaView style={styles.safeArea}>
       {/* Gradient Header */}
       <LinearGradient
-        colors={["#D70000", "#E52421", "#F0533F"]}
+        colors={["#9F0901", "#E20E02"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.header}
@@ -78,6 +80,13 @@ export default function ProfileScreen({ navigation }) {
             <Ionicons name="create-outline" size={16} color="#000" />
           </TouchableOpacity>
         </View>
+            <View style={{position: "absolute",  top:15, right: -186, backgroundColor: "#FFFFFF0A", height: 80, width: "100%",transform: [{ rotate: "130deg" }], // Rotate 45 degrees
+                    justifyContent: "center",
+                    alignItems: "center",}}></View>
+                    
+                          <View style={{position: "absolute",  top:15, right: -300, backgroundColor: "#FFFFFF14", height: 120, width: "100%",transform: [{ rotate: "130deg" }], // Rotate 45 degrees
+                    justifyContent: "center",
+                    alignItems: "center",}}></View>
       </LinearGradient>
 
       {/* Body */}
@@ -96,50 +105,66 @@ export default function ProfileScreen({ navigation }) {
         <View style={styles.card}>
           <ProfileRow
             icon={
-              <MaterialIcons
-                name="receipt-long"
+              <Ionicons
+                name="person-circle-outline"
                 size={22}
                 color={Colors.primary}
               />
             }
-            title="Statement"
-            subtitle="View your statement"
-            onPress={goStatement}
+            title="Profile"
+            subtitle="View Your Profile and update"
+            onPress={goProfileDetails}
           />
 
           <ProfileRow
             icon={
               <Ionicons
-                name="wallet-outline"
+                name="globe-outline"
                 size={22}
                 color={Colors.primary}
               />
             }
-            title="Manage"
-            subtitle="Easily manage your wallet"
-            onPress={goManage}
+            title="Language"
+            subtitle="Manage your language"
+            onPress={goManageLanguage}
           />
 
           <ProfileRow
             icon={
               <Ionicons
-                name="settings-outline"
+                name="key-outline"
                 size={22}
                 color={Colors.primary}
               />
             }
-            title="Setting"
-            subtitle="Perform account setting"
-            onPress={goSettings}
+            title="Security"
+            subtitle="setup your security"
+            onPress={goSecurity}
           />
 
           <ProfileRow
             icon={
-              <Ionicons name="grid-outline" size={22} color={Colors.primary} />
+              <Ionicons name="refresh-circle-outline" size={22} color={Colors.primary} />
             }
-            title="More"
+            title="About App"
             subtitle="Access additional features and informations."
-            onPress={goMore}
+            onPress={goAboutApp}
+          />
+          <ProfileRow
+            icon={
+              <Ionicons name="headset-outline" size={22} color={Colors.primary} />
+            }
+            title="Contact Us"
+            subtitle="Access additional features and informations."
+            onPress={goContactUs}
+          />
+          <ProfileRow
+            icon={
+              <Ionicons name="information-circle-outline" size={22} color={Colors.primary} />
+            }
+            title="About Us"
+            subtitle="Access additional features and informations."
+            onPress={goAboutUs}
           />
 
           <ProfileRow
@@ -164,14 +189,15 @@ export default function ProfileScreen({ navigation }) {
 function ProfileRow({ icon, title, subtitle, onPress, isLast }) {
   return (
     <TouchableOpacity
-      style={[styles.row, isLast && { borderBottomWidth: 0 }]}
+      style={styles.row }
+      // style={[styles.row, isLast && { borderBottomWidth: 0 }]}
       onPress={onPress}
     >
       <View style={styles.rowLeft}>
         <View style={styles.rowIcon}>{icon}</View>
         <View>
           <Text style={styles.rowTitle}>{title}</Text>
-          <Text style={styles.rowSubtitle}>{subtitle}</Text>
+          {/* <Text style={styles.rowSubtitle}>{subtitle}</Text> */}
         </View>
       </View>
       <Ionicons name="chevron-forward" size={18} color="#BDBDBD" />
@@ -259,22 +285,25 @@ const styles = StyleSheet.create({
   },
 
   card: {
-    backgroundColor: "#fff",
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#F2F2F2",
+    // backgroundColor: "#fff",
+    // borderRadius: 20,
+    // borderWidth: 1,
+    // borderColor: "#F2F2F2",
     paddingVertical: 8,
     overflow: "hidden",
   },
 
   row: {
     flexDirection: "row",
-    paddingVertical: 14,
+    gap: 10,
+    paddingVertical: 8,
     paddingHorizontal: 16,
     alignItems: "center",
-    borderBottomWidth: 1,
-    borderBottomColor: "#F3F3F3",
+    borderWidth: 1,
+    borderColor: "#F3F3F3",
+    marginBottom:10,
     justifyContent: "space-between",
+    borderRadius: 10
   },
   rowLeft: { flexDirection: "row", alignItems: "center", flex: 1 },
   rowIcon: {

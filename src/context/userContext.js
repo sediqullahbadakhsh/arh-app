@@ -24,6 +24,7 @@ export const UserProvider = ({ children }) => {
       roleId: parsed?.roleId,
       id: freshUser?.data?.id,
       username: freshUser?.data?.username,
+      language: freshUser?.data?.messageLanguage
     };
           console.log("this is user profile: ❤❤❤", freshUser)
 
