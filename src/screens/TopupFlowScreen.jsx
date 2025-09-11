@@ -13,6 +13,7 @@ import {
   Platform,
   KeyboardAvoidingView,
   Alert,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../theme/colors";
@@ -29,14 +30,16 @@ import { DIAL_CODES, guessOperator } from "../constants/dialing";
 import { useAuth } from "../auth/AuthProvider";
 import { getCountries, makeRecharge } from "../services/merchantApi";
 import { getSetaraganMnoId } from "../utils/getCompanyIdForSetaragan";
+import { getMnoLogo } from "../utils/getMnoLogo";
 
-const BASE_STEPS = { COUNTRY: 0, NUMBER: 1, AMOUNT: 2, PAY: 3 };
+// const BASE_STEPS = { COUNTRY: 0, NUMBER: 1, AMOUNT: 2, PAY: 3 };
+const BASE_STEPS = { COUNTRY: 0, NUMBER: 1, PAY: 2 };
 
 export default function TopupFlowScreen({ navigation }) {
   const { user } = useAuth?.() || { user: null };
   const isB2B = (user?.role || "").toLowerCase().includes("b2b");
   const stepsCount = isB2B ? 3 : 4; // dots
-  const lastStep = isB2B ? BASE_STEPS.AMOUNT : BASE_STEPS.PAY;
+  const lastStep = isB2B ? BASE_STEPS.NUMBER : BASE_STEPS.PAY;
 const [countries, setCountries] = useState([])
   const [step, setStep] = useState(0);
   const [success, setSuccess] = useState(null); // show inline success
@@ -63,6 +66,7 @@ const [countries, setCountries] = useState([])
 
   // Number
   const [localNumber, setLocalNumber] = useState("");
+  const [amountAfn, setAmountAfn] = useState("")
   const dial = DIAL_CODES[country?.countryCode] || "";
   const operator = guessOperator(country?.countryCode, localNumber.replace(/\D/g, ""));
 
@@ -90,8 +94,8 @@ const [countries, setCountries] = useState([])
   const canNext =
     (step === BASE_STEPS.COUNTRY && !!country) ||
     (step === BASE_STEPS.NUMBER &&
-      localNumber.replace(/\D/g, "").length >= 7) ||
-    (step === BASE_STEPS.AMOUNT && usd > 0) ||
+      localNumber.replace(/\D/g, "").length >= 7 && amountAfn > 0) ||
+    (step === BASE_STEPS.AMOUNT && amountAfn > 0) ||
     (!isB2B &&
       step === BASE_STEPS.PAY &&
       ((method === "card" && cardNumber && cvv && exp) ||
@@ -133,7 +137,7 @@ const [countries, setCountries] = useState([])
         return
       }
       const payload = {
-        amount: afn,
+        amount: amountAfn,
         companyId: "",
         countryId: country?.id,
         currency: "AFN",
@@ -146,7 +150,7 @@ const [countries, setCountries] = useState([])
       const res = await makeRecharge(payload)
        setSuccess({
         mobile: `${dial} ${formatLocal(localNumber)}`,
-        amountUsd: usd,
+        amountUsd: amountAfn,
         txId: res?.txnNumber,
         date: new Date().toISOString(),
       });
@@ -260,6 +264,7 @@ const [countries, setCountries] = useState([])
             )}
 
             {step === BASE_STEPS.NUMBER && (
+              <View style={{display:"flex", gap:4}}>
               <StepNumber
                 dial={dial}
                 country={country}
@@ -276,6 +281,21 @@ const [countries, setCountries] = useState([])
                   })
                 }
               />
+
+
+            
+<View>
+  <Text style={styles.sectionTitle}>Amount</Text>
+              <TextInput
+          value={amountAfn}
+          onChangeText={setAmountAfn}
+          placeholder="0.00"
+          keyboardType="decimal-pad"
+          style={styles.amountInput}
+          // product is automatically cleared in parent when typing
+        />
+</View>
+              </View>
             )}
 
             {step === BASE_STEPS.AMOUNT && (
@@ -451,10 +471,12 @@ function StepNumber({
 
       <View style={styles.phoneRow}>
         <View style={styles.phonePrefix}>
-          <Text style={{ fontSize: 18, marginRight: 6 }}>
-            {codeToFlag(country?.countryCode)}
+          <Text style={{ fontSize: 18 }}>
+            {/* {codeToFlag(country?.countryCode)} */}
+{localNumber.length > 1 &&<View style={{width:52, height:52,  paddingLeft: 10, display: "flex", justifyContent: "center", alignItems:"center"}}>                                <Image source={ getMnoLogo(getSetaraganMnoId(localNumber))} style={{ width: "100%", height: "100%", resizeMode: "contain", borderRadius: 100 }} />
+</View>}
           </Text>
-          <Text style={{ fontWeight: "700", color: Colors.textPrimary }}>
+          <Text style={{ fontWeight: "700", color: Colors.textPrimary, marginRight: 10 }}>
             {dial}
           </Text>
         </View>
@@ -488,15 +510,15 @@ function StepNumber({
       <View style={{ marginTop: 10, minHeight: 24 }}>
         {operator ? (
           <View
-            style={[
-              styles.operatorPill,
-              {
-                backgroundColor: hexFade(operator.color, 0.14),
-                borderColor: operator.color,
-              },
-            ]}
+            // style={[
+            //   styles.operatorPill,
+            //   {
+            //     backgroundColor: hexFade(operator.color, 0.14),
+            //     borderColor: operator.color,
+            //   },
+            // ]}
           >
-            <Ionicons
+            {/* <Ionicons
               name="radio-outline"
               size={14}
               color={operator.color}
@@ -506,7 +528,7 @@ function StepNumber({
               style={{ color: operator.color, fontWeight: "600", fontSize: 12 }}
             >
               {operator.name}
-            </Text>
+            </Text> */}
           </View>
         ) : (
           <Text style={{ color: "#9E9E9E", fontSize: 12 }}>
@@ -740,9 +762,10 @@ function hexFade(hex, op) {
 }
 
 const styles = StyleSheet.create({
+  
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 14,
+    fontWeight: "400",
     color: Colors.textPrimary,
     marginBottom: 12,
   },
@@ -783,12 +806,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   phonePrefix: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 0,
     flexDirection: "row",
     alignItems: "center",
     borderRightWidth: 1,
     borderRightColor: "#EEE",
-    backgroundColor: "#FAFAFA",
+    backgroundColor: "white",
   },
   phoneInput: {
     flex: 1,
@@ -819,6 +842,26 @@ const styles = StyleSheet.create({
   },
   currencyTag: { fontWeight: "700", marginRight: 8, color: Colors.textPrimary },
   customInput: { flex: 1, fontSize: 16, color: Colors.textPrimary },
+  amountInput: {
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    borderRadius: 20,
+     flex: 1,
+    paddingHorizontal: 14,
+    fontSize: 14,
+    color: Colors.textPrimary,
+    // borderWidth: 1,
+    // borderColor: "#ccc",
+    // borderRadius: 8,
+    // padding: 12,
+    // fontSize: 18,
+    // color: "#000",
+    // textAlign: "center", // center the amount
+    // backgroundColor: "#f9f9f9",
+    // marginVertical: 10,
+    // width: "60%", // adjust to your design
+    // alignSelf: "center",
+  },
   clearBtn: { padding: 6 },
   equivText: { fontSize: 12, color: "#9E9E9E", marginTop: 6 },
 
