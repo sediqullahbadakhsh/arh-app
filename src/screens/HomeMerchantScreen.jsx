@@ -18,7 +18,7 @@ import { formatDateTime } from "../utils/formatDate";
 import { capitalizeFirstLetter } from "../utils/capitalizeFirstLetter";
 
 export default function HomeMerchantScreen({ navigation }) {
-  const userName = "Test Merchant"; // dummy
+  const userName = "Test Merchant"; 
   const { user, setUser } = useUser();
   const [recentTransaction, setRecentTransactions] = useState([])
 
@@ -36,7 +36,7 @@ export default function HomeMerchantScreen({ navigation }) {
 
   console.log(user, "this is userInfo from user context")
 
-  // keep it to the 4 tiles we want for B2B
+  
   const services = useMemo(
     () => [
       {
@@ -59,7 +59,7 @@ export default function HomeMerchantScreen({ navigation }) {
     []
   );
 
-  // simple fake recents
+
   const recentTx = [
     {
       id: "t1",
@@ -93,14 +93,16 @@ export default function HomeMerchantScreen({ navigation }) {
         navigation.navigate("StockTransfer");
         break;
       case "MobileTopup":
-     navigation.navigate("Topup");
-         // role-aware TopupFlowScreen (B2B skips pay)
+
+        navigation.navigate("Topup"); 
+
+
         break;
       case "DataBundle":
-        navigation.navigate("Data"); // role-aware DataFlowScreen (B2B skips pay)
+        navigation.navigate("Data"); 
         break;
       case "GameCoins":
-        navigation.navigate("GameCoins"); // your existing screen
+        navigation.navigate("GameCoins"); 
         break;
       default:
         break;

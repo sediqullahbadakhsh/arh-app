@@ -8,10 +8,11 @@ import AccessFromAuth from "./src/acl/AccessFromAuth";
 import { UserProvider } from "./src/context/userContext";
 import * as Font from "expo-font";
 import { Fonts } from "./src/utils/fonts";
+import { StripeProvider } from '@stripe/stripe-react-native';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 export default function App() {
   const [fontsLoaded, setFontsLoaded] = useState(false);
-
 
   useEffect(() => {
     async function loadFonts() {
@@ -25,22 +26,29 @@ export default function App() {
     loadFonts();
   }, []);
 
-  
-
-
-
   if (!fontsLoaded) return null;
+  const queryClient = new QueryClient();
   return (
+    <QueryClientProvider client={queryClient}>
+
     <SafeAreaProvider>
-      <UserProvider>
-      <AuthProvider>
-        <AccessFromAuth>
-          <NavigationContainer>
-            <RootNavigator />
-          </NavigationContainer>
-        </AccessFromAuth>
-      </AuthProvider>
-      </UserProvider>
+      <StripeProvider
+        publishableKey={process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || "pk_test_51RxnvBKOx8MiO1ejmrVjvOoop4cA1ANX3lDRPOTy1cu95T1f4qRWnM6GmnoQnAK5RDxtVsNVmH3eKdny6PWyswn300iWaALjXq"}
+        // merchantIdentifier="merchant.com.yourapp" // Required for Apple Pay
+        // urlScheme="yourapp" // Required for 3D Secure and redirects
+      >
+        <UserProvider>
+          <AuthProvider>
+            <AccessFromAuth>
+              <NavigationContainer>
+                <RootNavigator />
+              </NavigationContainer>
+            </AccessFromAuth>
+          </AuthProvider>
+        </UserProvider>
+      </StripeProvider>
     </SafeAreaProvider>
+    </QueryClientProvider>
+
   );
 }

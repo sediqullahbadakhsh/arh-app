@@ -55,7 +55,7 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontFamily: "dmsansBold",
     color: "#fff",
-    lineHeight: "140%",
+
 
   },
 });

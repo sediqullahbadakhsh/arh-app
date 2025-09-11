@@ -13,11 +13,13 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../theme/colors";
 import ServiceButton from "../components/ServiceButton";
-import { useUser } from "../context/userContext";
+import { useAuth } from "../auth/AuthProvider";
 
 export default function HomeConsumerScreen({ navigation }) {
-  const {user} = useUser()
-  const userName = user?.username; // mock
+  const { user } = useAuth();
+  console.log(user, "this is user")
+  const userName = user?.username; 
+  console.log(userName, "this is user name")
 
   const goToNotifications = () => navigation.navigate("Notifications");
   const goToAllTransactions = () => navigation.navigate("Transactions");
@@ -25,10 +27,10 @@ export default function HomeConsumerScreen({ navigation }) {
   const SERVICES_B2C = useMemo(
     () => [
       {
-        key: "MobileTopup",
+        key: "MobileTopup1",
         label: "Mobile Top-up",
         icon: "phone-portrait-outline",
-        onPress: () => navigation.navigate("Topup"),
+        onPress: () => navigation.navigate("Topup1"),
       },
       {
         key: "DataBundle",
@@ -46,7 +48,7 @@ export default function HomeConsumerScreen({ navigation }) {
     [navigation]
   );
 
-  // Dummy recent transactions (same shape you already used)
+
   const recentTx = [
     {
       id: "t1",

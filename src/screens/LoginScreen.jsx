@@ -27,7 +27,7 @@ export default function LoginScreen({ navigation }) {
   const navigateOtp = async () => {
     try {
       setLoading(true);
-      await auth.loginOtpSend(email.trim()); // will no-op if your backend already sent it
+      await auth.loginOtpSend(email.trim()); 
       navigation.navigate("OtpVerification", {
         channel: "email",
         target: email.trim(),
