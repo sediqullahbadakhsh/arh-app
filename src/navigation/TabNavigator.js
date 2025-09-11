@@ -1,4 +1,3 @@
-// src/navigation/TabNavigator.js
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -6,15 +5,17 @@ import HomeStackNavigator from "./HomeStackNavigator";
 import TransactionsScreen from "../screens/TransactionsScreen";
 import ContactsScreen from "../screens/ContactsScreen";
 import ProfileScreen from "../screens/ProfileScreen";
-import { Ionicons } from "@expo/vector-icons";
+import TopupFlowScreen from "../screens/TopupFlowScreen1";
+import WalletStackNavigator from "./WalletStackNavigator";
+import ReportStackNavigator from "./ReportStackNavigator";
+import AgentStackNavigator from "./AgentStackNavigator";
+import { TouchableOpacity, View, Text } from "react-native";
 import { Colors } from "../theme/colors";
 import { useAccess } from "../acl/AccessProvider";
 import { useAuth } from "../auth/AuthProvider";
 import { ACTIONS, SCREENS } from "../acl/permissions";
-import TopupFlowScreen from "../screens/TopupFlowScreen";
-import WalletStackNavigator from "./WalletStackNavigator";
-import ReportStackNavigator from "./ReportStackNavigator";
-import AgentStackNavigator from "./AgentStackNavigator";
+import Feather from "react-native-vector-icons/Feather";
+import OrdersScreen from "../screens/OrdersScreen";
 
 const Tab = createBottomTabNavigator();
 
@@ -28,7 +29,6 @@ export default function TabNavigator() {
   const canUse = (screenId) =>
     access?.canUseScreen ? access.canUseScreen(screenId) : true;
 
-  // ----- Define tab sets -----
   const TABS_B2C = [
     {
       name: "HomeTab",
@@ -38,10 +38,10 @@ export default function TabNavigator() {
       show: can(() => canUse(SCREENS?.HOME)),
     },
     {
-      name: "Contacts",
-      label: "Contacts",
-      icon: "people",
-      component: ContactsScreen,
+      name: "Order",
+      label: "Order",
+      icon: "shopping-cart",
+      component: OrdersScreen,
       show: can(
         () => access?.can?.(ACTIONS.SEE_CONTACTS) && canUse(SCREENS?.CONTACTS)
       ),
@@ -49,17 +49,17 @@ export default function TabNavigator() {
     {
       name: "TopupTab",
       label: "Top-up",
-      icon: "flash",
+      icon: "zap",
       component: TopupFlowScreen,
       show: true,
-    }, // placeholder
+    },
     {
       name: "Statements",
       label: "Statement",
-      icon: "document-text",
+      icon: "file-text",
       component: TransactionsScreen,
       show: true,
-    }, // reusing Transactions
+    },
     {
       name: "Profile",
       label: "Setting",
@@ -80,34 +80,34 @@ export default function TabNavigator() {
     {
       name: "Wallet",
       label: "Wallet",
-      icon: "wallet",
+      icon: "credit-card",
       component: WalletStackNavigator,
       show: true,
     },
     {
       name: "Agent",
       label: "Agent",
-      icon: "people-circle",
+      icon: "user-check",
       component: AgentStackNavigator,
       show: true,
     },
     {
       name: "Report",
       label: "Report",
-      icon: "stats-chart",
+      icon: "bar-chart-2",
       component: ReportStackNavigator,
       show: true,
     },
     {
       name: "Profile",
       label: "Profile",
-      icon: "person",
+      icon: "user",
       component: ProfileScreen,
       show: can(() => canUse(SCREENS?.PROFILE)),
     },
   ];
 
-  const tabs = role === "b2b" ? TABS_B2B : TABS_B2C;
+  const tabs = (role === "b2b" ? TABS_B2B : TABS_B2C).filter((t) => t.show);
 
   if (tabs.length === 0) return null;
 
@@ -130,10 +130,18 @@ export default function TabNavigator() {
         },
         tabBarIcon: ({ color, size }) => {
           const tab = tabs.find((t) => t.name === route.name);
-          const icon = tab?.icon ?? "ellipse";
-          return <Ionicons name={icon} size={size} color={color} />;
+          const iconName = tab?.icon ?? "circle";
+          return (
+            <View style={{ alignItems: "center", justifyContent: "center" }}>
+              <Feather name={iconName} size={size} color={color} />
+              <View style={{ height: 4 }} />
+            </View>
+          );
         },
-        tabBarLabelStyle: { fontSize: 11, marginTop: -4 },
+        tabBarLabel: ({ color, children }) => (
+          <Text style={{ color, fontSize: 11, marginTop: 1 }}>{children}</Text>
+        ),
+        tabBarButton: (props) => <TouchableOpacity {...props} activeOpacity={1} />,
       })}
     >
       {tabs.map((t) => (
