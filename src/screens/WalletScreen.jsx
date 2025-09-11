@@ -9,6 +9,7 @@ import {
   FlatList,
   Dimensions,
   StatusBar,
+  ScrollView,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -126,7 +127,7 @@ setWallets(data)
         style={styles.header}
       >
         <Text style={styles.greeting}>Hi,</Text>
-        <Text style={styles.userName}>Ajmal Badakhsh</Text>
+        <Text style={styles.userName}>{user?.username}</Text>
         <View style={styles.headerIcons}>
           <TouchableOpacity
             onPress={() => navigation.navigate("Notifications")}
@@ -140,7 +141,8 @@ setWallets(data)
         </View>
       </LinearGradient>
 
-      {/* Wallet pager */}
+     <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
+       {/* Wallet pager */}
       <View style={{ marginTop: 10 }}>
         <FlatList
           ref={flatRef}
@@ -238,6 +240,7 @@ setWallets(data)
           </View>
         ))}
       </View>
+     </ScrollView>
     </SafeAreaView>
   );
 }

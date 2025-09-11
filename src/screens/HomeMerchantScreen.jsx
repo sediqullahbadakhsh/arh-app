@@ -93,7 +93,8 @@ export default function HomeMerchantScreen({ navigation }) {
         navigation.navigate("StockTransfer");
         break;
       case "MobileTopup":
-        navigation.navigate("Topup"); // role-aware TopupFlowScreen (B2B skips pay)
+     navigation.navigate("Topup");
+         // role-aware TopupFlowScreen (B2B skips pay)
         break;
       case "DataBundle":
         navigation.navigate("Data"); // role-aware DataFlowScreen (B2B skips pay)

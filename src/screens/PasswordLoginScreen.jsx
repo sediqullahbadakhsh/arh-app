@@ -1,5 +1,5 @@
 // // src/screens/PasswordLoginScreen.jsx
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   SafeAreaView,
   View,
@@ -25,32 +25,32 @@ export default function PasswordLoginScreen({ route, navigation }) {
    const { user, setUser } = useUser();
   const [password, setPassword] = useState("");
   const [email, setEmail] = useState( "");
+  const [rememberMe, setRememberMe]  = useState(false)
   const [busy, setBusy] = useState(false);
   const auth = useAuth();
 
-  // const onLogin = async () => {
-  //   try {
-  //     setBusy(true);
-  //    const res =  await auth.loginPassword({ identifier: email, password });
-  //    console.log(res, "this is agent login res👏👏😜")
-  //    const userInfo = {role: res?.role,
-  //     roleId: res?.role_id,
-  //     id: res.id,
-  //     username: res.username,}
 
-  //     await AsyncStorage.setItem("user", JSON.stringify(userInfo));
-  //    setUser((prev)=>({
-  //     ...prev,
-  //     ...userInfo
+ useEffect(() => {
+  const getRememberMeDetails = async () => {
+    try {
+      const storedData = await AsyncStorage.getItem("rememberMe");
+      if (!storedData) return;
 
-  //    }))
-  //     navigation.replace("Tabs");
-  //   } catch (e) {
-  //     Alert.alert("Login", e?.message || "Unable to sign in");
-  //   } finally {
-  //     setBusy(false);
-  //   }
-  // };
+      const credentials = JSON.parse(storedData);
+
+      if (!credentials?.email || !credentials?.password) return;
+
+      setEmail(credentials.email);
+      setPassword(credentials.password);
+      setRememberMe(true); // ✅ restore checkbox state
+    } catch (error) {
+      console.error("Failed to fetch rememberMe data:", error);
+    }
+  };
+
+  getRememberMeDetails();
+}, []);
+
 const onLogin = async () => {
   try {
     setBusy(true);
@@ -59,12 +59,25 @@ const onLogin = async () => {
     console.log(res, "this is agent login res👏👏😜");
 
     const userInfo = {
-      token: res.access_token,   
+      token: res.access_token,
       role: res.role,
       roleId: res.role_id,
       id: res.id,
       username: res.username,
+      accountType: res?.accountType,
     };
+
+    if (rememberMe) {
+      // ✅ avoid shadowing variable names (don't use const rememberMe again)
+      const credentials = {
+        email,
+        password,
+      };
+      await AsyncStorage.setItem("rememberMe", JSON.stringify(credentials));
+    } else {
+      // ✅ clear rememberMe if unchecked
+      await AsyncStorage.removeItem("rememberMe");
+    }
 
     await AsyncStorage.setItem("user", JSON.stringify(userInfo));
     setUser(userInfo);
@@ -76,6 +89,7 @@ const onLogin = async () => {
     setBusy(false);
   }
 };
+
 
   const canSubmit = password.trim().length > 0 && !busy;
 
@@ -114,7 +128,7 @@ const onLogin = async () => {
        </View>
        <View style={{display: "flex", flexDirection: "row", justifyContent: "space-between" }}>
         <View style={{display: "flex", justifyContent: "flex-start", flexDirection: "row", alignItems: "center"}}>
-          <Checkbox/>
+          <Checkbox checked={rememberMe} onToggle={()=>{setRememberMe((prev)=>!prev)}}/>
           <Text style={{fontFamily: "mdsansRegular", fontSize: 14,marginLeft: 8, color: Colors.textTitle}}>Remember Me</Text>
         </View>
         <View><Text style={{fontFamily: "mdsansMedium", fontSize: 14, color: "#E48D08"}}>Forget Password?</Text></View>

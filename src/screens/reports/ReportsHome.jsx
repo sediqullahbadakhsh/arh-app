@@ -39,7 +39,7 @@ export default function ReportsHome({ navigation }) {
                 onPress={() => navigation.navigate("ReportList", { type })}
               >
                 <Ionicons name={meta.icon} size={22} color={Colors.primary} />
-                <Text style={styles.tileText}>{meta.title}</Text>
+                <Text style={styles.tileText}>{"Statements Report"}</Text>
               </TouchableOpacity>
             );
           })}
