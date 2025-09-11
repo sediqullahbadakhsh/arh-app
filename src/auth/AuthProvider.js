@@ -197,16 +197,24 @@ export function AuthProvider({ children }) {
     setUser((prev) => ({ ...(prev || {}), role }));
   };
 
-  const setToken = async (newToken, meta = {}) => {
-    if (newToken) {
-      await AsyncStorage.setItem("auth_token", newToken);
-      setTokenState(newToken);
-    }
-    const role = meta.role || (await AsyncStorage.getItem("auth_role")) || null;
-    const u = { role, role_id: meta.role_id ?? null };
-    setUser(u);
-  };
+ const setToken = async (newToken, meta = {}) => {
+  if (newToken) {
+    await AsyncStorage.setItem("auth_token", newToken);
+    setTokenState(newToken);
+  }
+  const role = meta.role || (await AsyncStorage.getItem("auth_role")) || null;
+  
 
+  const u = { 
+    ...(user || {}), 
+    role, 
+    role_id: meta.role_id ?? null,
+    username: meta.username ?? user?.username 
+  };
+  
+  console.log(u, "this is u - updated user object");
+  setUser(u);
+};
   const clearToken = async () => {
     await AsyncStorage.removeItem("auth_token");
     await AsyncStorage.removeItem("auth_role");
@@ -242,10 +250,12 @@ export function AuthProvider({ children }) {
 
   const loginOtpVerifyFn = async ({ identifier, otp }) => {
     const data = await loginOtpVerify({ identifier, otp });
+    console.log(data, "this is data")
     await setRoleLocal("b2c");
     await setToken(data.access_token, {
       role: "b2c",
       role_id: data.role_id,
+      username: data.fullName
     });
     setPending(null);
     return data;

@@ -34,7 +34,7 @@ export const transferStockToDownlineAgent = (payload = {})=>{
 }
 export const makeRecharge = (payload = {})=>{
   
-  return api.post(`/orders?lang=en`,payload).then((r)=>r.data)
+  return api.post(`/orders/customer?lang=en`,payload).then((r)=>r.data)
 }
 
 export const getDataProducts = (filters = {})=>{

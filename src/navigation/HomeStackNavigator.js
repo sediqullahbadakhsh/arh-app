@@ -12,12 +12,17 @@ import GameCoinsScreen from "../screens/GameCoinsScreen";
 import TopupFlowScreen from "../screens/TopupFlowScreen";
 import DataFlowScreen from "../screens/DataFlowScreen";
 import StockTransferScreen from "../screens/StockTransferScreen";
+
+import TopupFlowScreen1 from "../screens/TopupFlowScreen1";
+
 import MerchantRechargeScreen from "../screens/AgentRecharge";
+
 
 const Stack = createNativeStackNavigator();
 
 export default function HomeStackNavigator() {
   const { user } = useAuth();
+  console.log(user, "this is user2")
   const HomeEntry =
     user?.role === "b2b" ? HomeMerchantScreen : HomeConsumerScreen;
 
@@ -31,6 +36,7 @@ export default function HomeStackNavigator() {
       <Stack.Screen name="GameCoins" component={GameCoinsScreen} /> 
       <Stack.Screen name="merchantRecharge" component={MerchantRechargeScreen} /> 
       <Stack.Screen name="Topup" component={TopupFlowScreen} />
+      <Stack.Screen name="Topup1" component={TopupFlowScreen1} />
       <Stack.Screen name="StockTransfer" component={StockTransferScreen} />
       {SERVICES.filter(
         (s) => !["MobileTopup", "DataBundle"].includes(s.key)
