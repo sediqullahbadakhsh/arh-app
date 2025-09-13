@@ -11,6 +11,8 @@ import {
   ScrollView,
   Platform,
   KeyboardAvoidingView,
+  Alert,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../theme/colors";
@@ -25,7 +27,9 @@ import { USD_TO_AFN } from "../constants/rates";
 import { codeToFlag } from "../utils/flag";
 import { DIAL_CODES, guessOperator } from "../constants/dialing";
 import { useAuth } from "../auth/AuthProvider";
-import { getCountries } from "../services/merchantApi";
+import { activateDataBundle, getCountries, getDataProducts } from "../services/merchantApi";
+import { getMnoLogo } from "../utils/getMnoLogo";
+import { getSetaraganMnoId } from "../utils/getCompanyIdForSetaragan";
 
 const STEPS = { COUNTRY: 0, NUMBER: 1, PRODUCT: 2 };
 const PAY_STEP = 3; // only used for B2C
@@ -52,7 +56,7 @@ export default function DataFlowScreen({ navigation }) {
 
   // Number (local, no leading 0)
   const [localNumber, setLocalNumber] = useState("");
-  const dial = DIAL_CODES[country?.code] || "";
+ const dial = DIAL_CODES[country?.countryCode] || "";
   const operator = guessOperator(country?.code, localNumber.replace(/\D/g, ""));
 const [countries, setCountries] = useState([])
   // Products
@@ -60,6 +64,7 @@ const [countries, setCountries] = useState([])
   const [category, setCategory] = useState(BUNDLE_CATEGORIES[0]);
   const [search, setSearch] = useState("");
   const [product, setProduct] = useState(null);
+  const [products, setProducts] = useState([])
 
   const filtered = useMemo(() => {
     const byCat = category
@@ -75,6 +80,8 @@ const [countries, setCountries] = useState([])
   // Amounts
   const usd = product?.usd || 0;
   const afn = product?.afn || Math.round(usd * USD_TO_AFN);
+
+ 
 
   // Payment (B2C only)
   const [method, setMethod] = useState("card");
@@ -95,6 +102,50 @@ const [countries, setCountries] = useState([])
 
     getAllCountries()
   },[])
+
+   useEffect(()=>{
+    const getProductsForAgent = async()=>{
+      const filter = {
+        countryId: country?.id,
+        productCategoryId: category?.id
+
+      }
+      const res = await getDataProducts(filter)
+      setProducts(res?.data)
+      console.log("these are products 💖💖💖: ", res)
+    }
+
+    getProductsForAgent()
+  },[])
+
+  const activateBundle = async()=>{
+    try {
+      const payload = {
+        productId: product?.id,
+        customerMobileNumber: localNumber
+      }
+
+      const res = await activateDataBundle(payload)
+        setSuccess({
+        mobile: `${dial} ${formatLocal(localNumber)}`,
+        txId: "#DB" + Math.floor(100000 + Math.random() * 899999),
+        date: new Date().toISOString(),
+        product,
+        method: isB2B ? "wallet" : method,
+      });
+      // setSuccess(true)
+      
+    } catch (error) {
+      console.log("Failed To Activate Bundle api  error: ", error)
+                      const message =
+                      error.response?.data?.error || 
+                      error.message ||               
+                      "Oops, Something Went Wrong!";
+                  
+                    console.log("Failed To Activate Bundle message:", message);
+                    Alert.alert("Failed To Activate Bundle", message);
+    }
+  }
   // Guards
   const canNext =
     (step === STEPS.COUNTRY && !!country) ||
@@ -112,13 +163,8 @@ const [countries, setCountries] = useState([])
 
     if (step === lastStep) {
       // Inline success
-      setSuccess({
-        mobile: `${dial} ${formatLocal(localNumber)}`,
-        txId: "#DB" + Math.floor(100000 + Math.random() * 899999),
-        date: new Date().toISOString(),
-        product,
-        method: isB2B ? "wallet" : method,
-      });
+      activateBundle()
+    
       return;
     }
     setStep(step + 1);
@@ -162,7 +208,7 @@ const [countries, setCountries] = useState([])
           </View>
           <View style={styles.kv}>
             <Text style={styles.k}>Plan</Text>
-            <Text style={styles.v}>{success.product?.desc}</Text>
+            <Text style={styles.v}>{success.product?.productName}</Text>
           </View>
           <View style={styles.kv}>
             <Text style={styles.k}>Transaction ID</Text>
@@ -178,7 +224,7 @@ const [countries, setCountries] = useState([])
           <View style={styles.totalBox}>
             <Text style={styles.totalLabel}>Total Amount</Text>
             <Text style={styles.totalValue}>
-              {usd} USD • {afn} AFN
+              {product?.price} AFN
             </Text>
           </View>
 
@@ -230,6 +276,7 @@ const [countries, setCountries] = useState([])
                 country={country}
                 value={localNumber}
                 onChange={setLocalNumber}
+
                 operator={operator}
                 onEditCountry={() => jumpTo(STEPS.COUNTRY)}
                 openContacts={() =>
@@ -249,7 +296,7 @@ const [countries, setCountries] = useState([])
                 setCategory={setCategory}
                 search={search}
                 setSearch={setSearch}
-                list={filtered}
+                list={products}
                 product={product}
                 setProduct={setProduct}
                 onEditNumber={() => jumpTo(STEPS.NUMBER)}
@@ -387,16 +434,104 @@ function StepCountry({ country, onOpen }) {
   );
 }
 
+// function StepNumber({
+//   dial,
+//   country,
+//   value,
+//   onChange,
+//   operator,
+//   onEditCountry,
+//   openContacts,
+// }) {
+//   const formatted = formatLocal(value);
+//   return (
+//     <View style={{ marginTop: 12 }}>
+//       <View style={styles.editHeader}>
+//         <Text style={styles.sectionTitle}>Mobile Number</Text>
+//         <View style={{ flexDirection: "row", gap: 16 }}>
+//           <TouchableOpacity onPress={openContacts}>
+//             <Text style={styles.editLink}>Contacts</Text>
+//           </TouchableOpacity>
+//           <TouchableOpacity onPress={onEditCountry}>
+//             <Text style={styles.editLink}>Change country</Text>
+//           </TouchableOpacity>
+//         </View>
+//       </View>
+
+//       <View style={styles.phoneRow}>
+//         <View style={styles.phonePrefix}>
+//           <Text style={{ fontSize: 18, marginRight: 6 }}>
+//             {codeToFlag(country?.countryCode)}
+//           </Text>
+//           <Text style={{ fontWeight: "700", color: Colors.textPrimary }}>
+//             {dial}
+//           </Text>
+//         </View>
+//         <TextInput
+//           value={formatted}
+//           onChangeText={(t) => {
+//             let d = t.replace(/\D/g, "");
+//             if (d.startsWith("0")) d = d.slice(1);
+//             onChange(d.slice(0, 9));
+//           }}
+//           keyboardType="number-pad"
+//           placeholder="700-000-000"
+//           placeholderTextColor="#B8B8B8"
+//           style={styles.phoneInput}
+//         />
+//         <TouchableOpacity
+//           onPress={openContacts}
+//           style={{ paddingHorizontal: 10, justifyContent: "center" }}
+//         >
+//           <Ionicons name="person-circle-outline" size={22} color="#A9A9A9" />
+//         </TouchableOpacity>
+//       </View>
+
+//       <View style={{ marginTop: 10, minHeight: 24 }}>
+//         {operator ? (
+//           <View
+//             style={[
+//               styles.operatorPill,
+//               {
+//                 backgroundColor: hexFade(operator.color, 0.14),
+//                 borderColor: operator.color,
+//               },
+//             ]}
+//           >
+//             <Ionicons
+//               name="radio-outline"
+//               size={14}
+//               color={operator.color}
+//               style={{ marginRight: 6 }}
+//             />
+//             <Text
+//               style={{ color: operator.color, fontWeight: "600", fontSize: 12 }}
+//             >
+//               {operator.name}
+//             </Text>
+//           </View>
+//         ) : (
+//           <Text style={{ color: "#9E9E9E", fontSize: 12 }}>
+//             We’ll detect the operator automatically
+//           </Text>
+//         )}
+//       </View>
+//     </View>
+//   );
+// }
+
 function StepNumber({
   dial,
   country,
   value,
   onChange,
+  localNumber,
   operator,
   onEditCountry,
   openContacts,
 }) {
   const formatted = formatLocal(value);
+
   return (
     <View style={{ marginTop: 12 }}>
       <View style={styles.editHeader}>
@@ -413,20 +548,29 @@ function StepNumber({
 
       <View style={styles.phoneRow}>
         <View style={styles.phonePrefix}>
-          <Text style={{ fontSize: 18, marginRight: 6 }}>
-            {codeToFlag(country?.countryCode)}
+          <Text style={{ fontSize: 18 }}>
+            {/* {codeToFlag(country?.countryCode)} */}
+{value.length > 1 &&<View style={{width:52, height:52,  paddingLeft: 10, display: "flex", justifyContent: "center", alignItems:"center"}}>                                <Image source={ getMnoLogo(getSetaraganMnoId(value))} style={{ width: "100%", height: "100%", resizeMode: "contain", borderRadius: 100 }} />
+</View>}
           </Text>
-          <Text style={{ fontWeight: "700", color: Colors.textPrimary }}>
+          <Text style={{ fontWeight: "700", color: Colors.textPrimary, marginRight: 10 }}>
             {dial}
           </Text>
         </View>
         <TextInput
           value={formatted}
           onChangeText={(t) => {
-            let d = t.replace(/\D/g, "");
-            if (d.startsWith("0")) d = d.slice(1);
-            onChange(d.slice(0, 9));
-          }}
+            const trimmed = value.trim()
+            if(t.startsWith("0") && trimmed.length == 0){
+                Alert.alert(
+      "Invalid Number",
+      "Please start your phone number with 7 instead of 0, as the 0 is already included in your country code."
+    );
+   const  numeric = trimmed.replace(/^0+/, "");
+    onChange(numeric)
+    return 
+            }
+            onChange(t.replace(/\D/g, "").slice(0, 9))}}
           keyboardType="number-pad"
           placeholder="700-000-000"
           placeholderTextColor="#B8B8B8"
@@ -443,15 +587,15 @@ function StepNumber({
       <View style={{ marginTop: 10, minHeight: 24 }}>
         {operator ? (
           <View
-            style={[
-              styles.operatorPill,
-              {
-                backgroundColor: hexFade(operator.color, 0.14),
-                borderColor: operator.color,
-              },
-            ]}
+            // style={[
+            //   styles.operatorPill,
+            //   {
+            //     backgroundColor: hexFade(operator.color, 0.14),
+            //     borderColor: operator.color,
+            //   },
+            // ]}
           >
-            <Ionicons
+            {/* <Ionicons
               name="radio-outline"
               size={14}
               color={operator.color}
@@ -461,7 +605,7 @@ function StepNumber({
               style={{ color: operator.color, fontWeight: "600", fontSize: 12 }}
             >
               {operator.name}
-            </Text>
+            </Text> */}
           </View>
         ) : (
           <Text style={{ color: "#9E9E9E", fontSize: 12 }}>
@@ -494,10 +638,11 @@ function StepProducts({
         activeOpacity={0.85}
       >
         <Text style={[styles.bundleDesc, active && { color: Colors.primary }]}>
-          {item.desc}
+          {item.productName}
         </Text>
         <Text style={[styles.bundlePrice, active && { color: Colors.primary }]}>
-          {item.usd} USD • {item.afn} AFN
+          {/* {item.usd} USD • {item.afn} AFN */}
+          {item.price} AFN
         </Text>
         {!!item.popular && <Text style={styles.popularTag}>★ Popular</Text>}
       </TouchableOpacity>
@@ -516,10 +661,10 @@ function StepProducts({
       <Text style={styles.smallLabel}>Country</Text>
       <View style={styles.countryBadge}>
         <Text style={{ fontSize: 16, marginRight: 6 }}>
-          {codeToFlag(country?.code)}
+          {codeToFlag(country?.countryCode)}
         </Text>
         <Text style={{ fontWeight: "600", color: Colors.textPrimary }}>
-          {country?.name}
+          {country?.countryName}
         </Text>
       </View>
 
@@ -581,7 +726,7 @@ function StepProducts({
             </View>
             <View style={styles.summaryRow}>
               <Text style={styles.summaryKey}>Plan</Text>
-              <Text style={styles.summaryValue}>{product.desc}</Text>
+              <Text style={styles.summaryValue}>{product?.productName}</Text>
             </View>
           </View>
           <View
@@ -604,7 +749,7 @@ function StepProducts({
                 { color: Colors.primary, fontWeight: "700" },
               ]}
             >
-              {summary.usd} USD • {summary.afn} AFN
+              {product.price} AFN
             </Text>
           </View>
         </View>

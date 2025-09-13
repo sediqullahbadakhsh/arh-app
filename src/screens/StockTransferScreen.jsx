@@ -113,7 +113,6 @@ console.log("this is transfer stock payload: ", payload)
           <Text style={styles.title}>Stock Transfer Successful!</Text>
 
           <Row k="Agent: " v={`${agent?.user?.username} (${agent?.user?.mobileNumber})`} />
-          <Row k="Transaction ID: " v={txId} />
           <Row k="Date: " v={new Date().toLocaleString()} />
 
           <View style={styles.totalBox}>
@@ -358,7 +357,7 @@ const styles = StyleSheet.create({
 
   card: {
     borderWidth: 1,
-    borderColor: "#E9E9E9",
+    borderColor: "#C40C0266",
     backgroundColor: "#FFF",
     borderRadius: 12,
     padding: 12,

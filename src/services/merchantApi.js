@@ -1,4 +1,5 @@
 import api from "./apiClient";
+import { buildQueryString } from "./queryBuilder";
 
 export const merchantSignup = (payload) =>
   api.post("/merchant/sign-up?lang=en", payload).then((r) => r.data);
@@ -37,8 +38,19 @@ export const makeRecharge = (payload = {})=>{
 }
 
 export const getDataProducts = (filters = {})=>{
+  // const query = buildQueryString({
+  //   lang: "en",
+  //   ...filters,
+  // });
   
-  return api.get(`/product/admin?lang=en`).then((r)=>r.data)
+  // return api.get(`/product/admin?lang=en&countryId=${filters?.countryId}&productCategoryId=${filters?.productCategoryId}&search=${filters?.search}`).then((r)=>r.data)
+  return api.get(`/product/admin?lang=en`).then((r)=>r?.data)
+}
+
+export const activateDataBundle = (payload = {})=>{
+
+  
+  return api.post(`/product-activation?lang=en`, payload).then((r)=>r?.data)
 }
 
 export const getDataBundleCategory = (filters = {})=>{
@@ -83,6 +95,16 @@ export const createDownlineAgent = (payload)=>{
 
 export const getStatementReport = ()=>{
   return api.get(`/statement/report?lang=en`).then((r)=>r.data)
+
+}
+
+export const updateCommissionRate = (agentId, payload)=>{
+  return api.patch(`/agents/setComission/${agentId}?lang=en`,payload).then((r)=>r.data)
+
+}
+
+export const updateLanguage = (agentId, payload)=>{
+  return api.patch(`/agents/${agentId}?lang=en`,payload).then((r)=>r.data)
 
 }
 
