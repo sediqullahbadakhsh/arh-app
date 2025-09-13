@@ -84,10 +84,32 @@ export const getStockInOut = ()=>{
 
 }
 
-export const getChildUsers = (parentUserId)=>{
-  return api.get(`/merchant-downlineAgent/${parentUserId}?lang=en`).then((r)=>r.data)
+export const getChildUsers = (parentUserId, filterParams = {}) => {
 
-}
+  console.log("this is filte robject form getCHildUsers: ", filterParams)
+  // Create query params dynamically
+  const params = new URLSearchParams();
+
+  // Always add lang
+  params.append("lang", "en");
+
+  // Add filters only if they exist
+  if (filterParams.status) {
+    params.append("status", filterParams.status);
+  }
+
+  if (filterParams.search) {
+    params.append("search", filterParams.search);
+  }
+  // params.append("status", "inactive")
+
+  // Build final URL
+  const queryString = params.toString();
+  const url = `/merchant-downlineAgent/${parentUserId}?${queryString}`;
+
+  return api.get(url).then((r) => r.data);
+};
+
 export const createDownlineAgent = (payload)=>{
   return api.post(`/merchant-downlineAgent?lang=en`, payload).then((r)=>r.data)
 

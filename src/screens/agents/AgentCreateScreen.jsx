@@ -30,7 +30,7 @@ const LANGS = ["english", "dari", "pashto"];
 
 const GAP = 1;
 
-export default function AgentCreateScreen({ navigation }) {
+export default function AgentCreateScreen({ navigation,route }) {
   const {user} = useUser()
   const [step, setStep] = useState(0);
 
@@ -63,7 +63,7 @@ export default function AgentCreateScreen({ navigation }) {
   // Step 3 (KYC)
   const [photoUri, setPhotoUri] = useState(null);
   const [idFile, setIdFile] = useState(null);
-
+const {refreshAgentList} = route.params || {}
   const next = () => setStep((s) => Math.min(2, s + 1));
   const back = () => setStep((s) => Math.max(0, s - 1));
 console.log("👀 AgentCreateScreen rendered!");
@@ -121,6 +121,7 @@ console.log("👀 AgentCreateScreen rendered!");
         parentAgentId: user?.id,
       };
       await createDownlineAgent(payload); 
+      refreshAgentList()
       navigation.replace("SignupResult", {
         type: "Retailer",
         title: "Application Submitted",

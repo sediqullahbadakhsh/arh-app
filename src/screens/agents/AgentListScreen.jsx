@@ -22,16 +22,35 @@ export default function AgentListScreen({ navigation }) {
   const [filter, setFilter] = useState("All");
   const [q, setQ] = useState("");
   const [childUser, setChildUsers] = useState([])
+  const [refetchAgents, setRefetchAgents] = useState(false)
+  const [filters, setFilters] = useState({search: "", status: ""})
+
+  const refreshAgentList = ()=>{
+    setRefetchAgents(!refetchAgents)
+  }
+
+  const handleFilterChange = (key, value) => {
+    setFilters((prev) => ({ ...prev, [key]: value }));
+  }
 
   useEffect(()=>{
 const getDownlineAgents = async()=>{
-  const res = await getChildUsers(user?.id)
+  const filterParams = {}
+
+  if (filters.status && filters.status !== "All") {
+    filterParams.status = filters.status.toLowerCase();
+  }
+
+  if (filters.search){
+    filterParams.search = filters.search
+  }
+  const res = await getChildUsers(user?.id,filterParams)
   setChildUsers(res?.data)
   console.log("💖💖💖",res?.data[0]?.user )
 }
 
 getDownlineAgents()
-  },[])
+  },[refetchAgents, filters.search, filters.status])
 
   const data = useMemo(() => {
     const base =
@@ -64,7 +83,7 @@ getDownlineAgents()
         </View>
         <TouchableOpacity
           style={styles.viewBtn}
-          onPress={() => navigation.navigate("AgentView", { agent: item })}
+          onPress={() => navigation.navigate("AgentView", { agent: item, refreshAgentList })}
         >
           <Text style={styles.viewBtnText}>View Agent</Text>
         </TouchableOpacity>
@@ -84,7 +103,10 @@ getDownlineAgents()
             return (
               <TouchableOpacity
                 key={f}
-                onPress={() => setFilter(f)}
+                onPress={() => {
+                  handleFilterChange("status", f === "All" ? "" : f)
+                  setFilter(f)
+                }}
                 style={[styles.pill, active && styles.pillActive]}
               >
                 <Text
@@ -104,7 +126,10 @@ getDownlineAgents()
             <TextInput
               style={styles.searchInput}
               value={q}
-              onChangeText={setQ}
+              onChangeText={(val)=>{
+                handleFilterChange("search", val)
+                setQ(val)
+              }}
               placeholder="Search Contacts"
               placeholderTextColor="#9E9E9E"
               autoCapitalize="none"
@@ -112,7 +137,7 @@ getDownlineAgents()
           </View>
           <TouchableOpacity
             style={styles.addBtn}
-            onPress={() => navigation.navigate("AgentCreate")}
+            onPress={() => navigation.navigate("AgentCreate", { refreshAgentList })}
           >
             <Text style={styles.addBtnText}>Add Agent</Text>
           </TouchableOpacity>
