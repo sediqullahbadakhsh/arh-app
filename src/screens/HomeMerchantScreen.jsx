@@ -93,7 +93,10 @@ export default function HomeMerchantScreen({ navigation }) {
         navigation.navigate("StockTransfer");
         break;
       case "MobileTopup":
+
         navigation.navigate("Topup"); 
+
+
         break;
       case "DataBundle":
         navigation.navigate("Data"); 
