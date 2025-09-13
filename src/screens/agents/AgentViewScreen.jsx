@@ -6,7 +6,7 @@ import Feather from '@expo/vector-icons/Feather';
 import { updateCommissionRate } from "../../services/merchantApi";
 
 export default function AgentViewScreen({ navigation, route }) {
-  const { agent } = route.params || {};
+  const { agent,refreshAgentList } = route.params || {};
   if (!agent) return null;
 
   console.log("this is agent information: ", agent)
@@ -28,7 +28,9 @@ export default function AgentViewScreen({ navigation, route }) {
         commission_rate: Number(commissionRate)
       }
       const res = await updateCommissionRate(agent?.user_id, payload)
+      refreshAgentList()
       Alert.alert("Commission Update", "Commission Rate Updated Successfully")
+      navigation.goBack(-1)
       
     } catch (error) {
       Alert.alert("Failed to set Commission", "Oops, Something Went Wrong!")
@@ -68,7 +70,7 @@ export default function AgentViewScreen({ navigation, route }) {
         <Row k="Location" v={agent.address} />
         </View>}
 
-        <View style={{   marginTop: 40}}>
+        {isCommissionScreen && <View style={{   marginTop: 40}}>
           <Text style={{marginBottom: 10}}>Commission Rate</Text>
           <View style={styles.commBox}>
              <TextInput
@@ -103,7 +105,7 @@ export default function AgentViewScreen({ navigation, route }) {
             <Text style={styles.addBtnText}>Cancel</Text>
           </TouchableOpacity>
           </View>}
-        </View>
+        </View>}
       </View>
     </SafeAreaView>
   );
