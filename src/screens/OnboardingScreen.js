@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../theme/colors";
 import DotIndicators from "../components/DotIndicators";
+import LottieView from "lottie-react-native";
 
 const { width } = Dimensions.get("window");
 const ILLUSTRATION = require("../../assets/onboard.png");
@@ -24,20 +25,24 @@ const SLIDES = [
     title: "Top-up Anytime, Anywhere",
     subtitle:
       "Send airtime and data to any mobile number in any country — instantly.",
+    lottie: require("../../assets/lotties/SecurePay1.json"),
   },
   {
     key: "s2",
     title: "All Networks. All Wallets.",
     subtitle:
       "Top-up across networks, pay with your preferred wallet in your local currency.",
+     lottie: require("../../assets/lotties/Securep1.json"),
   },
   {
     key: "s3",
     title: "Your Security, Our Priority",
     subtitle:
       "Bank-grade encryption, OTPs, and real-time monitoring keep your transactions safe.",
+     lottie: require("../../assets/lotties/mobile.json"),
   },
 ];
+
 
 export default function OnboardingScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -70,18 +75,18 @@ export default function OnboardingScreen({ navigation }) {
   const renderItem = useCallback(
     ({ item }) => (
       <View style={{ width }}>
-        {/* inner column so padding doesn’t break centering */}
+     
         <View style={[styles.slideInner, { paddingTop: insets.top + 124 }]}>
-          {/* HERO */}
-          <View style={styles.heroArea}>
-            <Image
-              source={ILLUSTRATION}
-              style={styles.heroImage}
-              resizeMode="contain"
-            />
-          </View>
+      <View style={styles.heroArea}>
+  <LottieView
+    source={item.lottie}
+    autoPlay
+    loop
+    style={styles.lottie}
+  />
+</View>
 
-          {/* COPY */}
+     
           <Text style={styles.title}>{item.title}</Text>
           <Text style={styles.subtitle}>{item.subtitle}</Text>
         </View>
@@ -106,12 +111,11 @@ export default function OnboardingScreen({ navigation }) {
           getItemLayout={getItemLayout}
         />
 
-        {/* Dots */}
+    
         <View style={styles.dots}>
           <DotIndicators total={SLIDES.length} activeIndex={index} />
         </View>
 
-        {/* Bottom bar */}
         <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 8 }]}>
           {!isLast ? (
             <TouchableOpacity
@@ -150,35 +154,38 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     alignItems: "center",
   },
+  lottie: {
+  width: 400,
+  height: 400,
+},
 
-  // HERO centered and consistent across slides
   heroArea: {
     height: HERO_HEIGHT,
     width: "100%",
     alignItems: "center",
     justifyContent: "center",
   },
-  // Size chosen to match the mock’s visual weight; adjust slightly if your PNG proportions differ
+
   heroImage: {
     width: 230,
     height: 180,
   },
 
   title: {
-    marginTop: 52,
-    fontSize: 18,
+    marginTop: 110,
+    fontSize: 20,
     // fontWeight: "500",
     fontFamily: "dmsansMedium",
     color: Colors.textTitle,
     textAlign: "center",
   },
   subtitle: {
-    marginTop: 20,
+    marginTop: 15,
     fontSize: 16,
     color: Colors.textSubtitle,
     textAlign: "center",
     fontFamily: "dmsansRegular",
-    lineHeight: 18,
+    lineHeight: 26,
     paddingHorizontal: 6,
   },
 

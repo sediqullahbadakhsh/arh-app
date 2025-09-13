@@ -18,7 +18,7 @@ export default function LoginScreen({ navigation }) {
   const [canUseOtp, setCanUseOtp] = useState(false);
   const [nextReady, setNextReady] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [hint, setHint] = useState(null); // UX hint after /auth/start
+  const [hint, setHint] = useState(null); 
   const auth = useAuth();
 
   const navigatePassword = () =>
@@ -52,7 +52,7 @@ export default function LoginScreen({ navigation }) {
       const pw = !!data?.canUsePassword;
       const otp = !!data?.canUseOtp;
 
-      // Auto-route when there's only one valid next step
+  
       if (data?.nextStep === "password" && pw && !otp) {
         navigatePassword();
         return;
@@ -62,19 +62,19 @@ export default function LoginScreen({ navigation }) {
         return;
       }
 
-      // Otherwise show both options
+  
       setCanUsePassword(pw);
       setCanUseOtp(otp);
       setNextReady(true);
 
-      // Helper hint
+   
       if (!pw && otp)
         setHint("This account signs in via a one-time code (OTP).");
       else if (pw && !otp) setHint("This account signs in with a password.");
       else if (pw && otp) setHint("Choose Password or One-Time Code (OTP).");
       else setHint("No available sign-in method. Contact support.");
     } catch (e) {
-      // Some flows (e.g. unverified customer) may return 4xx with nextStep=otp
+   
       const nextStep = e?.response?.data?.nextStep || e?.nextStep;
       const canPw = !!e?.response?.data?.canUsePassword;
       const canO = !!e?.response?.data?.canUseOtp;
@@ -115,7 +115,7 @@ export default function LoginScreen({ navigation }) {
 
       <View style={styles.container}>
        <View style={{marginVertical: 20}}>
-         {/* Email only */}
+   
          <Text style={styles.label}>Email Address</Text>
         <RoundedInput
           value={email}
@@ -127,7 +127,7 @@ export default function LoginScreen({ navigation }) {
           onSubmitEditing={nextReady ? undefined : start}
         />
 
-        {/* Subtle helper text after /auth/start */}
+    
         {hint && (
           <Text style={styles.helperText} accessibilityRole="text">
             {hint}{" "}
@@ -168,7 +168,7 @@ export default function LoginScreen({ navigation }) {
           </>
         )}
 
-          {/* Divider */}
+
         <View style={styles.dividerRow}>
           <View style={styles.divider} />
           <Text style={styles.dividerText}>if you have a merchant account</Text>
@@ -238,15 +238,15 @@ const styles = StyleSheet.create({
   dividerRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 30,
-    marginBottom: 30,
+    marginTop: 20,
+    marginBottom: 20,
   },
   divider: { flex: 1, height: 1, backgroundColor: Colors.divider },
   dividerText: { marginHorizontal: 12, color: "#666666", fontSize: 13, fontFamily: "dmsansMedium" },
   socialRow: {
     flexDirection: "row",
     justifyContent: "center",
-    marginBottom: 24,
+    marginBottom: 20,
   },
   label: {
     fontFamily: "dmsansRegular",
