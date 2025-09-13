@@ -7,7 +7,7 @@ export default function ServiceButton({ icon, label, onPress }) {
     return (
         <TouchableOpacity style={styles.wrapper} onPress={onPress} activeOpacity={0.85}>
             <View style={styles.iconBox}>
-                <Ionicons name={icon} size={24} color={Colors.primary} />
+                <Ionicons name={icon} size={32} color={Colors.primary} />
             </View>
             <Text style={styles.text} numberOfLines={2}>{label}</Text>
         </TouchableOpacity>
@@ -16,13 +16,13 @@ export default function ServiceButton({ icon, label, onPress }) {
 
 const styles = StyleSheet.create({
     wrapper: {
-        width: '23%',       // 4 items per row roughly
+        width: '23%',      
         alignItems: 'center',
         marginBottom: 18,
     },
     iconBox: {
-        width: 56,
-        height: 56,
+        width: 68,
+        height: 68,
         borderRadius: 16,
         backgroundColor: '#fff',
         borderWidth: 1,
@@ -37,7 +37,8 @@ const styles = StyleSheet.create({
         elevation: 2,
     },
     text: {
-        fontSize: 11,
+        fontSize: 12,
+        marginTop: 3,
         color: Colors.textPrimary,
         textAlign: 'center',
         lineHeight: 14,
