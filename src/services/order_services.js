@@ -5,7 +5,7 @@ export const getOrdersC = async (filters = {}) => {
   try {
     const params = new URLSearchParams();
     
-    // Add filters to params
+
     Object.keys(filters).forEach(key => {
       if (filters[key]) {
         params.append(key, filters[key]);
