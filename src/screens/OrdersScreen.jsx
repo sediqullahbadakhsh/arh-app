@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from "../theme/colors";
 import { getOrdersC, retryOrder } from '../services/order_services';
 import ServiceHeader from '../components/ServiceHeader';
+import { useNavigation } from '@react-navigation/native';
 
 const OrdersScreen = () => {
   const [filters, setFilters] = useState({
@@ -27,6 +28,7 @@ const OrdersScreen = () => {
     limit: 10,
   });
   const [refreshing, setRefreshing] = useState(false);
+   const navigation = useNavigation(); 
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
@@ -49,7 +51,9 @@ const OrdersScreen = () => {
       alert('Failed to retry order. Please try again.');
     },
   });
- const goBack = () => (step > 0 ? setStep(step - 1) : navigation.goBack());
+  const goBack = () => {
+    navigation.goBack();
+  };
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
