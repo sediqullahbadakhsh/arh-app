@@ -10,17 +10,21 @@ import * as Font from "expo-font";
 import { Fonts } from "./src/utils/fonts";
 import { StripeProvider } from '@stripe/stripe-react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import dmsansRegular from './assets/fonts/dmsansRegular.ttf';
+import dmsansMedium from './assets/fonts/dmsansMedium.ttf';
+import dmsansBold from './assets/fonts/dmsansBold.ttf';
 
 export default function App() {
   const [fontsLoaded, setFontsLoaded] = useState(false);
 
   useEffect(() => {
     async function loadFonts() {
-      await Font.loadAsync({
-        [Fonts.REGULAR]: require("./assets/fonts/dmsansRegular.ttf"),
-        [Fonts.MEDIUM]: require("./assets/fonts/dmsansMedium.ttf"),
-        [Fonts.BOLD]: require("./assets/fonts/dmsansBold.ttf"),
-      });
+await Font.loadAsync({
+  [Fonts.REGULAR]: dmsansRegular,
+  [Fonts.MEDIUM]: dmsansMedium,
+  [Fonts.BOLD]: dmsansBold,
+});
+
       setFontsLoaded(true);
     }
     loadFonts();
