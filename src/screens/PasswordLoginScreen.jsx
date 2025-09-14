@@ -8,6 +8,7 @@ import {
   Platform,
   Text,
   Alert,
+  TouchableOpacity,
 } from "react-native";
 import { Colors } from "../theme/colors";
 import AuthHeader from "../components/AuthHeader";
@@ -19,6 +20,7 @@ import InputField from "../components/InputField";
 import Checkbox from "../components/Checkbox";
 import { useUser } from "../context/userContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function PasswordLoginScreen({ route, navigation }) {
   const { target = "" } = route.params || {}; // email / identifier
@@ -92,7 +94,7 @@ const onLogin = async () => {
 
 
   const canSubmit = password.trim().length > 0 && !busy;
-
+  const [hidden, setHidden] = useState(true);
   return (
     <SafeAreaView style={styles.safeArea}>
       <AuthHeader title={"Sign in to your\nAccount"} onBack={() => navigation.goBack()} />
@@ -104,29 +106,49 @@ const onLogin = async () => {
         
        <View style={{marginTop: 40}}>
           <View style={{marginBottom: 20}}> 
-            <Text style={{marginBottom: 6}}>Email</Text>
-          <InputField
-  value={email}
-  onChangeText={setEmail}
-  placeholder="example@example.com"
-  returnKeyType="done"
+            <Text style={{marginBottom: 6, fontSize: 16}}>Email</Text>
+            <RoundedInput
+              value={email}
+              onChangeText={setEmail}
+              placeholder="example@example.com"
+              keyboardType="email-address"
+              rightIcon={<Ionicons name="mail-outline" size={24} color="#344054" />}
+                returnKeyType="done"
   onSubmitEditing={canSubmit ? onLogin : undefined}
-  style={{ marginBottom: 16, backgroundColor: Colors.pageBackColor }}
-/>
+            />
           </View>
          <View>
-<Text style={{marginBottom: 6}}>Password</Text>
-           <PasswordField
+<Text style={{marginBottom: 6, fontSize: 16}}>Password</Text>
+            <RoundedInput
+            value={password}
+            onChangeText={setPassword}
+             placeholder="xxxxxxx"
+            secureTextEntry={hidden}
+            rightIcon={
+                <TouchableOpacity onPress={() => setHidden(!hidden)}>
+                    <Ionicons 
+                        name={hidden ? 'eye-off-outline' : 'eye-outline'} 
+                        size={22} 
+                        color="#A9A9A9" 
+                    />
+                </TouchableOpacity>
+            }
+        
+           returnKeyType="done"
+           onSubmitEditing={canSubmit ? onLogin : undefined}
+        />
+
+           {/* <PasswordField
             value={password}
             onChangeText={setPassword}
             placeholder="xxxxxxx"
             returnKeyType="done"
             onSubmitEditing={canSubmit ? onLogin : undefined}
             style={ {marginBottom: 16, backgroundColor: Colors.pageBackColor} }
-          />
+          /> */}
          </View>
        </View>
-       <View style={{display: "flex", flexDirection: "row", justifyContent: "space-between" }}>
+       <View style={{display: "flex", flexDirection: "row", marginTop: 8, justifyContent: "space-between" }}>
         <View style={{display: "flex", justifyContent: "flex-start", flexDirection: "row", alignItems: "center"}}>
           <Checkbox checked={rememberMe} onToggle={()=>{setRememberMe((prev)=>!prev)}}/>
           <Text style={{fontFamily: "mdsansRegular", fontSize: 14,marginLeft: 8, color: Colors.textTitle}}>Remember Me</Text>

@@ -3,9 +3,7 @@ import { View, Text, StyleSheet, Image, SafeAreaView } from "react-native";
 import { Colors } from "../theme/colors";
 import PrimaryButton from "../components/PrimaryButton";
 import OutlineButton from "../components/OutlineButton";
-
-const phoneIllustration = require("../../assets/images/phone-illustration.png");
-
+import phoneIllustration from "../../assets/images/phone-illustration.png";
 export default function WelcomeScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safeArea}>

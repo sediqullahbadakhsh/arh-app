@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,10 @@ import {
   ScrollView,
   ActivityIndicator,
   SafeAreaView,
-  StatusBar
+  Alert,
+  Share,
+  Platform,
+  Dimensions
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,6 +22,11 @@ import { Colors } from "../theme/colors";
 import { getOrdersC, retryOrder } from '../services/order_services';
 import ServiceHeader from '../components/ServiceHeader';
 import { useNavigation } from '@react-navigation/native';
+import ViewShot from 'react-native-view-shot';
+import * as MediaLibrary from 'expo-media-library';
+import * as FileSystem from 'expo-file-system';
+
+const { width } = Dimensions.get('window');
 
 const OrdersScreen = () => {
   const [filters, setFilters] = useState({
@@ -28,29 +36,30 @@ const OrdersScreen = () => {
     limit: 10,
   });
   const [refreshing, setRefreshing] = useState(false);
-   const navigation = useNavigation(); 
+  const navigation = useNavigation(); 
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const queryClient = useQueryClient();
+  const viewShotRef = useRef();
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['orders', filters],
     queryFn: () => getOrdersC(filters),
   });
-  console.log(data, "this is data of order")
 
   const retryOrderMutation = useMutation({
     mutationFn: (id) => retryOrder(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
-      alert('Order retry requested successfully');
+      Alert.alert('Success', 'Order retry requested successfully');
     },
     onError: (error) => {
       console.error('Failed to retry order:', error);
-      alert('Failed to retry order. Please try again.');
+      Alert.alert('Error', 'Failed to retry order. Please try again.');
     },
   });
+
   const goBack = () => {
     navigation.goBack();
   };
@@ -77,27 +86,159 @@ const OrdersScreen = () => {
     setDetailModalVisible(true);
   };
 
-  const renderOrderItem = ({ item }) => (
-    <TouchableOpacity 
-      style={styles.orderItem} 
-      onPress={() => handleViewDetails(item)}
-    >
-      <View style={styles.orderHeader}>
-        <Text style={styles.txnId}>TXN: {item.txnNumber}</Text>
-        <View style={[styles.statusBadge, 
-          { backgroundColor: 
-            item.status === 'succeeded' ? '#4caf50' : 
-            item.status === 'failed' ? '#f44336' : 
-            '#ff9800' 
-          }
-        ]}>
-          <Text style={styles.statusText}>{item.status}</Text>
+  const handleResendOrder = (order) => {
+    navigation.navigate('Topup1', { 
+      resendOrder: {
+        receiver: order.receiver,
+        amount: order.amount
+      }
+    });
+  };
+
+  const requestMediaPermission = async () => {
+    if (Platform.OS !== 'web') {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      return status === 'granted';
+    }
+    return false;
+  };
+
+  const downloadReceipt = async () => {
+    try {
+      if (Platform.OS === 'web') {
+        Alert.alert('Info', 'Download feature is not available on web');
+        return;
+      }
+
+      const hasPermission = await requestMediaPermission();
+      if (!hasPermission) {
+        Alert.alert('Permission required', 'Please allow access to save the receipt');
+        return;
+      }
+
+      const uri = await viewShotRef.current.capture();
+      const asset = await MediaLibrary.createAssetAsync(uri);
+      await MediaLibrary.createAlbumAsync('Receipts', asset, false);
+      
+      Alert.alert('Success', 'Receipt saved to your gallery');
+    } catch (error) {
+      console.error('Error saving receipt:', error);
+      Alert.alert('Error', 'Failed to save receipt');
+    }
+  };
+
+  const shareReceipt = async () => {
+    try {
+      if (Platform.OS === 'web') {
+        Alert.alert('Info', 'Share feature is not available on web');
+        return;
+      }
+
+      const uri = await viewShotRef.current.capture();
+      await Share.share({
+        url: uri,
+        title: 'Order Receipt',
+        message: 'Here is my order receipt',
+      });
+    } catch (error) {
+      console.error('Error sharing receipt:', error);
+    }
+  };
+
+  const OrderReceipt = ({ order }) => (
+    <ViewShot ref={viewShotRef} options={{ format: 'jpg', quality: 0.9 }}>
+      <View style={styles.receiptContainer}>
+        <View style={styles.receiptHeader}>
+          <Text style={styles.receiptTitle}>ORDER RECEIPT</Text>
+          <Text style={styles.receiptSubtitle}>Transaction Confirmation</Text>
         </View>
+        
+        <View style={styles.receiptDivider} />
+        
+        <View style={styles.receiptDetails}>
+          <View style={styles.receiptRow}>
+            <Text style={styles.receiptLabel}>Transaction ID:</Text>
+            <Text style={styles.receiptValue}>{order.txnNumber}</Text>
+          </View>
+          
+          <View style={styles.receiptRow}>
+            <Text style={styles.receiptLabel}>Date:</Text>
+            <Text style={styles.receiptValue}>
+              {new Date(order.createdAt).toLocaleString()}
+            </Text>
+          </View>
+          
+          <View style={styles.receiptRow}>
+            <Text style={styles.receiptLabel}>Status:</Text>
+            <View style={[
+              styles.receiptStatus, 
+              { backgroundColor: 
+                order.status === 'succeeded' ? '#4caf50' : 
+                order.status === 'failed' ? '#f44336' : 
+                '#ff9800' 
+              }
+            ]}>
+              <Text style={styles.receiptStatusText}>{order.status}</Text>
+            </View>
+          </View>
+          
+          <View style={styles.receiptDividerThin} />
+          
+          <View style={styles.receiptRow}>
+            <Text style={styles.receiptLabel}>Receiver:</Text>
+            <Text style={styles.receiptValue}>{order.receiver}</Text>
+          </View>
+          
+          <View style={styles.receiptRow}>
+            <Text style={styles.receiptLabel}>Amount:</Text>
+            <Text style={[styles.receiptValue, styles.amountText]}>
+              {Number(order.amount).toFixed(2)} {order.currency}
+            </Text>
+          </View>
+          
+          <View style={styles.receiptRow}>
+            <Text style={styles.receiptLabel}>Payment Method:</Text>
+            <Text style={styles.receiptValue}>
+              {order.source?.replace('_', ' ').toUpperCase()}
+            </Text>
+          </View>
+        </View>
+        
+        <View style={styles.receiptDivider} />
+        
+        <View style={styles.receiptFooter}>
+          <Text style={styles.thankYouText}>Thank you for your order!</Text>
+          <Text style={styles.supportText}>
+            For support, contact: support@example.com
+          </Text>
+        </View>
+      </View>
+    </ViewShot>
+  );
+
+  const renderOrderItem = ({ item }) => (
+    <View style={styles.orderItem}>
+      <View style={styles.orderHeader}>
+        <View style={styles.orderIdContainer}>
+          <Text style={styles.txnId}>TXN: {item.txnNumber}</Text>
+          <View style={[styles.statusBadge, 
+            { backgroundColor: 
+              item.status === 'succeeded' ? '#4caf50' : 
+              item.status === 'failed' ? '#f44336' : 
+              '#ff9800' 
+            }
+          ]}>
+            <Text style={styles.statusText}>{item.status}</Text>
+          </View>
+        </View>
+        <Text style={styles.dateText}>
+          {new Date(item.createdAt).toLocaleDateString()}
+        </Text>
       </View>
       
       <View style={styles.orderBody}>
         <View style={styles.receiverInfo}>
-          <Ionicons name="person" size={16} color="#666" />
+          <Ionicons name="call" size={16} color="#666" />
           <Text style={styles.receiverText}>{item.receiver}</Text>
         </View>
         
@@ -112,13 +253,10 @@ const OrdersScreen = () => {
       </View>
       
       <View style={styles.orderFooter}>
-        <Text style={styles.dateText}>
-          {new Date(item.createdAt).toLocaleDateString()}
-        </Text>
-        
         <View style={styles.actionButtons}>
           {item.status === 'failed' && (
             <TouchableOpacity 
+              style={styles.actionButton}
               onPress={() => handleRetryOrder(item.id)}
               disabled={retryOrderMutation.isLoading}
             >
@@ -127,15 +265,28 @@ const OrdersScreen = () => {
                 size={20} 
                 color={retryOrderMutation.isLoading ? '#ccc' : '#007AFF'} 
               />
+              <Text style={styles.actionButtonText}>Retry</Text>
             </TouchableOpacity>
           )}
           
-          <TouchableOpacity onPress={() => handleViewDetails(item)}>
-            <Ionicons name="eye" size={20} color="#CD0202" />
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => handleResendOrder(item)}
+          >
+            <Ionicons name="return-up-forward" size={20} color={Colors.primary} />
+            <Text style={styles.actionButtonText}>Resend</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => handleViewDetails(item)}
+          >
+            <Ionicons name="receipt" size={20} color="#CD0202" />
+            <Text style={styles.actionButtonText}>Receipt</Text>
           </TouchableOpacity>
         </View>
       </View>
-    </TouchableOpacity>
+    </View>
   );
 
   const renderEmptyState = () => (
@@ -163,10 +314,9 @@ const OrdersScreen = () => {
   );
 
   return (
-     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
-        <ServiceHeader title="Orders" onBack={goBack} />
+    <SafeAreaView style={styles.container}>
+      <ServiceHeader title="Orders" onBack={goBack} />
       
- 
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Order History</Text>
         <TouchableOpacity 
@@ -176,7 +326,6 @@ const OrdersScreen = () => {
           <Ionicons name="filter" size={24} color="#CD0202" />
         </TouchableOpacity>
       </View>
-
 
       <View style={styles.searchContainer}>
         <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
@@ -188,7 +337,6 @@ const OrdersScreen = () => {
         />
       </View>
 
-  
       {isError ? (
         renderErrorState()
       ) : (
@@ -200,17 +348,15 @@ const OrdersScreen = () => {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
           ListEmptyComponent={!isLoading ? renderEmptyState() : null}
-          contentContainerStyle={data?.data?.length === 0 ? styles.emptyList : null}
+          contentContainerStyle={data?.data?.length === 0 ? styles.emptyList : styles.listContainer}
         />
       )}
-
 
       {isLoading && (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#CD0202" />
         </View>
       )}
-
 
       <Modal
         visible={filterModalVisible}
@@ -229,7 +375,7 @@ const OrdersScreen = () => {
 
             <ScrollView style={styles.filterOptions}>
               <Text style={styles.filterSectionTitle}>Status</Text>
-              {['', 'pending', 'succeeded', 'failed', ].map(status => (
+              {['', 'pending', 'succeeded', 'failed'].map(status => (
                 <TouchableOpacity
                   key={status}
                   style={[
@@ -272,7 +418,6 @@ const OrdersScreen = () => {
         </View>
       </Modal>
 
-
       <Modal
         visible={detailModalVisible}
         animationType="slide"
@@ -280,79 +425,50 @@ const OrdersScreen = () => {
         onRequestClose={() => setDetailModalVisible(false)}
       >
         <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, styles.receiptModalContent]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Order Details</Text>
+              <Text style={styles.modalTitle}>Order Receipt</Text>
               <TouchableOpacity onPress={() => setDetailModalVisible(false)}>
                 <Ionicons name="close" size={24} color="#000" />
               </TouchableOpacity>
             </View>
 
-            {selectedOrder && (
-              <ScrollView style={styles.orderDetails}>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Transaction ID</Text>
-                  <Text style={styles.detailValue}>{selectedOrder.txnNumber}</Text>
-                </View>
+            <ScrollView style={styles.orderDetails}>
+              {selectedOrder && <OrderReceipt order={selectedOrder} />}
+              
+              <View style={styles.receiptActions}>
+                <TouchableOpacity 
+                  style={[styles.receiptButton, styles.downloadButton]}
+                  onPress={downloadReceipt}
+                >
+                  <Ionicons name="download" size={20} color="#fff" />
+                  <Text style={styles.receiptButtonText}>Download</Text>
+                </TouchableOpacity>
                 
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Receiver</Text>
-                  <Text style={styles.detailValue}>{selectedOrder.receiver}</Text>
-                </View>
-                
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Amount</Text>
-                  <Text style={styles.detailValue}>
-                    {Number(selectedOrder.amount).toFixed(2)} {selectedOrder.currency}
+                <TouchableOpacity 
+                  style={[styles.receiptButton, styles.shareButton]}
+                  onPress={shareReceipt}
+                >
+                  <Ionicons name="share" size={20} color="#fff" />
+                  <Text style={styles.receiptButtonText}>Share</Text>
+                </TouchableOpacity>
+              </View>
+              
+              {selectedOrder?.status === 'failed' && (
+                <TouchableOpacity 
+                  style={styles.retryButton}
+                  onPress={() => {
+                    handleRetryOrder(selectedOrder.id);
+                    setDetailModalVisible(false);
+                  }}
+                  disabled={retryOrderMutation.isLoading}
+                >
+                  <Text style={styles.retryButtonText}>
+                    {retryOrderMutation.isLoading ? 'Processing...' : 'Retry Order'}
                   </Text>
-                </View>
-                
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Source</Text>
-                  <Text style={styles.detailValue}>
-                    {selectedOrder.source?.replace('_', ' ')}
-                  </Text>
-                </View>
-                
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Status</Text>
-                  <View style={[
-                    styles.statusBadge, 
-                    { 
-                      backgroundColor: 
-                        selectedOrder.status === 'success' ? '#4caf50' : 
-                        selectedOrder.status === 'failed' ? '#f44336' : 
-                        '#ff9800',
-                      alignSelf: 'flex-start'
-                    }
-                  ]}>
-                    <Text style={styles.statusText}>{selectedOrder.status}</Text>
-                  </View>
-                </View>
-                
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Created At</Text>
-                  <Text style={styles.detailValue}>
-                    {new Date(selectedOrder.createdAt).toLocaleString()}
-                  </Text>
-                </View>
-                
-                {selectedOrder.status === 'failed' && (
-                  <TouchableOpacity 
-                    style={styles.retryButton}
-                    onPress={() => {
-                      handleRetryOrder(selectedOrder.id);
-                      setDetailModalVisible(false);
-                    }}
-                    disabled={retryOrderMutation.isLoading}
-                  >
-                    <Text style={styles.retryButtonText}>
-                      {retryOrderMutation.isLoading ? 'Processing...' : 'Retry Order'}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </ScrollView>
-            )}
+                </TouchableOpacity>
+              )}
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -364,7 +480,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
-    marginBottom: 12,
+  },
+  listContainer: {
+    padding: 16,
   },
   header: {
     flexDirection: 'row',
@@ -403,28 +521,31 @@ const styles = StyleSheet.create({
   },
   orderItem: {
     backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginBottom: 12,
-    borderRadius: 8,
-    borderColor: "#CD0202",
-    borderWidth: 1,
+    borderRadius: 12,
     padding: 16,
-    shadowColor: '#0c5e35ff',
-    shadowOffset: { width: 0, height: 0 },
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowRadius: 4,
+    elevation: 3,
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.primary,
   },
   orderHeader: {
+    marginBottom: 12,
+  },
+  orderIdContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   txnId: {
     fontSize: 14,
     fontWeight: '600',
     color: '#333',
+    flex: 1,
   },
   statusBadge: {
     paddingHorizontal: 8,
@@ -437,18 +558,23 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textTransform: 'capitalize',
   },
+  dateText: {
+    fontSize: 12,
+    color: '#999',
+  },
   orderBody: {
-    marginBottom: 12,
+    marginBottom: 16,
   },
   receiverInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   receiverText: {
-    marginLeft: 6,
+    marginLeft: 8,
     fontSize: 16,
     color: '#333',
+    fontWeight: '500',
   },
   amountInfo: {
     flexDirection: 'row',
@@ -458,7 +584,7 @@ const styles = StyleSheet.create({
   amountText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: Colors.primary,
   },
   sourceText: {
     fontSize: 14,
@@ -466,17 +592,22 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
   },
   orderFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  dateText: {
-    fontSize: 12,
-    color: '#999',
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    paddingTop: 12,
   },
   actionButtons: {
     flexDirection: 'row',
-    gap: 16,
+    justifyContent: 'space-around',
+  },
+  actionButton: {
+    alignItems: 'center',
+    padding: 8,
+  },
+  actionButtonText: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
   },
   emptyList: {
     flex: 1,
@@ -519,8 +650,10 @@ const styles = StyleSheet.create({
   retryButton: {
     backgroundColor: '#CD0202',
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderRadius: 8,
+    marginTop: 16,
+    alignItems: 'center',
   },
   retryButtonText: {
     color: '#fff',
@@ -539,19 +672,24 @@ const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
     justifyContent: "flex-end",
-    backgroundColor: 'rgba(0,0,0,0.1)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalContent: {
     backgroundColor: '#fff',
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
-    maxHeight: '100%',
+    maxHeight: '80%',
+    padding: 16,
+  },
+  receiptModalContent: {
+    maxHeight: '90%',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    marginBottom: 16,
+    paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
@@ -561,7 +699,7 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   filterOptions: {
-    padding: 16,
+    marginBottom: 16,
   },
   filterSectionTitle: {
     fontSize: 16,
@@ -591,16 +729,12 @@ const styles = StyleSheet.create({
   },
   modalActions: {
     flexDirection: 'row',
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
+    gap: 12,
   },
- 
   resetButton: {
     flex: 1,
     padding: 12,
     alignItems: 'center',
-    marginRight: 8,
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
@@ -613,7 +747,6 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 12,
     alignItems: 'center',
-    marginLeft: 8,
     backgroundColor: '#CD0202',
     borderRadius: 8,
   },
@@ -622,26 +755,113 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   orderDetails: {
-    padding: 16,
+    maxHeight: 640,
   },
-  detailRow: {
+  receiptContainer: {
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    marginBottom: 20,
+    width: "100%",
+  },
+  receiptHeader: {
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  receiptTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: Colors.primary,
+    marginBottom: 5,
+  },
+  receiptSubtitle: {
+    fontSize: 14,
+    color: '#666',
+  },
+  receiptDivider: {
+    height: 2,
+    backgroundColor: Colors.primary,
+    marginVertical: 15,
+  },
+  receiptDividerThin: {
+    height: 1,
+    backgroundColor: '#e0e0e0',
+    marginVertical: 10,
+  },
+  receiptDetails: {
+    marginBottom: 15,
+  },
+  receiptRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    marginBottom: 10,
   },
-  detailLabel: {
+  receiptLabel: {
     fontSize: 14,
     color: '#666',
     fontWeight: '500',
   },
-  detailValue: {
+  receiptValue: {
     fontSize: 14,
     color: '#333',
     fontWeight: '500',
+  },
+  amountText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: Colors.primary,
+  },
+  receiptStatus: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  receiptStatusText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
     textTransform: 'capitalize',
+  },
+  receiptFooter: {
+    alignItems: 'center',
+  },
+  thankYouText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 5,
+  },
+  supportText: {
+    fontSize: 12,
+    color: '#666',
+  },
+  receiptActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  receiptButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 8,
+    flex: 1,
+    marginHorizontal: 5,
+  },
+  downloadButton: {
+    backgroundColor: Colors.primary,
+  },
+  shareButton: {
+    backgroundColor: '#4caf50',
+  },
+  receiptButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    marginLeft: 5,
   },
 });
 
