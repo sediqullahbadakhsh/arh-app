@@ -23,11 +23,12 @@ export default function SignupResultScreen({ navigation, route }) {
   const buttonLabel = cta || (type === "customer" ? "Go to Login" : "Go Back");
 
   const onPress = () => navigation.replace("Login");
+  const goBack = () => navigation.goBack(type === "Retailer" ? "AgentList": "ReportsHome");
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
       <AuthHeader
-        title={type === "customer" ? "Register" : "Transfer To Primary Wallet"}
+        title={type === "customer" ? "Register" : type === "Retailer" ? "Donwline Agent Registration" : "Transfer To Primary Wallet"}
         onBack={() => navigation.goBack()}
       />
       <View style={styles.wrap}>
@@ -43,7 +44,7 @@ export default function SignupResultScreen({ navigation, route }) {
         <TouchableOpacity
           style={styles.btn}
           activeOpacity={0.9}
-          onPress={onPress}
+          onPress={goBack}
         >
           <Text style={styles.btnText}>{buttonLabel}</Text>
         </TouchableOpacity>

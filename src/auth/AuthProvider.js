@@ -180,7 +180,7 @@ export function AuthProvider({ children }) {
           AsyncStorage.getItem("auth_token"),
           AsyncStorage.getItem("auth_role"),
         ]);
-        console.log(t, role, "role and t");
+        // console.log(t, role, "role and t");
         if (t) {
           setTokenState(t);
           setUser({ role: role || null });
