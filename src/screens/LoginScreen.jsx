@@ -1,4 +1,3 @@
-// src/screens/LoginScreen.jsx
 import React, { useState } from "react";
 import { SafeAreaView, View, Text, StyleSheet, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -98,7 +97,7 @@ export default function LoginScreen({ navigation }) {
 
   const goSignupChooser = () => navigation.navigate("SignUpChooser");
 
-  // Allow changing email after next step is shown
+
   const editEmail = () => {
     setNextReady(false);
     setCanUsePassword(false);
@@ -122,7 +121,7 @@ export default function LoginScreen({ navigation }) {
           onChangeText={setEmail}
           placeholder="ahmad@example.com"
           keyboardType="email-address"
-          rightIcon={<Ionicons name="mail-outline" size={18} color="#344054" />}
+          rightIcon={<Ionicons name="mail-outline" size={24} color="#344054" />}
           returnKeyType={nextReady ? "done" : "go"}
           onSubmitEditing={nextReady ? undefined : start}
         />
@@ -140,7 +139,7 @@ export default function LoginScreen({ navigation }) {
         
        </View>
 
-        {/* Primary action(s) */}
+ 
         {!nextReady ? (
           <PrimaryButton
             label={loading ? <WhiteSpinner/> : "Continue"}
@@ -182,7 +181,7 @@ export default function LoginScreen({ navigation }) {
                 disabled={loading}
               />
 
-        {/* Sign up CTA */}
+
         <View style={{ height: 16 }} />
         <OutlineButton
         style={{borderColor: "#DB8510", fontFamily: "dmsansRegulars", color: "#E20E02"}}
@@ -250,8 +249,8 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: "dmsansRegular",
-    marginBottom: 4,
-    fontSize: 14,
+    marginBottom: 8,
+    fontSize: 16,
     lineHeight: 24,
     color: Colors.textTitle
   }
