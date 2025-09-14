@@ -24,22 +24,32 @@ export default function PasswordField({ value, onChangeText, placeholder, style 
 
 const styles = StyleSheet.create({
   container: {
-    
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#ccc",
-    paddingHorizontal: 12,
-    
+    width: '100%',
+    height: 60,
+    borderRadius: 30, // Half of height for pill shape
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E4E7EC',
+    paddingHorizontal: 20,
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 2,
   },
   input: {
-    flex: 1,
-    height: 48,
-    color: "#000",
-
+    width: '100%',
+    height: '100%',
+    fontSize: 16,
+    color: '#000',
+    fontFamily: 'dmsansRegular',
+    paddingRight: 44, // Space for icon
   },
   icon: {
-    marginLeft: 8,
+    position: 'absolute',
+    right: 20,
+    top: '50%',
+    transform: [{ translateY: -11 }],
   },
 });

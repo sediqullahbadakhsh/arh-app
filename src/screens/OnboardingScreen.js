@@ -15,31 +15,32 @@ import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../theme/colors";
 import DotIndicators from "../components/DotIndicators";
 import LottieView from "lottie-react-native";
+import onboardImage from '../../assets/onboard.png';
+import securePay1 from '../../assets/lotties/SecurePay1.json';
+import securep1 from '../../assets/lotties/Securep1.json';
+import mobile from '../../assets/lotties/mobile.json';
 
 const { width } = Dimensions.get("window");
-const ILLUSTRATION = require("../../assets/onboard.png");
+const ILLUSTRATION = onboardImage;
 
 const SLIDES = [
   {
-    key: "s1",
-    title: "Top-up Anytime, Anywhere",
-    subtitle:
-      "Send airtime and data to any mobile number in any country — instantly.",
-    lottie: require("../../assets/lotties/SecurePay1.json"),
+    key: 's1',
+    title: 'Top-up Anytime, Anywhere',
+    subtitle: 'Send airtime and data to any mobile number in any country — instantly.',
+    lottie: securePay1,
   },
   {
-    key: "s2",
-    title: "All Networks. All Wallets.",
-    subtitle:
-      "Top-up across networks, pay with your preferred wallet in your local currency.",
-     lottie: require("../../assets/lotties/Securep1.json"),
+    key: 's2',
+    title: 'All Networks. All Wallets.',
+    subtitle: 'Top-up across networks, pay with your preferred wallet in your local currency.',
+    lottie: securep1,
   },
   {
-    key: "s3",
-    title: "Your Security, Our Priority",
-    subtitle:
-      "Bank-grade encryption, OTPs, and real-time monitoring keep your transactions safe.",
-     lottie: require("../../assets/lotties/mobile.json"),
+    key: 's3',
+    title: 'Your Security, Our Priority',
+    subtitle: 'Bank-grade encryption, OTPs, and real-time monitoring keep your transactions safe.',
+    lottie: mobile,
   },
 ];
 
