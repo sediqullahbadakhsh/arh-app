@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import {
   SafeAreaView,
   View,
@@ -12,6 +12,8 @@ import {
   Platform,
   KeyboardAvoidingView,
   Alert,
+  Animated,
+  Easing,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../theme/colors";
@@ -52,6 +54,11 @@ export default function TopupFlowScreen({ navigation }) {
   const [slabPercentage, setSlabPercentage] = useState(0);
   const [loadingData, setLoadingData] = useState(false);
   const [serviceType, setServiceType] = useState('recharge'); // 'recharge' or 'bundle'
+  
+  // New states for animation
+  const [showPopularAmounts, setShowPopularAmounts] = useState(true);
+  const [showContinueButton, setShowContinueButton] = useState(false);
+  const continueButtonAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(()=>{
     const getAllCountries = async()=>{
@@ -84,6 +91,31 @@ export default function TopupFlowScreen({ navigation }) {
     }
   }, [searchQuery, contacts]);
 
+  useEffect(() => {
+    // Show/hide popular amounts based on custom input
+    if (customAfn && customAfn.length > 0) {
+      setShowPopularAmounts(false);
+      if (!showContinueButton) {
+        setShowContinueButton(true);
+        Animated.timing(continueButtonAnim, {
+          toValue: 1,
+          duration: 300,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }).start();
+      }
+    } else {
+      setShowPopularAmounts(true);
+      if (showContinueButton) {
+        Animated.timing(continueButtonAnim, {
+          toValue: 0,
+          duration: 300,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }).start(() => setShowContinueButton(false));
+      }
+    }
+  }, [customAfn]);
   
   useEffect(() => {
     const fetchRateAndSlab = async () => {
@@ -237,7 +269,7 @@ export default function TopupFlowScreen({ navigation }) {
   const goNext = () => {
     if (!canNext) return;
     
-    // If trying to proceed with bundle, show coming soon message
+
     if (step === BASE_STEPS.AMOUNT && serviceType === 'bundle') {
       Alert.alert("Coming Soon", "Bundle packages will be available soon!");
       return;
@@ -251,6 +283,18 @@ export default function TopupFlowScreen({ navigation }) {
   useEffect(() => {
     setLocalNumber("");
   }, [country?.countryCode]);
+
+  const handleSelectPopularAmount = (amount) => {
+    setCustomAfn(String(amount.afn));
+    setProduct(null);
+    
+    // Auto-proceed after a short delay
+    setTimeout(() => {
+      if (canNext) {
+        goNext();
+      }
+    }, 300);
+  };
 
   const handlePayment = async () => {
     setLoading(true);
@@ -454,6 +498,12 @@ export default function TopupFlowScreen({ navigation }) {
                 loadingData={loadingData}
                 serviceType={serviceType}
                 setServiceType={setServiceType}
+                showPopularAmounts={showPopularAmounts}
+                onSelectPopularAmount={handleSelectPopularAmount}
+                showContinueButton={showContinueButton}
+                continueButtonAnim={continueButtonAnim}
+                onContinue={goNext}
+                canContinue={canNext}
               />
             )}
 
@@ -473,28 +523,143 @@ export default function TopupFlowScreen({ navigation }) {
               />
             )}
 
-            <PrimaryButton
-              label={
-                step === lastStep
-                  ? `Pay $${usd} USD`
-                  : "Continue"
-              }
-              onPress={step === lastStep ? recharge : goNext}
-              style={{ marginTop: 24, opacity: canNext ? 1 : 0.5 }}
-              loading={loading}
-            />
-            {step > 0 && (
-              <PrimaryButton
-                label="Back"
-                onPress={goBack}
-                style={{ marginTop: 12, backgroundColor: "#4A4A4A" }}
-              />
-            )}
+           {step !== BASE_STEPS.AMOUNT && (
+  <>
+    <PrimaryButton
+      label={
+        step === lastStep
+          ? `Pay $${usd} USD`
+          : "Continue"
+      }
+      onPress={step === lastStep ? recharge : goNext}
+      style={{ marginTop: 24, opacity: canNext ? 1 : 0.5 }}
+      loading={loading}
+    />
+    {step > 0 && (
+      <PrimaryButton
+        label="Back"
+        onPress={goBack}
+        style={{ marginTop: 12, backgroundColor: "#4A4A4A" }}
+      />
+    )}
+  </>
+)}
           </ScrollView>
         </KeyboardAvoidingView>
       )}
 
-      {/* Modals remain the same */}
+      {/* Country Selection Modal */}
+      <Modal visible={countryOpen} animationType="slide" transparent>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Country</Text>
+              <TouchableOpacity onPress={() => setCountryOpen(false)}>
+                <Ionicons name="close" size={24} color={Colors.textPrimary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.searchContainer}>
+              <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
+              <TextInput
+                placeholder="Search countries..."
+                value={countrySearch}
+                onChangeText={setCountrySearch}
+                style={styles.searchInput}
+                placeholderTextColor="#999"
+              />
+            </View>
+
+            <FlatList
+              data={filteredCountries}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.modalRow}
+                  onPress={() => {
+                    setCountry(item);
+                    setCountryOpen(false);
+                    setCountrySearch('');
+                  }}
+                >
+                  <Text style={{ fontSize: 24, marginRight: 12 }}>
+                    {codeToFlag(item.countryCode)}
+                  </Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: Colors.textPrimary, fontSize: 16, fontWeight: '500' }}>
+                      {item.countryName}
+                    </Text>
+                    <Text style={{ color: Colors.textSecondary, fontSize: 14 }}>
+                      {DIAL_CODES[item.countryCode] || ""}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+              ItemSeparatorComponent={() => <View style={styles.contactSeparator} />}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Contacts Modal */}
+      <Modal visible={contactsModalVisible} animationType="slide" transparent>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Contact</Text>
+              <TouchableOpacity onPress={() => setContactsModalVisible(false)}>
+                <Ionicons name="close" size={24} color={Colors.textPrimary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.searchContainer}>
+              <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
+              <TextInput
+                placeholder="Search contacts..."
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                style={styles.searchInput}
+                placeholderTextColor="#999"
+              />
+            </View>
+
+            {filteredContacts.length > 0 ? (
+              <FlatList
+                data={filteredContacts}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.contactItem}
+                    onPress={() => {
+                      if (item.phoneNumbers && item.phoneNumbers.length > 0) {
+                        handleContactSelect(item.phoneNumbers[0].number);
+                      }
+                    }}
+                  >
+                    <View style={styles.contactAvatar}>
+                      <Text style={{ color: 'white', fontWeight: 'bold' }}>
+                        {item.name ? item.name.charAt(0).toUpperCase() : '?'}
+                      </Text>
+                    </View>
+                    <View style={styles.contactInfo}>
+                      <Text style={styles.contactName}>{item.name}</Text>
+                      {item.phoneNumbers && item.phoneNumbers.length > 0 && (
+                        <Text style={styles.contactPhone}>{item.phoneNumbers[0].number}</Text>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                )}
+                ItemSeparatorComponent={() => <View style={styles.contactSeparator} />}
+              />
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="people-outline" size={48} color="#999" />
+                <Text style={styles.emptyText}>No contacts found</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -667,10 +832,15 @@ function StepAmount({
   loadingData,
   serviceType,
   setServiceType,
+  showPopularAmounts,
+  onSelectPopularAmount,
+  showContinueButton,
+  continueButtonAnim,
+  onContinue,
+  canContinue,
 }) {
   const [isFocused, setIsFocused] = useState(false);
   
-
   const rechargeAmounts = [
     { afn: 50, usd: calculateUsdAmount(50, exchangeRate, slabPercentage) },
     { afn: 100, usd: calculateUsdAmount(100, exchangeRate, slabPercentage) },
@@ -766,49 +936,67 @@ function StepAmount({
             <Text style={styles.equivText}>Calculating USD equivalent...</Text>
           )} */}
 
-          <View style={styles.quickAmountsContainer}>
-            <Text style={styles.quickAmountsTitle}>Popular amounts</Text>
-            <View style={styles.quickAmountsList}>
-              {rechargeAmounts.map((amount) => {
-                const isSelected = afn === amount.afn;
-                
-                return (
-                  <TouchableOpacity
-                    key={amount.afn}
-                    style={[
-                      styles.quickAmountItem,
-                      isSelected && styles.quickAmountItemSelected
-                    ]}
-                    onPress={() => {
-                      setCustomAfn(String(amount.afn));
-                      setProduct(null);
-                    }}
-                  >
-                    <View style={styles.amountInfo}>
-                      <Text style={[
-                        styles.amountValue,
-                        isSelected && styles.amountValueSelected
-                      ]}>
-                        {amount.afn} AFN
-                      </Text>
-                      <Text style={[
-                        styles.amountSubtext,
-                        isSelected && styles.amountSubtextSelected
-                      ]}>
-                        ${amount.usd} USD
-                      </Text>
-                    </View>
-                    
-                    {/* {isSelected && (
-                      <View style={styles.selectedIndicator}>
-                        <Ionicons name="checkmark-circle" size={20} color={Colors.primary} />
+          {/* Popular amounts with conditional rendering */}
+          {showPopularAmounts && (
+            <View style={styles.quickAmountsContainer}>
+              <Text style={styles.quickAmountsTitle}>Popular amounts</Text>
+              <View style={styles.quickAmountsList}>
+                {rechargeAmounts.map((amount) => {
+                  const isSelected = afn === amount.afn;
+                  
+                  return (
+                    <TouchableOpacity
+                      key={amount.afn}
+                      style={[
+                        styles.quickAmountItem,
+                        isSelected && styles.quickAmountItemSelected
+                      ]}
+                      onPress={() => onSelectPopularAmount(amount)}
+                    >
+                      <View style={styles.amountInfo}>
+                        <Text style={[
+                          styles.amountValue,
+                          isSelected && styles.amountValueSelected
+                        ]}>
+                          {amount.afn} AFN
+                        </Text>
+                        <Text style={[
+                          styles.amountSubtext,
+                          isSelected && styles.amountSubtextSelected
+                        ]}>
+                          ${amount.usd} USD
+                        </Text>
                       </View>
-                    )} */}
-                  </TouchableOpacity>
-                );
-              })}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             </View>
-          </View>
+          )}
+
+       
+       {showContinueButton && (
+  <Animated.View 
+    style={{
+      opacity: continueButtonAnim,
+      transform: [{
+        translateY: continueButtonAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [20, 0]
+        })
+      }]
+    }}
+  >
+    <PrimaryButton
+      label="Continue"
+      onPress={onContinue}
+      style={{ 
+        marginTop: 24, 
+        opacity: canContinue ? 1 : 0.5 
+      }}
+    />
+  </Animated.View>
+)}
 
           {!loadingData && afn > 0 && (
             <View style={styles.breakdownContainer}>
@@ -1292,7 +1480,7 @@ amountSubtextSelected: {
     lineHeight: 24,
   },
 
-  // Modal styles
+
   modalBackdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -1349,7 +1537,7 @@ amountSubtextSelected: {
     color: Colors.textPrimary,
   },
   
-  // Empty state styles
+  
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -1360,8 +1548,7 @@ amountSubtextSelected: {
     color: '#999',
     marginTop: 12,
   },
-  
-  // Contact list styles
+
   contactItem: {
     flexDirection: 'row',
     alignItems: 'center',
