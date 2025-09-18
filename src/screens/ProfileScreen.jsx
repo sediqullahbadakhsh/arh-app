@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Image,
   Platform,
+  ScrollView,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
@@ -90,7 +91,8 @@ export default function ProfileScreen({ navigation }) {
       </LinearGradient>
 
       {/* Body */}
-      <View style={styles.body}>
+   <ScrollView showsVerticalScrollIndicator={false}>
+       <View style={styles.body}>
         {/* Name below avatar now */}
         <View style={styles.nameRow}>
           <Text style={styles.nameText}>{userName}</Text>
@@ -182,6 +184,7 @@ export default function ProfileScreen({ navigation }) {
           />
         </View>
       </View>
+   </ScrollView>
     </SafeAreaView>
   );
 }
