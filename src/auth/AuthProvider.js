@@ -197,19 +197,22 @@ export function AuthProvider({ children }) {
     setUser((prev) => ({ ...(prev || {}), role }));
   };
 
- const setToken = async (newToken, meta = {}) => {
+const setToken = async (newToken, meta = {}) => {
   if (newToken) {
     await AsyncStorage.setItem("auth_token", newToken);
     setTokenState(newToken);
   }
+  
   const role = meta.role || (await AsyncStorage.getItem("auth_role")) || null;
   
-
+  // Create user object with ALL available data from the API response
   const u = { 
     ...(user || {}), 
+    ...meta, // Spread all meta properties (includes id, username, etc.)
     role, 
-    role_id: meta.role_id ?? null,
-    username: meta.username ?? user?.username 
+    role_id: meta.role_id ?? user?.role_id,
+    username: meta.username ?? user?.username,
+    id: meta.id ?? user?.id // Make sure to include the id
   };
   
   console.log(u, "this is u - updated user object");
@@ -248,18 +251,25 @@ export function AuthProvider({ children }) {
     return data;
   };
 
-  const loginOtpVerifyFn = async ({ identifier, otp }) => {
-    const data = await loginOtpVerify({ identifier, otp });
-    console.log(data, "this is data")
-    await setRoleLocal("b2c");
-    await setToken(data.access_token, {
-      role: "b2c",
-      role_id: data.role_id,
-      username: data.fullName
-    });
-    setPending(null);
-    return data;
+const loginOtpVerifyFn = async ({ identifier, otp }) => {
+  const data = await loginOtpVerify({ identifier, otp });
+  console.log(data, "this is data");
+  await setRoleLocal("b2c");
+  
+  const userData = {
+    role: "b2c",
+    role_id: data.role_id,
+    username: data.fullName,
+    ...data.customer,
+    ...data,
+    id: data.customer?.id || data.id,
+    fullName: data.fullName || data.customer?.fullName
   };
+  
+  await setToken(data.access_token, userData);
+  setPending(null);
+  return data;
+};
 
   const signupCustomerSendOtpFn = async ({ identifier }) => {
     const email = identifier;

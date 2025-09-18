@@ -18,7 +18,29 @@ export const signupOtpGenerate = ({ email }) =>
 
 export const signupOtpVerify = ({ otp }) =>
   api.post("/customer/verify-otp", { otp }).then((r) => r.data);
+export const updateCustomerProfile = async (customerId, formData) => {
+  try {
+    const response = await api.patch(`/customer/${customerId}`, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Update customer profile error:", error);
+    throw error;
+  }
+};
 
 
+export const getCustomerById = async (customerId) => {
+  try {
+    const response = await api.get(`/customer/${customerId}`);
+    return response.data;
+  } catch (error) {
+    console.error("Get customer by ID error:", error);
+    throw error;
+  }
+};
 export const profile = () =>
   api.get("/profile").then((r) => r.data);

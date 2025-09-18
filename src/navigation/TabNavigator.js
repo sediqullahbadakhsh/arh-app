@@ -1,25 +1,58 @@
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { TouchableOpacity, View, Text } from "react-native";
+import Feather from "react-native-vector-icons/Feather";
+
 import HomeStackNavigator from "./HomeStackNavigator";
 import TransactionsScreen from "../screens/TransactionsScreen";
-import ContactsScreen from "../screens/ContactsScreen";
-import ProfileScreen from "../screens/ProfileScreen";
+import OrdersScreen from "../screens/OrdersScreen";
 import TopupFlowScreen from "../screens/TopupFlowScreen1";
+import ProfileStackNavigator from "./ProfileStackNavigator";
 import WalletStackNavigator from "./WalletStackNavigator";
 import ReportStackNavigator from "./ReportStackNavigator";
 import AgentStackNavigator from "./AgentStackNavigator";
-import { TouchableOpacity, View, Text } from "react-native";
+
 import { Colors } from "../theme/colors";
 import { useAccess } from "../acl/AccessProvider";
 import { useAuth } from "../auth/AuthProvider";
 import { ACTIONS, SCREENS } from "../acl/permissions";
-import Feather from "react-native-vector-icons/Feather";
-import OrdersScreen from "../screens/OrdersScreen";
-import ProfileStackNavigator from "./ProfileStackNavigator";
-
 
 const Tab = createBottomTabNavigator();
+
+const CustomMiddleButton = ({ onPress }) => {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.9}
+      style={{
+        top: -20,
+        justifyContent: "center",
+        alignItems: "center",
+      }}
+    >
+      <View
+        style={{
+          width: 64,
+          position: "static",
+          zIndex: 9999,
+          height: 64,
+          borderRadius: 32,
+          backgroundColor: Colors.primary,
+          justifyContent: "center",
+          alignItems: "center",
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.3,
+          shadowRadius: 5,
+          elevation: 6,
+        }}
+      >
+        <Feather name="zap" size={28} color="#fff" />
+      </View>
+    </TouchableOpacity>
+  );
+};
 
 export default function TabNavigator() {
   const insets = useSafeAreaInsets();
@@ -45,7 +78,8 @@ export default function TabNavigator() {
       icon: "shopping-cart",
       component: OrdersScreen,
       show: can(
-        () => access?.can?.(ACTIONS.SEE_CONTACTS) && canUse(SCREENS?.CONTACTS)
+        () =>
+          access?.can?.(ACTIONS.SEE_CONTACTS) && canUse(SCREENS?.CONTACTS)
       ),
     },
     {
@@ -63,10 +97,10 @@ export default function TabNavigator() {
       show: true,
     },
     {
-      name: "Profile",
+      name: "Setting",
       label: "Setting",
       icon: "settings",
-      component: ProfileScreen,
+      component: ProfileStackNavigator,
       show: can(() => canUse(SCREENS?.PROFILE)),
     },
   ];
@@ -103,10 +137,8 @@ export default function TabNavigator() {
     {
       name: "Profile",
       label: "Profile",
-
       icon: "user",
       component: ProfileStackNavigator,
-
       show: can(() => canUse(SCREENS?.PROFILE)),
     },
   ];
@@ -120,42 +152,47 @@ export default function TabNavigator() {
     : tabs[0].name;
 
   return (
-    <Tab.Navigator
-      initialRouteName={initial}
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarActiveTintColor: Colors.primary,
-        tabBarInactiveTintColor: "#BDBDBD",
-        tabBarStyle: {
-          height: 60 + insets.bottom,
-          paddingTop: 6,
-          paddingBottom: Math.max(insets.bottom, 8),
-          backgroundColor: "#fff",
-        },
-        tabBarIcon: ({ color, size }) => {
+    <View style={{ flex: 1 }}>
+      <Tab.Navigator
+        initialRouteName={initial}
+        screenOptions={({ route }) => {
           const tab = tabs.find((t) => t.name === route.name);
           const iconName = tab?.icon ?? "circle";
-          return (
-            <View style={{ alignItems: "center", justifyContent: "center" }}>
-              <Feather name={iconName} size={size} color={color} />
-              <View style={{ height: 4 }} />
-            </View>
-          );
-        },
-        tabBarLabel: ({ color, children }) => (
-          <Text style={{ color, fontSize: 11, marginTop: 1 }}>{children}</Text>
-        ),
-        tabBarButton: (props) => <TouchableOpacity {...props} activeOpacity={1} />,
-      })}
-    >
-      {tabs.map((t) => (
-        <Tab.Screen
-          key={t.name}
-          name={t.name}
-          component={t.component}
-          options={{ tabBarLabel: t.label }}
-        />
-      ))}
-    </Tab.Navigator>
+          const isMiddle = route.name === "TopupTab";
+
+          return {
+            headerShown: false,
+            tabBarActiveTintColor: Colors.primary,
+            tabBarInactiveTintColor: "#BDBDBD",
+            tabBarStyle: {
+              height: 60 + insets.bottom,
+              paddingTop: 6,
+              paddingBottom: Math.max(insets.bottom, 8),
+              backgroundColor: "#fff",
+              zIndex: 10, // Ensure tab bar stays on top
+            },
+            tabBarIcon: ({ color, size }) => (
+              <View style={{ alignItems: "center", justifyContent: "center" }}>
+                <Feather name={iconName} size={size} color={color} />
+                <View style={{ height: 4 }} />
+              </View>
+            ),
+            tabBarLabel: ({ color, children }) => (
+              <Text style={{ color, fontSize: 11, marginTop: 1 }}>{children}</Text>
+            ),
+            tabBarButton: (props) =>
+              isMiddle ? (
+                <CustomMiddleButton {...props} />
+              ) : (
+                <TouchableOpacity {...props} activeOpacity={1} />
+            ),
+          };
+        }}
+      >
+        {tabs.map((t) => (
+          <Tab.Screen key={t.name} name={t.name} component={t.component} />
+        ))}
+      </Tab.Navigator>
+    </View>
   );
 }

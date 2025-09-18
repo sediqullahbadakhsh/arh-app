@@ -68,7 +68,7 @@ export default function HomeConsumerScreen({ navigation }) {
 
   const getServiceIcon = (source) => {
     switch (source) {
-      case 'mobile_topup':
+      case 'stripe_card':
         return 'phone-portrait-outline';
       case 'data_bundle':
         return 'wifi-outline';
@@ -99,7 +99,11 @@ export default function HomeConsumerScreen({ navigation }) {
           />
         </View>
         <View style={styles.txInfo}>
-          <Text style={styles.txTitle}>{item.source?.replace('_', ' ') || 'Transaction'}</Text>
+          <Text style={styles.txTitle}>
+  {item.source === 'stripe_card'
+    ? 'Topup'
+    : item.source?.replace('_', ' ') || 'Transaction'}
+</Text>
           <Text style={styles.txSub}>{formatDate(item.createdAt)}</Text>
           <Text style={styles.txPhone}>{item.receiver}</Text>
         </View>
@@ -268,7 +272,7 @@ const styles = StyleSheet.create({
   recentTitle: { 
     color: Colors.textPrimary, 
     fontSize: 18, 
-    fontWeight: "700" 
+    fontWeight: "500" 
   },
   seeAll: { 
     color: Colors.primary, 
