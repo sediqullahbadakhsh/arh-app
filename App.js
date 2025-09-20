@@ -13,9 +13,32 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import dmsansRegular from './assets/fonts/dmsansRegular.ttf';
 import dmsansMedium from './assets/fonts/dmsansMedium.ttf';
 import dmsansBold from './assets/fonts/dmsansBold.ttf';
+import { LanguageProvider } from "./src/context/LanguageContext";
+import { initI18n } from "./src/locales/i18n";
 
 export default function App() {
-  const [fontsLoaded, setFontsLoaded] = useState(false);
+    const [ready, setReady] = useState(false);
+const [fontsLoaded, setFontsLoaded] = useState(false);
+
+
+
+
+
+    useEffect(() => {
+    const initialize = async () => {
+      const lang = await initI18n(); 
+      console.log("Initialized i18n with language:", lang);
+      setReady(true);
+    };
+    
+    initialize();
+  }, []);
+
+   useEffect(() => {
+    if (ready) {
+      loadFonts().then(() => setFontsLoaded(true));
+    }
+  }, [ready]);
 
   useEffect(() => {
     async function loadFonts() {
@@ -30,10 +53,18 @@ await Font.loadAsync({
     loadFonts();
   }, []);
 
-  if (!fontsLoaded) return null;
+
+
+ 
+
+
   const queryClient = new QueryClient();
+   if (!ready || !fontsLoaded) {
+    return null; 
+  }
   return (
     <QueryClientProvider client={queryClient}>
+      <LanguageProvider>
 
     <SafeAreaProvider>
       <StripeProvider
@@ -52,6 +83,8 @@ await Font.loadAsync({
         </UserProvider>
       </StripeProvider>
     </SafeAreaProvider>
+
+    </LanguageProvider>
     </QueryClientProvider>
 
   );
