@@ -1,6 +1,15 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { TouchableOpacity, Text, StyleSheet, Dimensions, PixelRatio } from 'react-native';
 import { Colors } from '../theme/colors';
+import {widthPercentageToDP as wp, heightPercentageToDP as hp} from 'react-native-responsive-screen';
+const {height, width} = Dimensions.get('window');
+console.log(height, width);
+console.log('hp(1.8):', hp(1.8));
+console.log('wp(1.8):', wp(1.8));
+console.log('Screen width:', width);
+console.log('Screen height:', height);
+console.log('PixelRatio:', PixelRatio.get());
+console.log('FontScale:', PixelRatio.getFontScale());
 
 export default function OutlineButton({ label, onPress, style }) {
     return (
@@ -11,17 +20,18 @@ export default function OutlineButton({ label, onPress, style }) {
 }
 
 const styles = StyleSheet.create({
-    button: {
-        backgroundColor: Colors.white,
-        borderRadius: 28,
-        paddingVertical: 14,
-        alignItems: 'center',
-        borderWidth: 1.5,
-        borderColor: Colors.primary,
-    },
-    label: {
-        color: "#E20E02",
-        fontSize: 16,
-        // fontWeight: '600',
-    },
+  button: {
+    backgroundColor: Colors.white,
+    borderRadius: wp(7.5),          
+    paddingVertical: hp(1.8),      
+    alignItems: 'center',
+    borderWidth: wp(0.4),          
+    borderColor: Colors.primary,
+  },
+  label: {
+    color: "#E20E02",
+    fontSize: hp(1.8),               
+    // fontWeight: '600',
+  },
 });
+

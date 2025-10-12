@@ -1,21 +1,20 @@
-// src/navigation/HomeStackNavigator.js
+
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import HomeConsumerScreen from "../screens/HomeConsumerScreen";
-import HomeMerchantScreen from "../screens/HomeMerchantScreen";
+import HomeConsumerScreen from "../screens/homeConsumerScreen/HomeConsumerScreen";
+import HomeMerchantScreen from "../screens/homeMerchantScreen/HomeMerchantScreen";
 import TodoScreen from "../screens/TodoScreen";
-import NotificationsScreen from "../screens/NotificationsScreen";
+import NotificationsScreen from "../screens/notificationScreen/NotificationsScreen";
 import { SERVICES } from "../constants/services";
 import ProductSelectScreen from "../screens/topup/ProductSelectScreen";
 import { useAuth } from "../auth/AuthProvider";
-import GameCoinsScreen from "../screens/GameCoinsScreen";
 import TopupFlowScreen from "../screens/TopupFlowScreen";
-import DataFlowScreen from "../screens/DataFlowScreen";
+import DataFlowScreen from "../screens/dataFlowScreen/DataFlowScreen";
 import StockTransferScreen from "../screens/StockTransferScreen";
-
-import TopupFlowScreen1 from "../screens/TopupFlowScreen1";
-
-import MerchantRechargeScreen from "../screens/AgentRecharge";
+import TopupFlowScreen1 from "../screens/topupScreen/TopupFlowScreen1";
+import GameCoinsScreen from "../screens/gameCoinsScreen/GameCoinsScreen";
+import MerchantApplicationScreen from "../screens/profileScreens/MerchantApllicationScreen";
+import DataFlowScreenMerchant from "../screens/dataFlowScreen1/DataFlowScreen";
 
 
 const Stack = createNativeStackNavigator();
@@ -33,8 +32,12 @@ export default function HomeStackNavigator() {
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
       <Stack.Screen name="TopupProducts" component={ProductSelectScreen} />
       <Stack.Screen name="Data" component={DataFlowScreen} />
+      <Stack.Screen name="DataMerchant" component={DataFlowScreenMerchant} />
       <Stack.Screen name="GameCoins" component={GameCoinsScreen} /> 
-      <Stack.Screen name="merchantRecharge" component={MerchantRechargeScreen} /> 
+          <Stack.Screen 
+       name="MerchantApplication" 
+       component={MerchantApplicationScreen} 
+     />
       <Stack.Screen name="Topup" component={TopupFlowScreen} />
       <Stack.Screen name="Topup1" component={TopupFlowScreen1} />
       <Stack.Screen name="StockTransfer" component={StockTransferScreen} />

@@ -1,0 +1,28 @@
+{
+  "greeting": {
+    "hi": "سلام"
+  },
+  "services": {
+    "title": "خدمات",
+    "mobileTopup": "موبایل ټاپ اپ",
+    "dataBundle": "ډاټا بندل",
+    "gameCoins": "د لوبې سکې"
+  },
+  "transactions": {
+    "recent": "وروستي معاملات",
+    "noTransactions": "تر اوسه هیڅ معاملات نشته"
+  },
+  "status": {
+    "succeeded": "بریالۍ شو",
+    "failed": "ناکام شو",
+    "pending": "په انتظار کې"
+  },
+  "common": {
+    "seeAll": "ټول وګورئ",
+    "tryAgain": "بیا هڅه وکړئ"
+  },
+  "errors": {
+    "loadTransactions": "د معاملاتو پورته کول ناکام شول"
+  },
+  "transaction": "معامله"
+}

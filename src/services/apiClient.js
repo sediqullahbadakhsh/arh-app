@@ -2,15 +2,16 @@
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-export const API_BASE = "http://3.67.144.22/backend/v1";
-const DEBUG_NET = __DEV__; // only log in dev builds
+export const API_BASE = "http://192.168.0.107:8081/v1";
+// export const API_BASE = "http://3.67.144.22/backend/v1";
+const DEBUG_NET = __DEV__; 
 
 const api = axios.create({
   baseURL: API_BASE,
   timeout: 15000,
 });
 
-// small helper to avoid leaking tokens in logs
+
 const redact = (obj) => {
   try {
     if (!obj) return obj;
@@ -53,7 +54,7 @@ api.interceptors.response.use(
     return res;
   },
   (err) => {
-    // Axios error anatomy
+
     const { config, response, message } = err;
     const status = response?.status;
     const url = (config?.baseURL || "") + (config?.url || "");

@@ -8,6 +8,8 @@ import AboutAppScreen from "../screens/profileScreens/AboutAppScreen";
 import ContactUsScreen from "../screens/profileScreens/ContactUsScreen";
 import AboutUsScreen from "../screens/profileScreens/AboutUsScreen";
 import ProfileScreen from "../screens/ProfileScreen";
+import MerchantApplicationScreen from "../screens/profileScreens/MerchantApllicationScreen";
+import ApplicationResultScreen from "../screens/profileScreens/ApplicationResultScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -28,6 +30,14 @@ export default function ProfileStackNavigator() {
         name="securityScreen"
         component={SecurityScreen}
       />
+     <Stack.Screen 
+  name="MerchantApplication" 
+  component={MerchantApplicationScreen} 
+/>
+<Stack.Screen 
+  name="ApplicationResult" 
+  component={ApplicationResultScreen} 
+/>
       <Stack.Screen
         name="aboutAppScreen"
         component={AboutAppScreen}

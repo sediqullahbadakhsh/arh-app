@@ -1,58 +1,38 @@
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { TouchableOpacity, View, Text } from "react-native";
+import { TouchableOpacity, View, Text, TabNavStylesheet, Platform } from "react-native";
 import Feather from "react-native-vector-icons/Feather";
-
 import HomeStackNavigator from "./HomeStackNavigator";
-import TransactionsScreen from "../screens/TransactionsScreen";
-import OrdersScreen from "../screens/OrdersScreen";
-import TopupFlowScreen from "../screens/TopupFlowScreen1";
+import OrdersScreen from "../screens/orderScreen/OrdersScreen";
+import TopupFlowScreen from "../screens/topupScreen/TopupFlowScreen1";
 import ProfileStackNavigator from "./ProfileStackNavigator";
 import WalletStackNavigator from "./WalletStackNavigator";
 import ReportStackNavigator from "./ReportStackNavigator";
 import AgentStackNavigator from "./AgentStackNavigator";
-
+import {widthPercentageToDP as wp, heightPercentageToDP as hp} from 'react-native-responsive-screen';
 import { Colors } from "../theme/colors";
 import { useAccess } from "../acl/AccessProvider";
 import { useAuth } from "../auth/AuthProvider";
 import { ACTIONS, SCREENS } from "../acl/permissions";
+import NotificationsScreen from "../screens/notificationScreen/NotificationsScreen";
+import TabNavStyles from "./TabNavigatorStyle";
+import { scale as Schp } from "../utils/normalizeSize";
+import ProfileStackNavigatorMerchant from "./ProfileStackNavigatorMerchant";
 
 const Tab = createBottomTabNavigator();
 
-const CustomMiddleButton = ({ onPress }) => {
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      activeOpacity={0.9}
-      style={{
-        top: -20,
-        justifyContent: "center",
-        alignItems: "center",
-      }}
-    >
-      <View
-        style={{
-          width: 64,
-          position: "static",
-          zIndex: 9999,
-          height: 64,
-          borderRadius: 32,
-          backgroundColor: Colors.primary,
-          justifyContent: "center",
-          alignItems: "center",
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.3,
-          shadowRadius: 5,
-          elevation: 6,
-        }}
-      >
-        <Feather name="zap" size={28} color="#fff" />
-      </View>
-    </TouchableOpacity>
-  );
-};
+const CustomMiddleButton = ({ onPress }) => (
+  <TouchableOpacity
+    onPress={onPress}
+    activeOpacity={0.9}
+    style={TabNavStyles.middleButtonContainer}
+  >
+    <View style={TabNavStyles.middleButton}>
+      <Feather name="zap" size={28} color="#fff" />
+    </View>
+  </TouchableOpacity>
+);
 
 export default function TabNavigator() {
   const insets = useSafeAreaInsets();
@@ -77,10 +57,7 @@ export default function TabNavigator() {
       label: "Order",
       icon: "shopping-cart",
       component: OrdersScreen,
-      show: can(
-        () =>
-          access?.can?.(ACTIONS.SEE_CONTACTS) && canUse(SCREENS?.CONTACTS)
-      ),
+      show: can(() => access?.can?.(ACTIONS.SEE_CONTACTS) && canUse(SCREENS?.CONTACTS)),
     },
     {
       name: "TopupTab",
@@ -90,10 +67,10 @@ export default function TabNavigator() {
       show: true,
     },
     {
-      name: "Statements",
-      label: "Statement",
-      icon: "file-text",
-      component: TransactionsScreen,
+      name: "Notifications",
+      label: "Notifications",
+      icon: "bell",
+      component: NotificationsScreen,
       show: true,
     },
     {
@@ -138,21 +115,18 @@ export default function TabNavigator() {
       name: "Profile",
       label: "Profile",
       icon: "user",
-      component: ProfileStackNavigator,
+      component: ProfileStackNavigatorMerchant,
       show: can(() => canUse(SCREENS?.PROFILE)),
     },
   ];
 
   const tabs = (role === "b2b" ? TABS_B2B : TABS_B2C).filter((t) => t.show);
-
   if (tabs.length === 0) return null;
 
-  const initial = tabs.find((t) => t.name === "HomeTab")
-    ? "HomeTab"
-    : tabs[0].name;
+  const initial = tabs.find((t) => t.name === "HomeTab") ? "HomeTab" : tabs[0].name;
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={TabNavStyles.navigatorWrapper}>
       <Tab.Navigator
         initialRouteName={initial}
         screenOptions={({ route }) => {
@@ -169,7 +143,10 @@ export default function TabNavigator() {
               paddingTop: 6,
               paddingBottom: Math.max(insets.bottom, 8),
               backgroundColor: "#fff",
-              zIndex: 10, // Ensure tab bar stays on top
+              zIndex: 9999,
+              elevation: 10,
+              position: "absolute",
+              borderTopWidth: 0,
             },
             tabBarIcon: ({ color, size }) => (
               <View style={{ alignItems: "center", justifyContent: "center" }}>
@@ -178,14 +155,10 @@ export default function TabNavigator() {
               </View>
             ),
             tabBarLabel: ({ color, children }) => (
-              <Text style={{ color, fontSize: 11, marginTop: 1 }}>{children}</Text>
+              <Text style={{ color, fontSize: Schp.hp(1.2),  }}>{children}</Text>
             ),
             tabBarButton: (props) =>
-              isMiddle ? (
-                <CustomMiddleButton {...props} />
-              ) : (
-                <TouchableOpacity {...props} activeOpacity={1} />
-            ),
+              isMiddle ? <CustomMiddleButton {...props} /> : <TouchableOpacity {...props} activeOpacity={1} />,
           };
         }}
       >
@@ -196,3 +169,4 @@ export default function TabNavigator() {
     </View>
   );
 }
+

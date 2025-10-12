@@ -13,6 +13,7 @@ export const UserProvider = ({ children }) => {
     const loadUser = async () => {
       try {
         const storedUser = await AsyncStorage.getItem("user");
+        console.log("Stored user from AsyncStorage:", storedUser);
      
         if (storedUser) {
           const parsed = JSON.parse(storedUser);

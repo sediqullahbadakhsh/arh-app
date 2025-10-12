@@ -1,65 +1,68 @@
-
 import React, { useEffect, useState } from "react";
-import { Alert, SafeAreaView, View } from "react-native";
+import { Alert, SafeAreaView, View, ActivityIndicator, Text, ScrollView } from "react-native";
 import ServiceHeader from "../../components/ServiceHeader";
 import { Colors } from "../../theme/colors";
 import LanguageSelector from "./languageSelector";
+import { useLanguage } from "../../context/LanguageContext";
 import { useUser } from "../../context/userContext";
 import { updateLanguage } from "../../services/merchantApi";
-const LANGS = [
-  { label: "English", value: "english", code: "en", flag: "https://flagcdn.com/w20/gb.png" },
-  { label: "Dari", value: "dari", code: "fa", flag: "https://flagcdn.com/w20/af.png" },
-  { label: "Pashto", value: "pashto", code: "ps", flag: "https://flagcdn.com/w20/af.png" },
-];
+import RTLTransitionHandler from '../../components/RTLTransitionHandler';
+
 export default function LanguageScreen({ navigation }) {
-  const [selectedLang, setSelectedLang] = useState(null);
-  const {user} = useUser()
+  const { user } = useUser();
+  const { selectedLang, LANGS, changeLanguage, isChangingLanguage } = useLanguage();
+  const [updatingBackend, setUpdatingBackend] = useState(false);
 
+  const handleLanguageChange = async (lang) => {
+    if (isChangingLanguage || updatingBackend) return;
 
-
-  useEffect(()=>{
-    const getUserLanguage = async()=>{
-        const userInfo = await AsyncStorage.getItem("user");
-        let parsed
-        console.log(parsed, "this is parsed")
-        if(userInfo){
-         parsed = JSON.parse(userInfo);
-        }
-
-        const langg = LANGS.find((lan)=>lan.value == parsed.language)
-        console.log(langg, "this is selecte language")
-        setSelectedLang(langg)
-    }
-getUserLanguage()
-    
-  },[])
-  const changeLanguage = async(lang)=>{
+    setUpdatingBackend(true);
     try {
-setSelectedLang(lang)
-        const payload = {
-            messageLanguage: lang?.value
-        }
+      const languageChanged = await changeLanguage(lang);
+      
+      if (!languageChanged) {
+        throw new Error('Failed to change app language');
+      }
 
-        const res = await updateLanguage(user?.id, payload)
+      if (user?.id) {
+        const payload = { messageLanguage: lang.value };
+        await updateLanguage(user.id, payload);
+      }
 
-        Alert.alert("Change Language", "Languaged Changed Successfully")
-        
+      Alert.alert("Success", "Language changed successfully!");
     } catch (error) {
-        Alert.alert("failed to Change Language", "Oops, Something Went Wrong!")
-        
+      console.error('Error changing language:', error);
+      Alert.alert("Error", "Failed to change language. Please try again.");
+    } finally {
+      setUpdatingBackend(false);
     }
-  }
+  };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
-      <ServiceHeader title="Manage Language" onBack={() => navigation.goBack()} />
-      <View style={{ padding: 16 }}>
-        <LanguageSelector
-          selectedLang={selectedLang}
-          onChange={changeLanguage}
-          langs={LANGS}
+    <RTLTransitionHandler>
+      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
+        <ServiceHeader 
+          title="Manage Language" 
+          onBack={() => navigation.goBack()} 
         />
-      </View>
-    </SafeAreaView>
+        <ScrollView contentContainerStyle={{ padding: 24 }}>
+          <LanguageSelector
+            selectedLang={selectedLang}
+            onChange={handleLanguageChange}
+            langs={LANGS}
+            loading={isChangingLanguage || updatingBackend}
+          />
+          
+          {(isChangingLanguage || updatingBackend) && (
+            <View style={{ marginTop: 20, alignItems: 'center' }}>
+              <ActivityIndicator size="large" color={Colors.primary} />
+              <Text style={{ marginTop: 10, color: Colors.textSecondary }}>
+                {updatingBackend ? "Updating preferences..." : "Changing language..."}
+              </Text>
+            </View>
+          )}
+        </ScrollView>
+      </SafeAreaView>
+    </RTLTransitionHandler>
   );
 }

@@ -43,7 +43,7 @@ export default function TopupFormScreen({ navigation, route }) {
 
     const openContacts = useCallback(() => {
         navigation.navigate('ContactPicker', {
-            onSelect: (num) => setMobile(num),  // callback to update state
+            onSelect: (num) => setMobile(num),  
         });
     }, [navigation, setMobile]);
 

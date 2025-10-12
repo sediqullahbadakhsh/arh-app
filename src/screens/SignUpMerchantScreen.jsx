@@ -1,60 +1,60 @@
 // src/screens/SignUpMerchantScreen.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import {
   SafeAreaView,
   View,
   Text,
-  StyleSheet,
   TouchableOpacity,
   TextInput,
   Modal,
   FlatList,
   Image,
   ScrollView,
+  Animated,
+  Easing,
+  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  Alert
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import { Colors } from "../theme/colors";
 import AuthHeader from "../components/AuthHeader";
-import InputField from "../components/InputField";
 import PrimaryButton from "../components/PrimaryButton";
 import { COUNTRIES } from "../constants/countries";
 import { codeToFlag } from "../utils/flag";
 import { getCountries, getDistricts, getProvinces, merchantSignup } from "../services/merchantApi";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const PROVINCES = ["Kabul", "Herat", "Kandahar", "Nangarhar"];
-const DISTRICTS = ["District 1", "District 2", "District 3"];
+const { height: screenHeight } = Dimensions.get('window');
 const LANGS = ["english", "dari", "pashto"];
-
-const GAP = 1;
 
 export default function SignUpMerchantScreen({ navigation }) {
   const [step, setStep] = useState(0);
+  const insets = useSafeAreaInsets();
+
+  // Animation values for bottom sheets
+  const [modalSlideAnim] = useState(new Animated.Value(screenHeight));
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Step 1
-  const [first, setFirst] = useState("");
-  const [last, setLast] = useState("");
-  const [father, setFather] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
+  const [mobileNumber, setMobileNumber] = useState("");
+  const [alternativeContact, setAlternativeContact] = useState("");
 
   // Step 2
-  const defaultAf = useMemo(
-    () => COUNTRIES.find((c) => c.code === "AF") || COUNTRIES[0],
-    []
-  );
+  const defaultAf = useMemo(() => COUNTRIES.find((c) => c.code === "AF") || COUNTRIES[0], []);
   const [countries, setCountries] = useState([])
   const [provinces, setProvinces] = useState([])
   const [districts, setDistricts] = useState([])
   const [country, setCountry] = useState(defaultAf);
   const [province, setProvince] = useState("");
   const [district, setDistrict] = useState("");
-  const [firstName, setFirstName] = useState("")
-  const [lastName, setLastName] = useState("")
   const [address, setAddress] = useState("");
-  const [mobileNumber, setMobileNumber] = useState("");
-  const [alternativeContact, setAlternaticeContact] = useState("");
   const [messageLanguage, setMessageLanguage] = useState("")
   const [picker, setPicker] = useState({ open: false, type: null });
 
@@ -62,42 +62,92 @@ export default function SignUpMerchantScreen({ navigation }) {
   const [photoUri, setPhotoUri] = useState(null);
   const [idFile, setIdFile] = useState(null);
 
+  // Input focus states
+  const [focusedInput, setFocusedInput] = useState(null);
+
   const next = () => setStep((s) => Math.min(2, s + 1));
   const back = () => setStep((s) => Math.max(0, s - 1));
-console.log("👀 AgentCreateScreen rendered!");
-  useEffect(()=>{
-    const getAllCountries = async()=>{
+
+  useEffect(() => {
+    const getAllCountries = async() => {
       const res = await getCountries()
       setCountries(res?.data)
-      console.log(res, "✔✔✔")
     }
-
     getAllCountries()
-  },[])
-  useEffect(()=>{
+  }, [])
+
+  useEffect(() => {
     if(country?.id){
- const getAllProvinces = async()=>{
-      const res = await getProvinces(country?.id)
-      setProvinces(res?.data)
-      console.log(res, "✔✔✔")
+      const getAllProvinces = async() => {
+        const res = await getProvinces(country?.id)
+        setProvinces(res?.data)
+      }
+      getAllProvinces()
     }
+  }, [country?.id])
 
-    getAllProvinces()
-    }
-   
-  },[country?.id])
-  useEffect(()=>{
+  useEffect(() => {
     if(province?.id){
- const getAllDistricts = async()=>{
-      const res = await getDistricts(province?.id)
-      setDistricts(res?.data)
-      console.log(res, "✔✔✔")
+      const getAllDistricts = async() => {
+        const res = await getDistricts(province?.id)
+        setDistricts(res?.data)
+      }
+      getAllDistricts()
+    }
+  }, [province?.id])
+
+  useEffect(() => {
+    if (picker.open) {
+      Animated.timing(modalSlideAnim, {
+        toValue: 0,
+        duration: 350,
+        easing: Easing.out(Easing.back(1)),
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(modalSlideAnim, {
+        toValue: screenHeight,
+        duration: 250,
+        easing: Easing.in(Easing.ease),
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [picker.open]);
+
+  const filteredData = useMemo(() => {
+    if (!searchQuery) {
+      switch (picker.type) {
+        case 'country': return countries;
+        case 'province': return provinces;
+        case 'district': return districts;
+        case 'lang': return LANGS;
+        default: return [];
+      }
     }
 
-    getAllDistricts()
+    const query = searchQuery.toLowerCase();
+    switch (picker.type) {
+      case 'country':
+        return countries.filter(item => 
+          item.countryName.toLowerCase().includes(query) ||
+          item.countryCode.toLowerCase().includes(query)
+        );
+      case 'province':
+        return provinces.filter(item => 
+          item.provinceName.toLowerCase().includes(query)
+        );
+      case 'district':
+        return districts.filter(item => 
+          item.districtName.toLowerCase().includes(query)
+        );
+      case 'lang':
+        return LANGS.filter(item => 
+          item.toLowerCase().includes(query)
+        );
+      default:
+        return [];
     }
-   
-  },[province?.id])
+  }, [searchQuery, picker.type, countries, provinces, districts]);
 
   const submit = async () => {
     try {
@@ -107,7 +157,7 @@ console.log("👀 AgentCreateScreen rendered!");
         mobileNumber: mobileNumber,
         user_type: "agent",
         status: "active",
-        profile_picture: null, // fill with base64 if you want
+        profile_picture: null,
         country: country?.id,
         province: province?.id,
         district: district?.id,
@@ -122,15 +172,14 @@ console.log("👀 AgentCreateScreen rendered!");
       navigation.replace("SignupResult", {
         type: "merchant",
         title: "Application Submitted",
-        message:
-          "Your application has been submitted. We’ll email you updates.",
+        message: "Your application has been submitted. We'll email you updates.",
         cta: "Go Back",
       });
     } catch (e) {
-      alert(e.message);
+      Alert.alert("Error", e.message);
     }
   };
-  // ---- Camera / File pickers ----
+
   const takePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
@@ -162,580 +211,719 @@ console.log("👀 AgentCreateScreen rendered!");
     });
   };
 
+  const PickerModal = () => (
+    <Modal
+      visible={picker.open}
+      transparent={true}
+      animationType="none"
+      statusBarTranslucent={true}
+      onRequestClose={() => setPicker({ open: false })}
+    >
+      <View style={styles.modalOverlay}>
+        <TouchableOpacity 
+          style={styles.modalBackdrop}
+          activeOpacity={1}
+          onPress={() => setPicker({ open: false })}
+        />
+        <Animated.View 
+          style={[
+            styles.modalCard,
+            { 
+              transform: [{ translateY: modalSlideAnim }],
+              height: '70%',
+              marginBottom: -insets.bottom
+            }
+          ]}
+        >
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>
+              {picker.type === 'country' && 'Select Country'}
+              {picker.type === 'province' && 'Select Province'}
+              {picker.type === 'district' && 'Select District'}
+              {picker.type === 'lang' && 'Select Language'}
+            </Text>
+            <TouchableOpacity 
+              onPress={() => setPicker({ open: false })}
+              style={styles.closeButton}
+            >
+              <Ionicons name="close" size={24} color="#666" />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.searchContainer}>
+            <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
+            <TextInput
+              placeholder={`Search ${picker.type}...`}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              style={styles.searchInput}
+              placeholderTextColor="#999"
+            />
+          </View>
+
+          <FlatList
+            data={filteredData}
+            keyExtractor={(item, index) => 
+              picker.type === 'country' ? item.countryCode : 
+              picker.type === 'province' ? item.id :
+              picker.type === 'district' ? item.id : 
+              item + index
+            }
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.modalRow}
+                onPress={() => {
+                  switch (picker.type) {
+                    case 'country': setCountry(item); break;
+                    case 'province': setProvince(item); break;
+                    case 'district': setDistrict(item); break;
+                    case 'lang': setMessageLanguage(item); break;
+                  }
+                  setPicker({ open: false });
+                  setSearchQuery('');
+                }}
+              >
+                {picker.type === 'country' && (
+                  <Text style={{ fontSize: 24, marginRight: 12 }}>
+                    {codeToFlag(item.countryCode)}
+                  </Text>
+                )}
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: Colors.textPrimary, fontSize: 16, fontWeight: '500' }}>
+                    {picker.type === 'country' ? item.countryName :
+                     picker.type === 'province' ? item.provinceName :
+                     picker.type === 'district' ? item.districtName : item}
+                  </Text>
+                  {picker.type === 'country' && (
+                    <Text style={{ color: Colors.textSecondary, fontSize: 14 }}>
+                      +{item.dialCode}
+                    </Text>
+                  )}
+                </View>
+                {(picker.type === 'country' && item.countryCode === country?.countryCode) ||
+                 (picker.type === 'province' && item.id === province?.id) ||
+                 (picker.type === 'district' && item.id === district?.id) ||
+                 (picker.type === 'lang' && item === messageLanguage) ? (
+                  <Ionicons name="checkmark-circle" size={24} color={Colors.primary} />
+                ) : null}
+              </TouchableOpacity>
+            )}
+            ItemSeparatorComponent={() => <View style={styles.separator} />}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Ionicons name="search-outline" size={48} color="#999" />
+                <Text style={styles.emptyText}>No results found</Text>
+              </View>
+            }
+          />
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
       <AuthHeader
-        title="Register"
+        title="Register as Merchant"
         onBack={() => (step === 0 ? navigation.goBack() : back())}
       />
 
-      {/* Step indicator */}
-      <View style={styles.stepperWrap}>
-        <StepDot index={0} current={step} label="Personal" />
-        <StepLine active={step >= 1} />
-        <StepDot index={1} current={step} label="Additional" />
-        <StepLine active={step >= 2} />
-        <StepDot index={2} current={step} label="Intermediate" />
+      {/* Premium Stepper */}
+      <View style={styles.stepperContainer}>
+        {[0, 1, 2].map((index) => (
+          <View key={index} style={styles.stepContainer}>
+            <View style={[
+              styles.stepCircle,
+              step >= index && styles.stepCircleActive
+            ]}>
+              {step > index ? (
+                <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+              ) : (
+                <Text style={[
+                  styles.stepNumber,
+                  step >= index && styles.stepNumberActive
+                ]}>
+                  {index + 1}
+                </Text>
+              )}
+            </View>
+            <Text style={[
+              styles.stepLabel,
+              step >= index && styles.stepLabelActive
+            ]}>
+              {index === 0 ? 'Personal' : index === 1 ? 'Additional' : 'KYC'}
+            </Text>
+            {index < 2 && (
+              <View style={[
+                styles.stepLine,
+                step > index && styles.stepLineActive
+              ]} />
+            )}
+          </View>
+        ))}
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.container}
-        keyboardShouldPersistTaps="handled"
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        {step === 0 && (
-          <>
-            <Text style={styles.sectionTitle}>Personal Information</Text>
+        <ScrollView
+          contentContainerStyle={styles.container}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {step === 0 && (
+            <>
+              <Text style={styles.sectionTitle}>Personal Information</Text>
 
-            <LabeledInput
-              label="First Name"
-              value={firstName}
-              onChangeText={setFirstName}
-              placeholder="Enter First Name"
-            />
-            <LabeledInput
-              label="Last Name"
-              value={lastName}
-              onChangeText={setLastName}
-              placeholder="Enter Last Name"
-            />
-
-             <LabeledInput
-              label="Email"
-              value={email}
-              onChangeText={setEmail}
-              placeholder="Enter Your Email Address"
-              keyboardType="email-address"
-            />
-
-            <LabeledInput
-              label="Mobile Number"
-              value={mobileNumber}
-              onChangeText={setMobileNumber}
-              placeholder="Enter Mobile Number"
-            />
-           
-            <LabeledInput
-              label="Alternative Contact"
-              value={alternativeContact}
-              onChangeText={setAlternaticeContact}
-              placeholder="Enter Alternative Contact"
-              keyboardType="phone-pad"
-            />
-
-            {/* Full-width primary button */}
-            <PrimaryButton
-              label="Continue"
-              onPress={next}
-              style={styles.fullButton}
-            />
-          </>
-        )}
-
-        {step === 1 && (
-          <>
-            <Text style={styles.sectionTitle}>Additional Information</Text>
-
-            <DropField
-              label="Country"
-              value={country?.countryName || "Select Country"}
-              onPress={() => setPicker({ open: true, type: "country" })}
-              leftIcon={
-                <Text style={{ fontSize: 18 }}>
-                  {codeToFlag(country?.countryCode)}
-                </Text>
-              }
-            />
-            <DropField
-              label="Province"
-              value={province?.provinceName || "Select Province"}
-              onPress={() => setPicker({ open: true, type: "province" })}
-            />
-            <DropField
-              label="District"
-              value={district?.districtName || "Select District"}
-              onPress={() => setPicker({ open: true, type: "district" })}
-            />
-            <LabeledInput
-              label="Full Address"
-              value={address}
-              onChangeText={setAddress}
-              placeholder="Enter Full Address"
-            />
-            <DropField
-              label="Select Message Language"
-              value={messageLanguage || "Select Language"}
-              onPress={() => setPicker({ open: true, type: "lang" })}
-            />
-
-            {/* Half-width buttons */}
-            <View style={styles.rowButtons}>
-              <DarkButton
-                label="Back"
-                onPress={back}
-                style={styles.halfButton}
+              <InputField
+                label="First Name *"
+                value={firstName}
+                onChangeText={setFirstName}
+                placeholder="Enter First Name"
+                isFocused={focusedInput === 'firstName'}
+                onFocus={() => setFocusedInput('firstName')}
+                onBlur={() => setFocusedInput(null)}
               />
+
+              <InputField
+                label="Last Name *"
+                value={lastName}
+                onChangeText={setLastName}
+                placeholder="Enter Last Name"
+                isFocused={focusedInput === 'lastName'}
+                onFocus={() => setFocusedInput('lastName')}
+                onBlur={() => setFocusedInput(null)}
+              />
+
+              <InputField
+                label="Email *"
+                value={email}
+                onChangeText={setEmail}
+                placeholder="Enter Your Email Address"
+                keyboardType="email-address"
+                isFocused={focusedInput === 'email'}
+                onFocus={() => setFocusedInput('email')}
+                onBlur={() => setFocusedInput(null)}
+              />
+
+              <InputField
+                label="Mobile Number *"
+                value={mobileNumber}
+                onChangeText={setMobileNumber}
+                placeholder="Enter Mobile Number"
+                keyboardType="phone-pad"
+                isFocused={focusedInput === 'mobileNumber'}
+                onFocus={() => setFocusedInput('mobileNumber')}
+                onBlur={() => setFocusedInput(null)}
+              />
+            
+              <InputField
+                label="Alternative Contact"
+                value={alternativeContact}
+                onChangeText={setAlternativeContact}
+                placeholder="Enter Alternative Contact"
+                keyboardType="phone-pad"
+                isFocused={focusedInput === 'alternativeContact'}
+                onFocus={() => setFocusedInput('alternativeContact')}
+                onBlur={() => setFocusedInput(null)}
+              />
+
               <PrimaryButton
                 label="Continue"
                 onPress={next}
-                style={styles.halfButton}
+                style={styles.continueButton}
               />
-            </View>
-          </>
-        )}
+            </>
+          )}
 
-        {step === 2 && (
-          <>
-            <Text style={styles.sectionTitle}>Intermediate Information</Text>
+          {step === 1 && (
+            <>
+              <Text style={styles.sectionTitle}>Additional Information</Text>
 
-            <View style={styles.photoBox}>
-              {photoUri ? (
-                <Image
-                  source={{ uri: photoUri }}
-                  style={{ width: "100%", height: "100%" }}
+              <DropField
+                label="Country *"
+                value={country?.countryName || "Select Country"}
+                onPress={() => setPicker({ open: true, type: "country" })}
+                leftIcon={
+                  <Text style={{ fontSize: 20 }}>
+                    {codeToFlag(country?.countryCode)}
+                  </Text>
+                }
+              />
+
+              <DropField
+                label="Province *"
+                value={province?.provinceName || "Select Province"}
+                onPress={() => setPicker({ open: true, type: "province" })}
+              />
+
+              <DropField
+                label="District *"
+                value={district?.districtName || "Select District"}
+                onPress={() => setPicker({ open: true, type: "district" })}
+              />
+
+              <InputField
+                label="Full Address *"
+                value={address}
+                onChangeText={setAddress}
+                placeholder="Enter Full Address"
+                isFocused={focusedInput === 'address'}
+                onFocus={() => setFocusedInput('address')}
+                onBlur={() => setFocusedInput(null)}
+              />
+
+              <DropField
+                label="Message Language *"
+                value={messageLanguage ? messageLanguage.charAt(0).toUpperCase() + messageLanguage.slice(1) : "Select Language"}
+                onPress={() => setPicker({ open: true, type: "lang" })}
+              />
+
+              <View style={styles.buttonRow}>
+                <SecondaryButton
+                  label="Back"
+                  onPress={back}
+                  style={styles.halfButton}
                 />
-              ) : (
-                <View style={styles.photoPlaceholder} />
-              )}
-            </View>
+                <PrimaryButton
+                  label="Continue"
+                  onPress={next}
+                  style={styles.halfButton}
+                />
+              </View>
+            </>
+          )}
 
-            <TouchableOpacity
-              style={styles.takePhotoBtn}
-              activeOpacity={0.9}
-              onPress={takePhoto}
-            >
-              <Ionicons name="camera-outline" size={18} color="#fff" />
-              <Text style={{ color: "#fff", fontWeight: "600", marginLeft: 8 }}>
-                Take Photo
-              </Text>
-            </TouchableOpacity>
+          {step === 2 && (
+            <>
+              <Text style={styles.sectionTitle}>KYC Information</Text>
 
-            <TouchableOpacity
-              style={styles.uploadBox}
-              onPress={pickIdFile}
-              activeOpacity={0.9}
-            >
-              <Ionicons name="cloud-upload-outline" size={20} color="#9E9E9E" />
-              <Text style={{ color: "#9E9E9E", marginTop: 8 }}>
-                {idFile ? idFile.name : "Upload Your Identify Number"}
-              </Text>
-            </TouchableOpacity>
+              <View style={styles.kycSection}>
+                <Text style={styles.kycLabel}>Profile Photo</Text>
+                <View style={styles.photoContainer}>
+                  {photoUri ? (
+                    <Image
+                      source={{ uri: photoUri }}
+                      style={styles.photoImage}
+                    />
+                  ) : (
+                    <View style={styles.photoPlaceholder}>
+                      <Ionicons name="camera-outline" size={32} color="#9CA3AF" />
+                      <Text style={styles.photoPlaceholderText}>No photo taken</Text>
+                    </View>
+                  )}
+                </View>
+                <TouchableOpacity
+                  style={styles.photoButton}
+                  onPress={takePhoto}
+                >
+                  <Ionicons name="camera" size={20} color="#FFFFFF" />
+                  <Text style={styles.photoButtonText}>Take Photo</Text>
+                </TouchableOpacity>
+              </View>
 
-            <View style={styles.rowButtons}>
-              <DarkButton
-                label="Back"
-                onPress={back}
-                style={styles.halfButton}
-              />
-              <PrimaryButton
-                label="Submit"
-                onPress={submit}
-                style={styles.halfButton}
-              />
-            </View>
-          </>
-        )}
-      </ScrollView>
+              <View style={styles.kycSection}>
+                <Text style={styles.kycLabel}>ID Document</Text>
+                <TouchableOpacity
+                  style={styles.uploadContainer}
+                  onPress={pickIdFile}
+                >
+                  <Ionicons name="cloud-upload-outline" size={32} color={Colors.primary} />
+                  <Text style={styles.uploadText}>
+                    {idFile ? idFile.name : "Upload ID Document"}
+                  </Text>
+                  <Text style={styles.uploadSubtext}>
+                    Supports: JPG, PNG, PDF (Max 5MB)
+                  </Text>
+                </TouchableOpacity>
+              </View>
 
-      {/* Picker modal */}
-      <Modal
-         transparent
-        visible={picker.open}
-        animationType="fade"
-        statusBarTranslucent
-        presentationStyle="overFullScreen"
-        onRequestClose={() => setPicker({ open: false })}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select</Text>
-              <TouchableOpacity
-                onPress={() => setPicker({ open: false })}
-                style={{ padding: 6 }}
-              >
-                <Ionicons name="close" size={20} color="#333" />
-              </TouchableOpacity>
-            </View>
+              <View style={styles.buttonRow}>
+                <SecondaryButton
+                  label="Back"
+                  onPress={back}
+                  style={styles.halfButton}
+                />
+                <PrimaryButton
+                  label="Submit Application"
+                  onPress={submit}
+                  style={styles.halfButton}
+                />
+              </View>
+            </>
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
 
-            {picker.type === "country" && (
-              <FlatList
-                data={countries}
-                keyExtractor={(it) => it.countryCode}
-                ItemSeparatorComponent={() => <View style={{ height: GAP }} />}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.modalRow}
-                    onPress={() => {
-                      setCountry(item);
-                      setPicker({ open: false });
-                    }}
-                    activeOpacity={0.85}
-                  >
-                    <Text style={{ fontSize: 18, marginRight: 8 }}>
-                      {codeToFlag(item.countryCode)}
-                    </Text>
-                    <Text
-                      style={{
-                        flex: 1,
-                        fontSize: 15,
-                        color: Colors.textPrimary,
-                      }}
-                    >
-                      {item.countryName}
-                    </Text>
-                    {item.code === country?.code && (
-                      <Ionicons
-                        name="checkmark-circle"
-                        color={Colors.primary}
-                        size={18}
-                      />
-                    )}
-                  </TouchableOpacity>
-                )}
-              />
-            )}
-
-            {picker.type === "province" && (
-              <FlatList
-                data={provinces}
-                keyExtractor={(it) => it?.id}
-                ItemSeparatorComponent={() => <View style={{ height: GAP }} />}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.modalRow}
-                    onPress={() => {
-                      setProvince(item);
-                      setPicker({ open: false });
-                    }}
-                    activeOpacity={0.85}
-                  >
-                    <Text
-                      style={{
-                        flex: 1,
-                        fontSize: 15,
-                        color: Colors.textPrimary,
-                      }}
-                    >
-                      {item?.provinceName}
-                    </Text>
-                    {item === province && (
-                      <Ionicons
-                        name="checkmark-circle"
-                        color={Colors.primary}
-                        size={18}
-                      />
-                    )}
-                  </TouchableOpacity>
-                )}
-              />
-            )}
-
-            {picker.type === "district" && (
-              <FlatList
-                data={districts}
-                keyExtractor={(it) => it?.id}
-                ItemSeparatorComponent={() => <View style={{ height: GAP }} />}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.modalRow}
-                    onPress={() => {
-                      setDistrict(item);
-                      setPicker({ open: false });
-                    }}
-                    activeOpacity={0.85}
-                  >
-                    <Text
-                      style={{
-                        flex: 1,
-                        fontSize: 15,
-                        color: Colors.textPrimary,
-                      }}
-                    >
-                      {item?.districtName}
-                    </Text>
-                    {item === district && (
-                      <Ionicons
-                        name="checkmark-circle"
-                        color={Colors.primary}
-                        size={18}
-                      />
-                    )}
-                  </TouchableOpacity>
-                )}
-              />
-            )}
-
-            {picker.type === "lang" && (
-              <FlatList
-                data={LANGS}
-                keyExtractor={(it) => it}
-                ItemSeparatorComponent={() => <View style={{ height: GAP }} />}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.modalRow}
-                    onPress={() => {
-                      setMessageLanguage(item);
-                      setPicker({ open: false });
-                    }}
-                    activeOpacity={0.85}
-                  >
-                    <Text
-                      style={{
-                        flex: 1,
-                        fontSize: 15,
-                        color: Colors.textPrimary,
-                      }}
-                    >
-                      {item}
-                    </Text>
-                    {item === messageLanguage && (
-                      <Ionicons
-                        name="checkmark-circle"
-                        color={Colors.primary}
-                        size={18}
-                      />
-                    )}
-                  </TouchableOpacity>
-                )}
-              />
-            )}
-          </View>
-        </View>
-      </Modal>
+      <PickerModal />
     </SafeAreaView>
   );
 }
 
-/* ---------- atoms ---------- */
-function LabeledInput({ label, placeholder, ...rest }) {
+// Component Definitions
+function InputField({ label, value, onChangeText, placeholder, keyboardType, isFocused, onFocus, onBlur }) {
   return (
-    <View style={{ marginBottom: GAP }}>
-      <Text style={styles.label}>
-        <Text style={{ color: "#F44336" }}>* </Text>
-        {label}
-      </Text>
-      <InputField placeholder={placeholder} {...rest} />
+    <View style={styles.inputContainer}>
+      <Text style={styles.inputLabel}>{label}</Text>
+      <View style={[
+        styles.inputWrapper,
+        isFocused && styles.inputWrapperFocused
+      ]}>
+        <TextInput
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor="#9CA3AF"
+          style={styles.textInput}
+          keyboardType={keyboardType}
+          onFocus={onFocus}
+          onBlur={onBlur}
+        />
+      </View>
     </View>
   );
 }
 
 function DropField({ label, value, onPress, leftIcon }) {
   return (
-    <View style={{ marginBottom: 13 }}>
-      <Text style={styles.label}>
-        <Text style={{ color: "#F44336" }}>* </Text>
-        {label}
-      </Text>
+    <View style={styles.inputContainer}>
+      <Text style={styles.inputLabel}>{label}</Text>
       <TouchableOpacity
-        style={styles.dropField}
+        style={styles.dropdownWrapper}
         onPress={onPress}
-        activeOpacity={0.85}
+        activeOpacity={0.8}
       >
-        <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
-          {leftIcon ? <View style={{ marginRight: 8 }}>{leftIcon}</View> : null}
-          <Text style={{ color: "#6B7280", fontSize: 14 }}>{value}</Text>
+        <View style={styles.dropdownContent}>
+          {leftIcon && <View style={styles.dropdownIcon}>{leftIcon}</View>}
+          <Text style={[
+            styles.dropdownText,
+            !value.includes('Select') && { color: Colors.textPrimary }
+          ]}>
+            {value}
+          </Text>
         </View>
-        <Ionicons name="chevron-down" size={18} color="#7A7A7A" />
+        <Ionicons name="chevron-down" size={20} color="#6B7280" />
       </TouchableOpacity>
     </View>
   );
 }
 
-function DarkButton({ label, onPress, style, disabled }) {
+function SecondaryButton({ label, onPress, style }) {
   return (
     <TouchableOpacity
+      style={[styles.secondaryButton, style]}
       onPress={onPress}
       activeOpacity={0.9}
-      disabled={disabled}
-      style={[styles.darkBtn, disabled && { opacity: 0.5 }, style]}
     >
-      <Text style={styles.darkBtnText}>{label}</Text>
+      <Text style={styles.secondaryButtonText}>{label}</Text>
     </TouchableOpacity>
   );
 }
 
-function StepDot({ index, current, label }) {
-  const active = current === index;
-  const done = current > index;
-  return (
-    <View style={styles.stepItem}>
-      <View
-        style={[
-          styles.stepDot,
-          active && {
-            backgroundColor: Colors.primary,
-            borderColor: Colors.primary,
-          },
-          done && { backgroundColor: Colors.primary },
-        ]}
-      >
-        {done ? (
-          <Ionicons name="checkmark" size={12} color="#fff" />
-        ) : (
-          <Text style={[styles.stepNum, active && { color: "#fff" }]}>
-            {index + 1}
-          </Text>
-        )}
-      </View>
-      <Text style={styles.stepLabel} numberOfLines={1}>
-        {label}
-      </Text>
-    </View>
-  );
-}
-
-function StepLine({ active }) {
-  return (
-    <View
-      style={[styles.stepLine, active && { backgroundColor: Colors.primary }]}
-    />
-  );
-}
-
-/* ---------- styles ---------- */
-const styles = StyleSheet.create({
+const styles = {
   container: {
     paddingHorizontal: 24,
-    paddingTop: 14,
-    paddingBottom: 24,
-    gap: GAP,
+    paddingTop: 20,
+    paddingBottom: 40,
+  },
+  
+  // Stepper Styles
+  stepperContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 20,
     backgroundColor: Colors.white,
   },
-    modalRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 10,
-    paddingHorizontal: 6,
-    borderRadius: 8,
-    backgroundColor: "#fff",
-  },
-    modalBackdrop: {
+  stepContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.25)",
-    justifyContent: "center",
-    padding: 24,
+  },
+  stepCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+  },
+  stepCircleActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  stepNumber: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  stepNumberActive: {
+    color: '#FFFFFF',
+  },
+  stepLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#9CA3AF',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  stepLabelActive: {
+    color: Colors.primary,
+  },
+  stepLine: {
+    flex: 1,
+    height: 2,
+    backgroundColor: '#E5E7EB',
+    marginHorizontal: 8,
+  },
+  stepLineActive: {
+    backgroundColor: Colors.primary,
+  },
+
+  // Section Styles
+  sectionTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+
+  // Input Styles
+  inputContainer: {
+    marginBottom: 20,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+    marginBottom: 8,
+  },
+  inputWrapper: {
+    height: 56,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    justifyContent: 'center',
+  },
+  inputWrapperFocused: {
+    borderColor: Colors.primary,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  textInput: {
+    fontSize: 16,
+    color: Colors.textPrimary,
+    padding: 0,
+  },
+
+  // Dropdown Styles
+  dropdownWrapper: {
+    height: 56,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  dropdownContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  dropdownIcon: {
+    marginRight: 12,
+  },
+  dropdownText: {
+    fontSize: 16,
+    color: '#9CA3AF',
+  },
+
+  // Button Styles
+  continueButton: {
+    marginTop: 8,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 24,
+  },
+  halfButton: {
+    width: '48%',
+  },
+  secondaryButton: {
+    height: 56,
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  secondaryButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+  },
+
+  // KYC Styles
+  kycSection: {
+    marginBottom: 32,
+  },
+  kycLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+    marginBottom: 12,
+  },
+  photoContainer: {
+    height: 200,
+    borderRadius: 12,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    borderStyle: 'dashed',
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  photoImage: {
+    width: '100%',
+    height: '100%',
+  },
+  photoPlaceholder: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoPlaceholderText: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    marginTop: 8,
+  },
+  photoButton: {
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: Colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginLeft: 8,
+  },
+  uploadContainer: {
+    height: 120,
+    borderRadius: 12,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  uploadText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  uploadSubtext: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
   },
   modalCard: {
-    width: "100%",
-    backgroundColor: "#fff",
-    borderRadius: 14,
-    padding: 14,
-    maxHeight: "70%",
-    // nice shadow
-    elevation: 6,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
+    padding: 16,
+    elevation: 5,
     shadowColor: "#000",
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 8 },
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
   },
   modalHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 8,
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
   },
-  modalTitle: { fontSize: 16, fontWeight: "700", color: Colors.textPrimary },
-
-  // Stepper
-  stepperWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 24,
-    paddingTop: 10,
-    backgroundColor: Colors.white,
-  },
-  stepItem: { alignItems: "center" },
-  stepDot: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: "#E5E7EB",
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  stepNum: { fontSize: 12, color: Colors.textPrimary, fontWeight: "700" },
-  stepLabel: {
-    fontSize: 10,
-    marginTop: 4,
-    color: Colors.textSecondary,
-    width: 72,
-    textAlign: "center",
-  },
-  stepLine: {
-    height: 2,
-    width: 28,
-    backgroundColor: "#E5E7EB",
-    marginHorizontal: 8,
-  },
-
-  sectionTitle: {
-    fontSize: 14,
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "700",
     color: Colors.textPrimary,
-    marginBottom: 6,
-    fontWeight: "600",
   },
-  label: { fontSize: 13, color: Colors.textPrimary, marginBottom: 4 },
-
-  dropField: {
-    height: 46,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    paddingHorizontal: 12,
-    backgroundColor: "#fff",
-    flexDirection: "row",
-    alignItems: "center",
+  closeButton: {
+    padding: 4,
   },
-
-  photoBox: {
-    height: 200,
-    borderRadius: 8,
-    backgroundColor: "#E5E7EB",
-    marginTop: GAP,
-    overflow: "hidden",
-  },
-  photoPlaceholder: { flex: 1, backgroundColor: "#BDBDBD" },
-
-  takePhotoBtn: {
-    alignSelf: "center",
-    marginVertical: 12,
-    height: 40,
-    paddingHorizontal: 14,
-    borderRadius: 8,
-    backgroundColor: Colors.primary,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  uploadBox: {
-    height: 84,
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
     borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#D7D7D7",
-    borderStyle: "dashed",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#fff",
+    paddingHorizontal: 12,
+    marginBottom: 16,
+    height: 44,
   },
-
-  // Buttons
-  fullButton: { marginTop: 12 }, // full width PrimaryButton
-  rowButtons: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: Colors.textPrimary,
+  },
+  modalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+  },
+  separator: {
+    height: 1,
+    backgroundColor: '#F0F0F0',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#999',
     marginTop: 12,
   },
-  halfButton: { width: "48%" }, // ~half width for both buttons
-  darkBtn: {
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "#2B2B2B",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  darkBtnText: { color: "#fff", fontSize: 15, fontWeight: "600" },
-});
+};
