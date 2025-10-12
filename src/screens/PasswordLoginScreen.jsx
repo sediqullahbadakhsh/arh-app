@@ -1,4 +1,3 @@
-// // src/screens/PasswordLoginScreen.jsx
 import React, { useEffect, useState } from "react";
 import {
   SafeAreaView,
@@ -21,9 +20,10 @@ import Checkbox from "../components/Checkbox";
 import { useUser } from "../context/userContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
-
+import {widthPercentageToDP as wp, heightPercentageToDP as hp} from 'react-native-responsive-screen';
+import { ScrollView } from "react-native";
 export default function PasswordLoginScreen({ route, navigation }) {
-  const { target = "" } = route.params || {}; // email / identifier
+  const { target = "" } = route.params || {}; 
    const { user, setUser } = useUser();
   const [password, setPassword] = useState("");
   const [email, setEmail] = useState( "");
@@ -44,7 +44,7 @@ export default function PasswordLoginScreen({ route, navigation }) {
 
       setEmail(credentials.email);
       setPassword(credentials.password);
-      setRememberMe(true); // ✅ restore checkbox state
+      setRememberMe(true);
     } catch (error) {
       console.error("Failed to fetch rememberMe data:", error);
     }
@@ -70,14 +70,13 @@ const onLogin = async () => {
     };
 
     if (rememberMe) {
-      // ✅ avoid shadowing variable names (don't use const rememberMe again)
       const credentials = {
         email,
         password,
       };
       await AsyncStorage.setItem("rememberMe", JSON.stringify(credentials));
     } else {
-      // ✅ clear rememberMe if unchecked
+
       await AsyncStorage.removeItem("rememberMe");
     }
 
@@ -98,10 +97,15 @@ const onLogin = async () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <AuthHeader title={"Sign in to your\nAccount"} onBack={() => navigation.goBack()} />
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={{ flex: 1 }}
-      >
+    <KeyboardAvoidingView
+  behavior={Platform.OS === "ios" ? "padding" : "height"}
+  style={{ flex: 1, backgroundColor: "transparent" }}
+  keyboardVerticalOffset={hp(2)}
+>
+         <ScrollView
+              contentContainerStyle={{ flexGrow: 1 }}
+              keyboardShouldPersistTaps="handled"
+            >  
         <View style={styles.container}>
         
        <View style={{marginTop: 40}}>
@@ -165,6 +169,7 @@ const onLogin = async () => {
           />
           </View>
         </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

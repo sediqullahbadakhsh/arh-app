@@ -4,7 +4,11 @@
     "slug": "arh",
     "version": "1.0.0",
     "orientation": "portrait",
+    "owner": "ajmal1234",
     "icon": "./assets/icon.png",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
@@ -33,8 +37,13 @@
     },
     "extra": {
       "eas": {
-        "projectId": "d8a0d4bc-904f-45cc-820b-797026150d81"
+        "projectId": "2bd8ada8-2619-4992-8fd9-7c9becd15394"
       }
-    }
+    },
+    "plugins": [
+      "expo-localization",
+      "react-native-edge-to-edge",
+      "expo-font"
+    ]
   }
 }

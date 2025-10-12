@@ -1,6 +1,6 @@
 import api from "./apiClient";
 
-// New auth flow
+
 export const authStart = (identifier) =>
   api.post("/start", { identifier }).then((r) => r.data);
 
@@ -18,9 +18,21 @@ export const signupOtpGenerate = ({ email }) =>
 
 export const signupOtpVerify = ({ otp }) =>
   api.post("/customer/verify-otp", { otp }).then((r) => r.data);
-export const updateCustomerProfile = async (customerId, formData) => {
+
+
+export const getCustomerProfile = async () => {
   try {
-    const response = await api.patch(`/customer/${customerId}`, formData, {
+    const response = await api.get("/customer/me");
+    return response.data;
+  } catch (error) {
+    console.error("Get customer profile error:", error);
+    throw error;
+  }
+};
+
+export const updateCustomerProfile = async (formData) => {
+  try {
+    const response = await api.put("/customer/me", formData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },
@@ -28,6 +40,26 @@ export const updateCustomerProfile = async (customerId, formData) => {
     return response.data;
   } catch (error) {
     console.error("Update customer profile error:", error);
+    throw error;
+  }
+};
+
+export const getProfileCompletionStatus = async () => {
+  try {
+    const response = await api.get("/customer/me/completion-status");
+    return response.data;
+  } catch (error) {
+    console.error("Get profile completion status error:", error);
+    throw error;
+  }
+};
+
+export const updateCustomerEmail = async (otp, email) => {
+  try {
+    const response = await api.post("/customer/verify-otp-update-email", { otp, email });
+    return response.data;
+  } catch (error) {
+    console.error("Update customer email error:", error);
     throw error;
   }
 };
@@ -42,5 +74,20 @@ export const getCustomerById = async (customerId) => {
     throw error;
   }
 };
+
+export const updateCustomerProfileAdmin = async (customerId, formData) => {
+  try {
+    const response = await api.patch(`/customer/${customerId}`, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Update customer profile admin error:", error);
+    throw error;
+  }
+};
+
 export const profile = () =>
   api.get("/profile").then((r) => r.data);

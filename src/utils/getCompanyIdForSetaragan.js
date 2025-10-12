@@ -1,7 +1,7 @@
 export const getSetaraganMnoId = function getValueFromLocalNumber(localNumber) {
   if (!localNumber) return null;
 
-  // Get the first two digits
+
   const prefix = localNumber.toString().slice(0, 2);
 
   if (['78', '73'].includes(prefix)) return 2;

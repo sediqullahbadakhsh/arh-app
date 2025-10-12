@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from "react";
 import {
-  SafeAreaView,
   View,
   Text,
-  StyleSheet,
   TouchableOpacity,
   Image,
   Platform,
@@ -11,14 +9,63 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  Modal,
+  Animated,
+  Easing,
+  Dimensions,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../theme/colors";
 import * as ImagePicker from "expo-image-picker";
 import { useAuth } from "../../auth/AuthProvider";
-import { useUser } from "../../context/userContext";
-import { updateCustomerProfile, getCustomerById } from "../../services/authApi"; 
+import { 
+  getCustomerProfile, 
+  updateCustomerProfile,
+  getProfileCompletionStatus 
+} from "../../services/authApi";
+import ProfileStyles from "./Styles/ProfileStyle";
+
+const { height: screenHeight } = Dimensions.get('window');
+
+
+const SkeletonLoader = () => (
+  <View style={ProfileStyles.skeletonContainer}>
+
+    <LinearGradient
+      colors={["#f5f5f5", "#e0e0e0"]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={ProfileStyles.skeletonHeader}
+    >
+      <View style={ProfileStyles.skeletonAvatarWrapper}>
+        <View style={ProfileStyles.skeletonAvatar} />
+        <View style={ProfileStyles.skeletonEditButton} />
+      </View>
+    </LinearGradient>
+
+
+    <View style={ProfileStyles.skeletonFormContainer}>
+      <View style={ProfileStyles.skeletonSectionTitle} />
+      
+      {[1, 2, 3, 4].map((item) => (
+        <View key={item} style={ProfileStyles.skeletonInputGroup}>
+          <View style={ProfileStyles.skeletonLabel} />
+          <View style={ProfileStyles.skeletonInput} />
+        </View>
+      ))}
+      
+      <View style={ProfileStyles.skeletonButton} />
+    </View>
+  </View>
+);
+
+
+const Shimmer = () => (
+  <View style={ProfileStyles.shimmerContainer}>
+    <Animated.View style={ProfileStyles.shimmer} />
+  </View>
+);
 
 export default function ProfileDetailsScreen({ navigation }) {
   const { user, updateUser } = useAuth();
@@ -31,8 +78,14 @@ export default function ProfileDetailsScreen({ navigation }) {
     address: "",
     email: "",
   });
-  console.log(user, "this is user")
+  const [completionStatus, setCompletionStatus] = useState(null);
   const [errors, setErrors] = useState({});
+  const [showImagePicker, setShowImagePicker] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [scaleAnim] = useState(new Animated.Value(0));
+  const [slideAnim] = useState(new Animated.Value(screenHeight));
+
+  console.log(user, "this is user");
 
   useEffect(() => {
     navigation.setOptions({
@@ -44,22 +97,33 @@ export default function ProfileDetailsScreen({ navigation }) {
     });
   }, []);
 
-
   useEffect(() => {
     const fetchCustomerData = async () => {
       try {
         setFetching(true);
-        const customerData = await getCustomerById(user.id);
-        console.log(customerData, "this is customer data")
-        setFormData({
-          fullName: customerData.fullName || "",
-          phoneNumber: customerData.phoneNumber || "",
-          address: customerData.address || "",
-          email: customerData.email || "",
-        });
+        const customerData = await getCustomerProfile();
+        console.log("Customer data:", customerData);
         
-        if (customerData.profileImg) {
-          setAvatar(customerData.profileImg);
+        if (customerData.success) {
+          const customer = customerData.data;
+          setFormData({
+            fullName: customer.fullName || "",
+            phoneNumber: customer.phoneNumber || "",
+            address: customer.address || "",
+            email: customer.email || "",
+          });
+          
+          if (customer.profileImg) {
+            const fullImageUrl = customer.profileImg.startsWith('http') 
+              ? customer.profileImg 
+              : `http://192.168.0.115:8081/uploads/customer_pictures/${customer.profileImg}`;
+            setAvatar(fullImageUrl);
+          }
+        }
+
+        const statusData = await getProfileCompletionStatus();
+        if (statusData.success) {
+          setCompletionStatus(statusData.data);
         }
       } catch (error) {
         console.error("Error fetching customer data:", error);
@@ -69,28 +133,123 @@ export default function ProfileDetailsScreen({ navigation }) {
       }
     };
 
-    if (user?.id) {
-      fetchCustomerData();
+    fetchCustomerData();
+  }, []);
+
+  useEffect(() => {
+    requestPermissions();
+  }, []);
+
+  useEffect(() => {
+    if (showImagePicker) {
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 350,
+        easing: Easing.out(Easing.back(1)),
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(slideAnim, {
+        toValue: screenHeight,
+        duration: 250,
+        easing: Easing.in(Easing.ease),
+        useNativeDriver: true,
+      }).start();
     }
-  }, [user?.id]);
+  }, [showImagePicker]);
+
+  useEffect(() => {
+    if (showSuccess) {
+      Animated.sequence([
+        Animated.timing(scaleAnim, {
+          toValue: 1.2,
+          duration: 200,
+          easing: Easing.out(Easing.back(1)),
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 1,
+          duration: 100,
+          easing: Easing.in(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      const timer = setTimeout(() => {
+        setShowSuccess(false);
+      }, 2000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [showSuccess]);
+
+  const requestPermissions = async () => {
+    if (Platform.OS !== 'web') {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Sorry, we need camera roll permissions to make this work!');
+      }
+    }
+  };
 
   const handleEditAvatar = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert("Permission required", "Please allow access to your photos to change your profile picture.");
-      return;
-    }
+    setShowImagePicker(false);
+    try {
+      const { status } = await ImagePicker.getMediaLibraryPermissionsAsync();
+      
+      if (status !== 'granted') {
+        const { status: newStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (newStatus !== 'granted') {
+          Alert.alert("Permission required", "Please allow access to your photos to change your profile picture.");
+          return;
+        }
+      }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaType.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+        allowsMultiple: false,
+      });
 
-    if (!result.canceled) {
-      setAvatar(result.assets[0].uri);
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setAvatar(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert("Error", "Failed to open image gallery. Please try again.");
     }
+  };
+
+  const takePhoto = async () => {
+    setShowImagePicker(false);
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      
+      if (status !== 'granted') {
+        Alert.alert("Permission required", "Please allow camera access to take a photo.");
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setAvatar(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error taking photo:', error);
+      Alert.alert("Error", "Failed to open camera. Please try again.");
+    }
+  };
+
+  const removePhoto = () => {
+    setShowImagePicker(false);
+    setAvatar(null);
   };
 
   const validateForm = () => {
@@ -131,30 +290,38 @@ export default function ProfileDetailsScreen({ navigation }) {
 
       if (avatar && avatar.startsWith("file://")) {
         const filename = avatar.split("/").pop();
-        const match = /\.(\w+)$/.exec(filename);
+        const match = /\.(\w+)$/.exec(filename || "");
         const type = match ? `image/${match[1]}` : "image/jpeg";
 
         data.append("profileImg", {
           uri: avatar,
-          name: filename,
+          name: filename || `profile-${Date.now()}.jpg`,
           type,
         });
       }
 
-      const response = await updateCustomerProfile(user.id, data);
+      const response = await updateCustomerProfile(data);
+      console.log("Update response:", response);
       
-      if (response.status) {
-        updateUser({
-          ...user,
-          fullName: formData.fullName,
-          phoneNumber: formData.phoneNumber,
-          address: formData.address,
-          profileImg: response.data.profileImg || avatar,
-        });
+      if (response.success) {
+        if (updateUser && typeof updateUser === 'function') {
+          updateUser({
+            ...user,
+            fullName: formData.fullName,
+            phoneNumber: formData.phoneNumber,
+            address: formData.address,
+            profileImg: response.data.profileImg || avatar,
+          });
+        }
         
-        Alert.alert("Success", "Profile updated successfully!");
+        const statusData = await getProfileCompletionStatus();
+        if (statusData.success) {
+          setCompletionStatus(statusData.data);
+        }
+        
+        setShowSuccess(true);
       } else {
-        Alert.alert("Error", response.error || "Failed to update profile");
+        Alert.alert("Error", response.message || "Failed to update profile");
       }
     } catch (error) {
       console.error("Update profile error:", error);
@@ -166,115 +333,206 @@ export default function ProfileDetailsScreen({ navigation }) {
 
   const handleChange = (field, value) => {
     setFormData({ ...formData, [field]: value });
-    // Clear error when user starts typing
     if (errors[field]) {
       setErrors({ ...errors, [field]: "" });
     }
   };
 
-  // if (fetching) {
-  //   return (
-  //     <SafeAreaView style={styles.safeArea}>
-  //       <View style={styles.loadingContainer}>
-  //         <ActivityIndicator size="large" color={Colors.primary} />
-  //         <Text>Loading profile data...</Text>
-  //       </View>
-  //     </SafeAreaView>
-  //   );
-  // }
+  const ImagePickerModal = () => (
+    <Modal
+      visible={showImagePicker}
+      transparent={true}
+      animationType="none"
+      statusBarTranslucent={true}
+      onRequestClose={() => setShowImagePicker(false)}
+    >
+      <View style={ProfileStyles.modalOverlay}>
+        <TouchableOpacity 
+          style={ProfileStyles.modalBackdrop}
+          activeOpacity={1}
+          onPress={() => setShowImagePicker(false)}
+        />
+        <Animated.View 
+          style={[
+            ProfileStyles.imagePickerContainer,
+            { transform: [{ translateY: slideAnim }] }
+          ]}
+        >
+          <View style={ProfileStyles.pickerHeader}>
+            <Text style={ProfileStyles.pickerTitle}>Choose Profile Photo</Text>
+            <TouchableOpacity 
+              onPress={() => setShowImagePicker(false)}
+              style={ProfileStyles.closeButton}
+            >
+              <Ionicons name="close" size={24} color="#666" />
+            </TouchableOpacity>
+          </View>
+          
+          <View style={ProfileStyles.pickerOptions}>
+            <TouchableOpacity 
+              style={ProfileStyles.optionButton}
+              onPress={takePhoto}
+            >
+              <View style={[ProfileStyles.optionIcon, { backgroundColor: '#007AFF' }]}>
+                <Ionicons name="camera" size={24} color="#fff" />
+              </View>
+              <Text style={ProfileStyles.optionText}>Take Photo</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={ProfileStyles.optionButton}
+              onPress={handleEditAvatar}
+            >
+              <View style={[ProfileStyles.optionIcon, { backgroundColor: '#34C759' }]}>
+                <Ionicons name="images" size={24} color="#fff" />
+              </View>
+              <Text style={ProfileStyles.optionText}>Choose from Gallery</Text>
+            </TouchableOpacity>
+            
+            {avatar && (
+              <TouchableOpacity 
+                style={ProfileStyles.optionButton}
+                onPress={removePhoto}
+              >
+                <View style={[ProfileStyles.optionIcon, { backgroundColor: '#FF3B30' }]}>
+                  <Ionicons name="trash" size={24} color="#fff" />
+                </View>
+                <Text style={ProfileStyles.optionText}>Remove Photo</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+
+  const SuccessModal = () => (
+    <Modal
+      visible={showSuccess}
+      transparent={true}
+      animationType="fade"
+      statusBarTranslucent={true}
+      onRequestClose={() => setShowSuccess(false)}
+    >
+      <View style={ProfileStyles.successOverlay}>
+        <Animated.View 
+          style={[
+            ProfileStyles.successContainer,
+            { transform: [{ scale: scaleAnim }] }
+          ]}
+        >
+          <View style={ProfileStyles.successIcon}>
+            <Ionicons name="checkmark-done" size={48} color="#fff" />
+          </View>
+          <Text style={ProfileStyles.successTitle}>Success!</Text>
+          <Text style={ProfileStyles.successMessage}>Your profile has been updated successfully</Text>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+
+  if (fetching) {
+    return <SkeletonLoader />;
+  }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container}>
-
+    <View style={ProfileStyles.container}>
+    
         <LinearGradient
           colors={["#9F0901", "#E20E02"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.header}
+          style={ProfileStyles.header}
         >
-          <View style={styles.avatarContainer}>
-            <View style={styles.avatarWrapper}>
+          <View style={ProfileStyles.avatarContainer}>
+            <View style={ProfileStyles.avatarWrapper}>
               {avatar ? (
-                <Image source={{ uri: avatar }} style={styles.avatar} />
+                <Image 
+                  source={{ uri: avatar }} 
+                  style={ProfileStyles.avatar} 
+                  onError={(e) => {
+                    console.log('Image load error:', e.nativeEvent.error);
+                    setAvatar(null);
+                  }}
+                />
               ) : (
-                <View style={styles.avatarPlaceholder}>
+                <View style={ProfileStyles.avatarPlaceholder}>
                   <Ionicons name="person" size={48} color="#fff" />
                 </View>
               )}
-              <TouchableOpacity style={styles.editBtn} onPress={handleEditAvatar}>
+              <TouchableOpacity 
+                style={ProfileStyles.editBtn} 
+                onPress={() => setShowImagePicker(true)}
+              >
                 <Ionicons name="camera" size={16} color="#000" />
               </TouchableOpacity>
             </View>
-            <Text style={styles.userName}>{formData.fullName || "Your Name"}</Text>
-            <Text style={styles.userEmail}>{formData.email}</Text>
           </View>
         </LinearGradient>
 
-    
-        <View style={styles.formContainer}>
-          <Text style={styles.sectionTitle}>Personal Information</Text>
+        <View style={ProfileStyles.formContainer}>
+            <ScrollView style={ProfileStyles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={ProfileStyles.scrollContent}>
+          <Text style={ProfileStyles.sectionTitle}>Personal Information</Text>
           
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Full Name</Text>
-            <View style={[styles.inputContainer, errors.fullName && styles.inputError]}>
-              <Ionicons name="person-outline" size={20} color="#666" style={styles.inputIcon} />
+          <View style={ProfileStyles.inputGroup}>
+            <Text style={ProfileStyles.label}>Full Name</Text>
+            <View style={[ProfileStyles.inputContainer, errors.fullName && ProfileStyles.inputError]}>
+              <Ionicons name="person-outline" size={20} color="#666" style={ProfileStyles.inputIcon} />
               <TextInput
-                style={styles.input}
+                style={ProfileStyles.input}
                 placeholder="Enter your full name"
                 value={formData.fullName}
                 onChangeText={(text) => handleChange("fullName", text)}
               />
             </View>
-            {errors.fullName ? <Text style={styles.errorText}>{errors.fullName}</Text> : null}
+            {errors.fullName ? <Text style={ProfileStyles.errorText}>{errors.fullName}</Text> : null}
           </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Email Address</Text>
-            <View style={styles.inputContainer}>
-              <Ionicons name="mail-outline" size={20} color="#666" style={styles.inputIcon} />
+          <View style={ProfileStyles.inputGroup}>
+            <Text style={ProfileStyles.label}>Email Address</Text>
+            <View style={ProfileStyles.inputContainer}>
+              <Ionicons name="mail-outline" size={20} color="#666" style={ProfileStyles.inputIcon} />
               <TextInput
-                style={[styles.input, { color: '#999' }]}
+                style={[ProfileStyles.input, { color: '#999' }]}
                 value={formData.email}
                 editable={false}
                 selectTextOnFocus={false}
               />
             </View>
-            <Text style={styles.helpText}>Email cannot be changed from this screen</Text>
+            {/* <Text style={ProfileStyles.helpText}>Email cannot be changed from this screen</Text> */}
           </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Phone Number</Text>
-            <View style={[styles.inputContainer, errors.phoneNumber && styles.inputError]}>
-              <Ionicons name="call-outline" size={20} color="#666" style={styles.inputIcon} />
+          <View style={ProfileStyles.inputGroup}>
+            <Text style={ProfileStyles.label}>Phone Number</Text>
+            <View style={[ProfileStyles.inputContainer, errors.phoneNumber && ProfileStyles.inputError]}>
+              <Ionicons name="call-outline" size={20} color="#666" style={ProfileStyles.inputIcon} />
               <TextInput
-                style={styles.input}
+                style={ProfileStyles.input}
                 placeholder="Enter your phone number"
                 value={formData.phoneNumber}
                 onChangeText={(text) => handleChange("phoneNumber", text)}
                 keyboardType="phone-pad"
               />
             </View>
-            {errors.phoneNumber ? <Text style={styles.errorText}>{errors.phoneNumber}</Text> : null}
+            {errors.phoneNumber ? <Text style={ProfileStyles.errorText}>{errors.phoneNumber}</Text> : null}
           </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Address</Text>
-            <View style={[styles.inputContainer, errors.address && styles.inputError, { height: 100 }]}>
-              <Ionicons name="location-outline" size={20} color="#666" style={[styles.inputIcon, { marginTop: 12 }]} />
+          <View style={ProfileStyles.inputGroup}>
+            <Text style={ProfileStyles.label}>Address</Text>
+            <View style={[ProfileStyles.inputContainer, errors.address && ProfileStyles.inputError]}>
+              <Ionicons name="location-outline" size={20} color="#666" style={ProfileStyles.inputIcon} />
               <TextInput
-                style={[styles.input, { height: 80, textAlignVertical: 'top' }]}
+                style={ProfileStyles.input}
                 placeholder="Enter your address"
                 value={formData.address}
                 onChangeText={(text) => handleChange("address", text)}
-                multiline
               />
             </View>
-            {errors.address ? <Text style={styles.errorText}>{errors.address}</Text> : null}
+            {errors.address ? <Text style={ProfileStyles.errorText}>{errors.address}</Text> : null}
           </View>
 
           <TouchableOpacity 
-            style={[styles.updateButton, loading && styles.updateButtonDisabled]} 
+            style={[ProfileStyles.updateButton, loading && ProfileStyles.updateButtonDisabled]} 
             onPress={handleUpdateProfile}
             disabled={loading}
           >
@@ -283,161 +541,16 @@ export default function ProfileDetailsScreen({ navigation }) {
             ) : (
               <>
                 <Ionicons name="checkmark-circle" size={20} color="#fff" />
-                <Text style={styles.updateButtonText}>Update Profile</Text>
+                <Text style={ProfileStyles.updateButtonText}>Update Profile</Text>
               </>
             )}
           </TouchableOpacity>
+               </ScrollView>
         </View>
-      </ScrollView>
-    </SafeAreaView>
+ 
+
+      <ImagePickerModal />
+      <SuccessModal />
+    </View>
   );
 }
-
-const AVATAR_SIZE = 100;
-const EDIT_SIZE = 32;
-
-const styles = StyleSheet.create({
-  safeArea: { 
-    flex: 1, 
-    backgroundColor: Colors.white 
-  },
-  container: {
-    flex: 1,
-  },
-  header: {
-    height: 220,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingTop: Platform.OS === "android" ? 30 : 0,
-  },
-  avatarContainer: {
-    alignItems: "center",
-  },
-  avatarWrapper: {
-    width: AVATAR_SIZE,
-    height: AVATAR_SIZE,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 15,
-  },
-  avatar: {
-    width: AVATAR_SIZE,
-    height: AVATAR_SIZE,
-    borderRadius: AVATAR_SIZE / 2,
-    borderWidth: 3,
-    borderColor: "#fff",
-  },
-  avatarPlaceholder: {
-    width: AVATAR_SIZE,
-    height: AVATAR_SIZE,
-    borderRadius: AVATAR_SIZE / 2,
-    backgroundColor: "#000",
-    borderWidth: 3,
-    borderColor: "#fff",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  editBtn: {
-    position: "absolute",
-    right: -4,
-    bottom: -4,
-    width: EDIT_SIZE,
-    height: EDIT_SIZE,
-    borderRadius: EDIT_SIZE / 2,
-    backgroundColor: "#fff",
-    justifyContent: "center",
-    alignItems: "center",
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
-    shadowOffset: { width: 0, height: 1 },
-  },
-  userName: {
-    color: "#fff",
-    fontSize: 22,
-    fontWeight: "600",
-    marginBottom: 5,
-  },
-  userEmail: {
-    color: "rgba(255, 255, 255, 0.8)",
-    fontSize: 14,
-  },
-  formContainer: {
-    flex: 1,
-    padding: 20,
-    marginTop: -20,
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: Colors.textPrimary,
-    marginBottom: 20,
-  },
-  inputGroup: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: Colors.textPrimary,
-    marginBottom: 8,
-  },
-  inputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-    borderRadius: 10,
-    backgroundColor: "#FAFAFA",
-    paddingHorizontal: 15,
-  },
-  inputIcon: {
-    marginRight: 10,
-  },
-  input: {
-    flex: 1,
-    height: 50,
-    fontSize: 16,
-    color: Colors.textPrimary,
-  },
-  inputError: {
-    borderColor: Colors.primary,
-  },
-  errorText: {
-    color: Colors.primary,
-    fontSize: 12,
-    marginTop: 5,
-  },
-  helpText: {
-    color: "#9E9E9E",
-    fontSize: 12,
-    marginTop: 5,
-  },
-  updateButton: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: Colors.primary,
-    padding: 15,
-    borderRadius: 10,
-    marginTop: 10,
-    gap: 10,
-  },
-  updateButtonDisabled: {
-    opacity: 0.7,
-  },
-  updateButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});

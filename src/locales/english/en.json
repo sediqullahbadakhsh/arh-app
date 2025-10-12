@@ -1,0 +1,28 @@
+{
+  "greeting": {
+    "hi": "Hi"
+  },
+  "services": {
+    "title": "Services",
+    "mobileTopup": "Mobile Top-up",
+    "dataBundle": "Data Bundle",
+    "gameCoins": "Game Coins"
+  },
+  "transactions": {
+    "recent": "Recent Transactions",
+    "noTransactions": "No transactions yet"
+  },
+  "status": {
+    "succeeded": "succeeded",
+    "failed": "failed",
+    "pending": "pending"
+  },
+  "common": {
+    "seeAll": "See all",
+    "tryAgain": "Try Again"
+  },
+  "errors": {
+    "loadTransactions": "Failed to load transactions"
+  },
+  "transaction": "Transaction"
+}

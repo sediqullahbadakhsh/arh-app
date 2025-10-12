@@ -1,0 +1,8 @@
+10:10:40:305 [CRITICAL]	SharedConnection - Failed to open WinHTTP Session. The parameter is incorrect.
+, last error code = 87 
+10:10:40:306 [ERROR]	Failed to Configure Secure Protocols. WinHTTP Incorrect Handle Type. last error code = 12018 
+10:10:40:310 [CRITICAL]	SharedConnection - Failed to open WinHTTP Session. The parameter is incorrect.
+, last error code = 87 
+10:10:40:310 [ERROR]	Failed to Configure Secure Protocols. WinHTTP Incorrect Handle Type. last error code = 12018 
+10:10:40:537 [WARN]	Request Failed. ErrorCode: 19 errorMessage: GUDE Operation Error, No Available Internet Session
+10:10:40:922 [WARN]	Request Failed. ErrorCode: 19 errorMessage: GUDE Operation Error, No Available Internet Session

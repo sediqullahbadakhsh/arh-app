@@ -36,6 +36,10 @@ export const makeRecharge = (payload = {})=>{
   
   return api.post(`/orders/customer?lang=en`,payload).then((r)=>r.data)
 }
+export const makeRechargeAgent = (payload = {})=>{
+  
+  return api.post(`/orders?lang=en`,payload).then((r)=>r.data)
+}
 
 export const getDataProducts = (filters = {})=>{
   // const query = buildQueryString({
@@ -46,11 +50,25 @@ export const getDataProducts = (filters = {})=>{
   // return api.get(`/product/admin?lang=en&countryId=${filters?.countryId}&productCategoryId=${filters?.productCategoryId}&search=${filters?.search}`).then((r)=>r.data)
   return api.get(`/product/admin?lang=en`).then((r)=>r?.data)
 }
+export const getDataProductsCustomer = (filters = {})=>{
+  // const query = buildQueryString({
+  //   lang: "en",
+  //   ...filters,
+  // });
+  
+  // return api.get(`/product/admin?lang=en&countryId=${filters?.countryId}&productCategoryId=${filters?.productCategoryId}&search=${filters?.search}`).then((r)=>r.data)
+  return api.get(`/product/admin/customer?lang=en`).then((r)=>r?.data)
+}
 
 export const activateDataBundle = (payload = {})=>{
 
   
   return api.post(`/product-activation?lang=en`, payload).then((r)=>r?.data)
+}
+export const activateDataBundleCustomer = (payload = {})=>{
+
+  
+  return api.post(`/product-activation/customer?lang=en`, payload).then((r)=>r?.data)
 }
 
 export const getDataBundleCategory = (filters = {})=>{

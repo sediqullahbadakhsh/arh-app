@@ -1,0 +1,28 @@
+{
+  "greeting": {
+    "hi": "سلام"
+  },
+  "services": {
+    "title": "خدمات",
+    "mobileTopup": "موبایل تاپ آپ",
+    "dataBundle": "بسته دیتا",
+    "gameCoins": "سکه های بازی"
+  },
+  "transactions": {
+    "recent": "معاملات اخیر",
+    "noTransactions": "هنوز هیچ معامله ای وجود ندارد"
+  },
+  "status": {
+    "succeeded": "موفق",
+    "failed": "ناموفق",
+    "pending": "در انتظار"
+  },
+  "common": {
+    "seeAll": "مشاهده همه",
+    "tryAgain": "دوباره تلاش کنید"
+  },
+  "errors": {
+    "loadTransactions": "بارگذاری معاملات ناموفق بود"
+  },
+  "transaction": "معامله"
+}

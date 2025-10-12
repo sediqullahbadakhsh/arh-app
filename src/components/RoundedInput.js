@@ -8,7 +8,7 @@ import {
   Easing 
 } from 'react-native';
 import { Colors } from '../theme/colors';
-
+import {widthPercentageToDP as wp, heightPercentageToDP as hp} from 'react-native-responsive-screen';
 export default function RoundedInput({
     value,
     onChangeText,
@@ -96,39 +96,39 @@ export default function RoundedInput({
 }
 
 const styles = StyleSheet.create({
-    container: {
-        width: '100%',
-        marginBottom: 10,
-        borderRadius: 60,
-        alignItems: 'center',
-        borderWidth: 1.5,
-        backgroundColor: '#FFFFFF',
-        shadowColor: Colors.primary,
-        shadowOffset: {
-            width: 0,
-            height: 4,
-        },
+  container: {
+    width: '100%',
+    marginBottom: hp(1.25),
+    borderRadius: wp(15), 
+    alignItems: 'center',
+    borderWidth: wp(0.4), 
+    backgroundColor: '#FFFFFF',
+    shadowColor: Colors.primary,
+    shadowOffset: {
+      width: 0,
+      height: hp(0.5),
     },
-    input: {
-        width: '100%',
-        height: 60,
-        borderRadius: 60,
-        backgroundColor: 'transparent',
-        paddingHorizontal: 20,
-        paddingRight: 44,
-        lineHeight: 24,
-        fontSize: 16,
-        color: Colors.textPrimary,
-        fontFamily: "dmsansRegular",
-    },
-    disabled: {
-        backgroundColor: '#F6F6F6',
-        color: '#9E9E9E',
-    },
-    iconRight: {
-        position: 'absolute',
-        right: 20,
-        top: '50%',
-        transform: [{ translateY: -12 }],
-    },
+  },
+  input: {
+    width: '100%',
+    height: hp(7.5), 
+    borderRadius: wp(15),
+    backgroundColor: 'transparent',
+    paddingHorizontal: wp(5.5), 
+    paddingRight: wp(11.7),     
+    lineHeight: hp(3),         
+    fontSize: hp(2),          
+    color: Colors.textPrimary,
+    fontFamily: 'dmsansRegular',
+  },
+  disabled: {
+    backgroundColor: '#F6F6F6',
+    color: '#9E9E9E',
+  },
+  iconRight: {
+    position: 'absolute',
+    right: wp(5.5), 
+    top: '50%',
+    transform: [{ translateY: -hp(1.5) }], 
+  },
 });
