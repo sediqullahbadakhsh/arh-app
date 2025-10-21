@@ -29,6 +29,9 @@ import {
   merchantSignup 
 } from "../../services/merchantApi";
 import { useAuth } from "../../auth/AuthProvider";
+import { useTranslation } from "react-i18next";
+import { useModal } from "../../hooks/useModal";
+import ValidationModal from "../../components/ValidationModal";
 
 const LANGS = ["english", "dari", "pashto"];
 const GAP = 1;
@@ -38,8 +41,7 @@ export default function MerchantApplicationScreen({ navigation }) {
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-
-
+  const { modal, showModal, hideModal } = useModal();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -48,8 +50,7 @@ export default function MerchantApplicationScreen({ navigation }) {
   const [businessName, setBusinessName] = useState("");
   const [businessType, setBusinessType] = useState("");
   const [taxId, setTaxId] = useState("");
-
-
+  const {t} = useTranslation();
   const [countries, setCountries] = useState([]);
   const [provinces, setProvinces] = useState([]);
   const [districts, setDistricts] = useState([]);
@@ -97,8 +98,8 @@ export default function MerchantApplicationScreen({ navigation }) {
         try {
           const res = await getProvinces(country?.id);
           setProvinces(res?.data || []);
-          setProvince(null); // Reset province when country changes
-          setDistrict(null); // Reset district when country changes
+          setProvince(null);
+          setDistrict(null); 
         } catch (error) {
           console.error("Error fetching provinces:", error);
         }
@@ -107,14 +108,14 @@ export default function MerchantApplicationScreen({ navigation }) {
     }
   }, [country?.id]);
 
-  // Fetch districts when province is selected
+ 
   useEffect(() => {
     if (province?.id) {
       const getAllDistricts = async () => {
         try {
           const res = await getDistricts(province?.id);
           setDistricts(res?.data || []);
-          setDistrict(null); // Reset district when province changes
+          setDistrict(null); 
         } catch (error) {
           console.error("Error fetching districts:", error);
         }
@@ -135,10 +136,11 @@ export default function MerchantApplicationScreen({ navigation }) {
     switch (currentStep) {
       case 0:
         if (!firstName.trim() || !lastName.trim() || !email.trim() || !mobileNumber.trim()) {
-          Alert.alert("Validation Error", "Please fill all required fields");
+          showModal("Validation Error", "Please fill all required fields");
           return false;
         }
         if (!/\S+@\S+\.\S+/.test(email)) {
+          showModal("Validation Error", "Please enter a valid email address");
           Alert.alert("Validation Error", "Please enter a valid email address");
           return false;
         }
@@ -253,50 +255,57 @@ export default function MerchantApplicationScreen({ navigation }) {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        <ValidationModal
+        visible={modal.visible}
+        title={modal.title}
+        message={modal.message}
+        onClose={hideModal}
+      />
+
         {step === 0 && (
           <>
-            <Text style={styles.sectionTitle}>Personal Information</Text>
+            <Text style={styles.sectionTitle}>{t('personalInformation')}</Text>
 
             <LabeledInput
-              label="First Name"
+              label={t("firstName")}
               value={firstName}
               onChangeText={setFirstName}
-              placeholder="Enter First Name"
+              placeholder={t("enterFirstName")}
               required
             />
             <LabeledInput
-              label="Last Name"
+              label={t("lastName")}
               value={lastName}
               onChangeText={setLastName}
-              placeholder="Enter Last Name"
+              placeholder={t("enterLastName")}
               required
             />
             <LabeledInput
-              label="Email"
+              label={t("email")}
               value={email}
               onChangeText={setEmail}
-              placeholder="Enter Your Email Address"
+              placeholder={t("enterYourEmailAddress")}
               keyboardType="email-address"
               required
             />
             <LabeledInput
-              label="Mobile Number"
+              label={t("mobileNumber")}
               value={mobileNumber}
               onChangeText={setMobileNumber}
-              placeholder="Enter Mobile Number"
+              placeholder={t("enterMobileNumber")}
               keyboardType="phone-pad"
               required
             />
             <LabeledInput
-              label="Alternative Contact"
+              label={t("alternativeContact")}
               value={alternativeContact}
               onChangeText={setAlternativeContact}
-              placeholder="Enter Alternative Contact"
+              placeholder={t("enterAlternativeContact")}
               keyboardType="phone-pad"
             />
 
             <PrimaryButton
-              label="Continue"
+              label={t("continue")}
               onPress={next}
               style={styles.fullButton}
             />
@@ -308,7 +317,7 @@ export default function MerchantApplicationScreen({ navigation }) {
 
 
             <DropField
-              label="Country"
+              label={t("country")}
               value={country?.countryName || "Select Country"}
               onPress={() => setPicker({ open: true, type: "country" })}
               leftIcon={
@@ -317,38 +326,38 @@ export default function MerchantApplicationScreen({ navigation }) {
               required
             />
             <DropField
-              label="Province"
+              label={t("province")}
               value={province?.provinceName || "Select Province"}
               onPress={() => setPicker({ open: true, type: "province" })}
               required
             />
             <DropField
-              label="District"
+              label={t("district")}
               value={district?.districtName || "Select District"}
               onPress={() => setPicker({ open: true, type: "district" })}
               required
             />
             <LabeledInput
-              label="Full Business Address"
+              label={t("fulladdress")}
               value={address}
               onChangeText={setAddress}
-              placeholder="Enter Full Business Address"
+              placeholder={t("enterFulladdress")}
               required
             />
             <DropField
-              label="Preferred Communication Language"
+              label={t("preferredCommunicationLanguage")}
               value={messageLanguage || "Select Language"}
               onPress={() => setPicker({ open: true, type: "lang" })}
             />
 
             <View style={styles.rowButtons}>
               <DarkButton
-                label="Back"
+                label={t("back")}
                 onPress={back}
                 style={styles.halfButton}
               />
               <PrimaryButton
-                label="Continue"
+                label={t("continue")}
                 onPress={next}
                 style={styles.halfButton}
               />
@@ -358,12 +367,12 @@ export default function MerchantApplicationScreen({ navigation }) {
 
         {step === 2 && (
           <>
-            <Text style={styles.sectionTitle}>Document Upload</Text>
-            <Text style={styles.subtitle}>Please upload the required documents for verification</Text>
+            <Text style={styles.sectionTitle}>{t('documentUpload')}</Text>
+            <Text style={styles.subtitle}>{t('pleaseUploadRequiredDocsForVerification')}</Text>
 
         
             <View style={styles.uploadSection}>
-              <Text style={styles.uploadLabel}>Profile Photo</Text>
+              <Text style={styles.uploadLabel}>{t('profilePhoto')}</Text>
               <View style={styles.photoBox}>
                 {photoUri ? (
                   <Image
@@ -391,7 +400,7 @@ export default function MerchantApplicationScreen({ navigation }) {
 
             <View style={styles.rowButtons}>
               <DarkButton
-                label="Back"
+                label={t("back")}
                 onPress={back}
                 style={styles.halfButton}
               />
@@ -405,7 +414,7 @@ export default function MerchantApplicationScreen({ navigation }) {
                 ) : (
                   <>
                     <Ionicons name="send-outline" size={18} color="#fff" />
-                    <Text style={styles.submitButtonText}>Submit Application</Text>
+                    <Text style={styles.submitButtonText}>{t('submitApplication')}</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -414,7 +423,7 @@ export default function MerchantApplicationScreen({ navigation }) {
         )}
       </ScrollView>
 
-      {/* Picker Modal */}
+
       <Modal
         transparent
         visible={picker.open}

@@ -3,9 +3,12 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 
 export default function NotificationsHeader({ title, onBack, onOpenModal }) {
+    const { t } = useTranslation();
     const insets = useSafeAreaInsets();
+    
     return (
         <View>
             <LinearGradient

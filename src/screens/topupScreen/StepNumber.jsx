@@ -4,10 +4,12 @@ import TopUpStyles from "./TopupStyle";
 import { useState } from "react";
 import { Colors } from "../../theme/colors";
 import formatLocal from "../../utils/formatLocal";
+import { useTranslation } from "react-i18next";
+import { isRTL } from "../../utils/rtl";
 
-// Operator logo mapping - replace these with your actual operator logo imports
+
 const OPERATOR_LOGOS = {
-  // Afghan operators
+
   'AWCC': require('../../../assets/mnos/awcc.png'),
   'Roshan': require('../../../assets/mnos/roshan.png'),
   'MTN': require('../../../assets/mnos/mtn.png'),
@@ -16,10 +18,10 @@ const OPERATOR_LOGOS = {
   'default': require('../../../assets/mnos/awcc.png'),
 };
 
-// Valid prefixes for Afghanistan mobile numbers
+
 const VALID_PREFIXES = ['71', '72', '73', '74', '76', '77', '78', '79'];
 
-// Function to get operator logo based on operator name
+
 const getOperatorLogo = (operatorName) => {
   if (!operatorName) return OPERATOR_LOGOS.default;
   
@@ -34,33 +36,32 @@ const getOperatorLogo = (operatorName) => {
   return OPERATOR_LOGOS.default;
 };
 
-// Function to validate mobile number
+
 const validateMobileNumber = (number) => {
   const cleanNumber = number.replace(/\D/g, "");
   
-  // Check if number starts with 7
+
   if (cleanNumber.length > 0 && !cleanNumber.startsWith('7')) {
     return {
       isValid: false,
-      message: "Mobile number must start with 7"
+      message: "mobileNumberStartWith7"
     };
   }
-  
-  // Check if number starts with invalid prefix 75
+
   if (cleanNumber.startsWith('75')) {
     return {
       isValid: false,
-      message: "75 prefix is not valid for mobile numbers in Afghanistan"
+      message: "invalidPrefix75"
     };
   }
   
-  // Check if the prefix is valid
+
   if (cleanNumber.length >= 2) {
     const prefix = cleanNumber.substring(0, 2);
     if (!VALID_PREFIXES.includes(prefix)) {
       return {
         isValid: false,
-        message: `Prefix ${prefix} is not valid. Valid prefixes are: ${VALID_PREFIXES.join(', ')}`
+        message: `invalidPrefix ${prefix}`
       };
     }
   }
@@ -81,27 +82,27 @@ function StepNumber({
   onEditCountry,
   openContacts,
 }) {
+  const { t } = useTranslation();
   const [isFocused, setIsFocused] = useState(false);
   const [validationError, setValidationError] = useState("");
   const formatted = formatLocal(value);
 
   const handleNumberChange = (input) => {
-    // Remove all non-digit characters
+
     const numericInput = input.replace(/\D/g, "");
     
-    // Limit to 9 digits
+
     const limitedInput = numericInput.slice(0, 9);
     
-    // Validate the number
+  
     const validation = validateMobileNumber(limitedInput);
     
     if (!validation.isValid && limitedInput.length > 0) {
-      setValidationError(validation.message);
+      const errorMessage = t(validation.message);
+      setValidationError(errorMessage);
       
-      // Show alert for major validation errors
+ 
       if (limitedInput.startsWith('75') || !limitedInput.startsWith('7')) {
-  
-  
         return;
       }
     } else {
@@ -120,11 +121,11 @@ function StepNumber({
   const handleBlur = () => {
     setIsFocused(false);
     
-   
     if (value.length > 0) {
       const validation = validateMobileNumber(value);
       if (!validation.isValid) {
-        setValidationError(validation.message);
+        const errorMessage = t(validation.message);
+        setValidationError(errorMessage);
       }
     }
   };
@@ -132,16 +133,17 @@ function StepNumber({
   return (
     <View style={{ marginTop: 12 }}>
       <View style={TopUpStyles.editHeader}>
-        <Text style={TopUpStyles.sectionTitle}>Mobile Number</Text>
+        <Text style={TopUpStyles.sectionTitle}>{t('mobileNumber')}</Text>
         <View style={{ flexDirection: "row", gap: 16 }}>
           <TouchableOpacity onPress={openContacts}>
-            <Text style={TopUpStyles.editLink}>Contacts</Text>
+            <Text style={TopUpStyles.editLink}>{t('contacts')}</Text>
           </TouchableOpacity>
         </View>
       </View>
 
       <View style={[
         TopUpStyles.phoneRow,
+        isRTL && TopUpStyles.phoneRowRTL,
         {
           borderColor: validationError ? '#EF4444' : (isFocused ? Colors.primary : '#E4E7EC'),
           backgroundColor: '#FFFFFF',
@@ -217,32 +219,10 @@ function StepNumber({
         </View>
       ) : (
         <View style={{ marginTop: 10, minHeight: 24 }}>
-     
         </View>
       )}
-
-
-      {/* {value.length === 0 && (
-        <Text style={{ 
-          color: "#6B7280", 
-          fontSize: 11, 
-          fontFamily: 'dmsansRegular',
-          marginTop: 8,
-          fontStyle: 'italic'
-        }}>
-          Valid prefixes: 71, 72, 73, 74, 76, 77, 78, 79
-        </Text>
-      )} */}
     </View>
   );
-}
-
-function hexFade(hex, op) {
-  const n = hex.replace("#", "");
-  const r = parseInt(n.slice(0, 2), 16);
-  const g = parseInt(n.slice(2, 4), 16);
-  const b = parseInt(n.slice(4, 6), 16);
-  return `rgba(${r},${g},${b},${op})`;
 }
 
 export default StepNumber;

@@ -13,10 +13,12 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../../theme/colors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTranslation } from "react-i18next";
 
 const { height: screenHeight } = Dimensions.get('window');
 
 function SettingModal({ visible, onRequestClose }) {
+  const { t } = useTranslation();
   const [modalSlideAnim] = useState(new Animated.Value(screenHeight));
   const insets = useSafeAreaInsets();
   
@@ -79,7 +81,7 @@ function SettingModal({ visible, onRequestClose }) {
           ]}
         >
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Notification Settings</Text>
+            <Text style={styles.modalTitle}>{t('notificationSettings')}</Text>
             <TouchableOpacity 
               onPress={onRequestClose}
               style={styles.closeButton}
@@ -89,14 +91,14 @@ function SettingModal({ visible, onRequestClose }) {
           </View>
 
           <ScrollView style={styles.modalScrollContent}>
-            <Text style={styles.settingsSectionTitle}>Push Notifications</Text>
+            <Text style={styles.settingsSectionTitle}>{t('pushNotifications')}</Text>
             
             <View style={styles.settingItem}>
               <View style={styles.settingInfo}>
                 <Ionicons name="notifications" size={20} color="#333" />
                 <View style={styles.settingText}>
-                  <Text style={styles.settingTitle}>Push Notifications</Text>
-                  <Text style={styles.settingDescription}>Receive notifications on your device</Text>
+                  <Text style={styles.settingTitle}>{t('pushNotifications')}</Text>
+                  <Text style={styles.settingDescription}>{t('receiveNotificationsDevice')}</Text>
                 </View>
               </View>
               <Switch
@@ -107,13 +109,13 @@ function SettingModal({ visible, onRequestClose }) {
               />
             </View>
 
-            <Text style={styles.settingsSectionTitle}>Notification Types</Text>
+            <Text style={styles.settingsSectionTitle}>{t('notificationTypes')}</Text>
             
             {[
-              { key: 'transactionAlerts', icon: 'arrow-up', title: 'Transaction Alerts', desc: 'Successful payments, transfers, and top-ups' },
-              { key: 'securityAlerts', icon: 'shield-checkmark', title: 'Security Alerts', desc: 'Login attempts and security updates' },
-              { key: 'promotionalOffers', icon: 'gift', title: 'Promotional Offers', desc: 'Special deals and cashback offers' },
-              { key: 'systemUpdates', icon: 'construct', title: 'System Updates', desc: 'Maintenance and service updates' },
+              { key: 'transactionAlerts', icon: 'arrow-up', title: t('transactionAlerts'), desc: t('transactionAlertsDesc') },
+              { key: 'securityAlerts', icon: 'shield-checkmark', title: t('securityAlerts'), desc: t('securityAlertsDesc') },
+              { key: 'promotionalOffers', icon: 'gift', title: t('promotionalOffers'), desc: t('promotionalOffersDesc') },
+              { key: 'systemUpdates', icon: 'construct', title: t('systemUpdates'), desc: t('systemUpdatesDesc') },
             ].map((setting) => (
               <View key={setting.key} style={styles.settingItem}>
                 <View style={styles.settingInfo}>
@@ -138,7 +140,7 @@ function SettingModal({ visible, onRequestClose }) {
               style={styles.saveButton}
               onPress={onRequestClose}
             >
-              <Text style={styles.saveButtonText}>Save Settings</Text>
+              <Text style={styles.saveButtonText}>{t('saveSettings')}</Text>
             </TouchableOpacity>
           </View>
         </Animated.View>

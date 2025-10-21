@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from "react";
 import {
   SafeAreaView,
   View,
+  Text,
   StyleSheet,
   Modal,
   FlatList,
@@ -24,10 +25,12 @@ import StepCountry from "./StepCountry";
 import StepNumber from "../topupScreen/StepNumber";
 import StepPay from "./StepPay";
 import SuccessScreen from "./SuccessScreen";
+import { useTranslation } from "react-i18next";
 
 const BASE_STEPS = { COUNTRY: 0, NUMBER: 1, PAY: 2 };
 
 export default function MerchantTopupFlow({ navigation }) {
+  const { t } = useTranslation();
   const { user } = useAuth?.() || { user: null };
   const stepsCount = 3;
   const lastStep = BASE_STEPS.PAY;
@@ -77,7 +80,7 @@ export default function MerchantTopupFlow({ navigation }) {
       const operatorId = getSetaraganMnoId(localNumber);
 
       if (!operatorId) {
-        Alert.alert("Invalid Number", "The number you have added is not matching with any mobile network in Afghanistan");
+        Alert.alert(t('invalidNumber'), t('invalidMobileNetwork'));
         return;
       }
       
@@ -106,10 +109,10 @@ export default function MerchantTopupFlow({ navigation }) {
       const message =
         error.response?.data?.error ||
         error.message ||
-        "Failed to Recharge";
+        t('failedToRecharge');
     
       console.log("this is recharge error:", message);
-      Alert.alert("Failed To Recharge", message);
+      Alert.alert(t('rechargeFailed'), message);
     }
   };
 
@@ -126,7 +129,7 @@ export default function MerchantTopupFlow({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ServiceHeader title="Mobile Top-up" onBack={goBack} />
+      <ServiceHeader title={t('mobileTopup')} onBack={goBack} />
 
       <View style={styles.stepper}>
         <DotIndicators
@@ -187,13 +190,13 @@ export default function MerchantTopupFlow({ navigation }) {
             )}
 
             <PrimaryButton
-              label={step === lastStep ? "Send Top-up" : "Continue"}
+              label={step === lastStep ? t('sendTopup') : t('continue')}
               onPress={step === lastStep ? recharge : goNext}
               style={{ marginTop: 24, opacity: canNext ? 1 : 0.5 }}
             />
             {step > 0 && (
               <PrimaryButton
-                label="Back"
+                label={t('back')}
                 onPress={goBack}
                 style={{ marginTop: 12, backgroundColor: "#4A4A4A" }}
               />
@@ -213,8 +216,9 @@ export default function MerchantTopupFlow({ navigation }) {
   );
 }
 
-
 function CountryModal({ visible, countries, selectedCountry, onSelect, onClose }) {
+  const { t } = useTranslation();
+  
   return (
     <Modal
       transparent
@@ -225,7 +229,7 @@ function CountryModal({ visible, countries, selectedCountry, onSelect, onClose }
       <View style={styles.modalBackdrop}>
         <View style={styles.modalCard}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Select Country</Text>
+            <Text style={styles.modalTitle}>{t('selectCountry')}</Text>
             <TouchableOpacity onPress={onClose} style={{ padding: 6 }}>
               <Ionicons name="close" size={20} color="#333" />
             </TouchableOpacity>
@@ -270,7 +274,6 @@ function CountryModalItem({ item, isSelected, onSelect }) {
     </TouchableOpacity>
   );
 }
-
 
 function formatLocal(s) {
   const d = s.replace(/\D/g, "");

@@ -487,7 +487,6 @@ const HomeStyles = StyleSheet.create({
 
   promoBanner: {
     marginHorizontal: wp(5.5),
-    marginTop: hp(2.5),
     marginBottom: hp(3.1),
     borderRadius: wp(5.5),
     shadowColor: "#000",
@@ -547,17 +546,11 @@ const HomeStyles = StyleSheet.create({
   servicesGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    marginTop: hp(3.1),
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.1,
-    shadowRadius: hp(0.75),
-    elevation: 3,
-    borderRadius: wp(4.2),
+
     marginHorizontal: wp(5.5),
-    backgroundColor: "#fff",
     padding: wp(2.7),
     justifyContent: "space-between",
-    marginBottom: hp(3),
+ 
   },
 
   offersContainer: {

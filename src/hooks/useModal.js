@@ -4,6 +4,7 @@ export const useModal = () => {
   const [isProgressVisible, setIsProgressVisible] = useState(false);
   const [isSuccessVisible, setIsSuccessVisible] = useState(false);
   const [modalData, setModalData] = useState(null);
+  const [modal, setModal] = useState({ visible: false, title: '', message: '' });
 
   const showProgress = useCallback((data = {}) => {
     setIsProgressVisible(true);
@@ -33,7 +34,16 @@ export const useModal = () => {
     }, duration);
   }, [showProgress, hideProgress, showSuccess]);
 
+    const showModal = (title, message) => {
+    setModal({ visible: true, title, message });
+  };
+
+  const hideModal = () => {
+    setModal({ ...modal, visible: false });
+  };
+
   return {
+    modal, showModal, hideModal,
     isProgressVisible,
     showProgress,
     hideProgress,
@@ -45,3 +55,5 @@ export const useModal = () => {
     setModalData
   };
 };
+
+

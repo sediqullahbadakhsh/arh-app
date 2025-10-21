@@ -30,6 +30,7 @@ const { height: screenHeight } = Dimensions.get('window');
 import { Colors } from "../../theme/colors";
 import OrdersHeader from './OrdersHeader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 
 const OrdersScreen = () => {
   const [filters, setFilters] = useState({
@@ -45,7 +46,7 @@ const OrdersScreen = () => {
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const queryClient = useQueryClient();
   const viewShotRef = useRef();
-  
+  const {t} = useTranslation();
  
   const [detailSlideAnim] = useState(new Animated.Value(screenHeight));
   const [filterSlideAnim] = useState(new Animated.Value(screenHeight));
@@ -248,27 +249,27 @@ const OrdersScreen = () => {
     <ViewShot ref={viewShotRef} options={{ format: 'jpg', quality: 0.9 }}>
       <View style={OrderStyles.receiptContainer}>
         <View style={OrderStyles.receiptHeader}>
-          <Text style={OrderStyles.receiptTitle}>ORDER RECEIPT</Text>
-          <Text style={OrderStyles.receiptSubtitle}>Transaction Confirmation</Text>
+          <Text style={OrderStyles.receiptTitle}>{t("orderReceipt")}</Text>
+          <Text style={OrderStyles.receiptSubtitle}>{t("transactionConfirmation")}</Text>
         </View>
         
         <View style={OrderStyles.receiptDivider} />
         
         <View style={OrderStyles.receiptDetails}>
           <View style={OrderStyles.receiptRow}>
-            <Text style={OrderStyles.receiptLabel}>Transaction ID:</Text>
+            <Text style={OrderStyles.receiptLabel}>{t("transactionIdLabel")}</Text>
             <Text style={OrderStyles.receiptValue}>{order.txnNumber}</Text>
           </View>
           
           <View style={OrderStyles.receiptRow}>
-            <Text style={OrderStyles.receiptLabel}>Date:</Text>
+            <Text style={OrderStyles.receiptLabel}>Date:{t("date")}</Text>
             <Text style={OrderStyles.receiptValue}>
               {new Date(order.createdAt).toLocaleString()}
             </Text>
           </View>
           
           <View style={OrderStyles.receiptRow}>
-            <Text style={OrderStyles.receiptLabel}>Status:</Text>
+            <Text style={OrderStyles.receiptLabel}>{t("status:")}</Text>
             <View style={[
               OrderStyles.receiptStatus, 
               { backgroundColor: 
@@ -284,19 +285,19 @@ const OrdersScreen = () => {
           <View style={OrderStyles.receiptDividerThin} />
           
           <View style={OrderStyles.receiptRow}>
-            <Text style={OrderStyles.receiptLabel}>Receiver:</Text>
+            <Text style={OrderStyles.receiptLabel}>{t("receiver:")}</Text>
             <Text style={OrderStyles.receiptValue}>{order.receiver}</Text>
           </View>
           
           <View style={OrderStyles.receiptRow}>
-            <Text style={OrderStyles.receiptLabel}>Amount:</Text>
+            <Text style={OrderStyles.receiptLabel}>{t("amount:")}</Text>
             <Text style={[OrderStyles.receiptValue, OrderStyles.amountText]}>
               {Number(order.amount).toFixed(2)} {order.currency}
             </Text>
           </View>
           
           <View style={OrderStyles.receiptRow}>
-            <Text style={OrderStyles.receiptLabel}>Payment Method:</Text>
+            <Text style={OrderStyles.receiptLabel}>{t("paymentMethod:")}</Text>
             <Text style={OrderStyles.receiptValue}>
               {order.source?.replace('_', ' ').toUpperCase()}
             </Text>
@@ -306,9 +307,9 @@ const OrdersScreen = () => {
         <View style={OrderStyles.receiptDivider} />
         
         <View style={OrderStyles.receiptFooter}>
-          <Text style={OrderStyles.thankYouText}>Thank you for your order!</Text>
+          <Text style={OrderStyles.thankYouText}>{t("thankYouForYourOrder")}</Text>
           <Text style={OrderStyles.supportText}>
-            For support, contact: support@example.com
+          {t("forSupportContact")}
           </Text>
         </View>
       </View>
@@ -340,7 +341,7 @@ const OrdersScreen = () => {
           ]}
         >
           <View style={OrderStyles.modalHeader}>
-            <Text style={OrderStyles.modalTitle}>Filter Orders</Text>
+            <Text style={OrderStyles.modalTitle}>{t("filterOrders")}</Text>
             <TouchableOpacity 
               onPress={() => setFilterModalVisible(false)}
               style={OrderStyles.closeButton}
@@ -350,7 +351,7 @@ const OrdersScreen = () => {
           </View>
 
           <ScrollView style={OrderStyles.filterOptions}>
-            <Text style={OrderStyles.filterSectionTitle}>Status</Text>
+            <Text style={OrderStyles.filterSectionTitle}>{t("status")}</Text>
             {['', 'pending', 'succeeded', 'failed'].map(status => (
               <TouchableOpacity
                 key={status}
@@ -381,13 +382,13 @@ const OrdersScreen = () => {
                 setFilterModalVisible(false);
               }}
             >
-              <Text style={OrderStyles.resetButtonText}>Reset Filters</Text>
+              <Text style={OrderStyles.resetButtonText}>{t('resetFilters')}</Text>
             </TouchableOpacity>
             <TouchableOpacity 
               style={OrderStyles.applyButton}
               onPress={() => setFilterModalVisible(false)}
             >
-              <Text style={OrderStyles.applyButtonText}>Apply Filters</Text>
+              <Text style={OrderStyles.applyButtonText}>{t('applyFilters')}</Text>
             </TouchableOpacity>
           </View>
         </Animated.View>
@@ -420,7 +421,7 @@ const OrdersScreen = () => {
           ]}
         >
           <View style={OrderStyles.modalHeader}>
-            <Text style={OrderStyles.modalTitle}>Order Receipt</Text>
+            <Text style={OrderStyles.modalTitle}>{t("orderReceipt")}</Text>
             <TouchableOpacity 
               onPress={() => setDetailModalVisible(false)}
               style={OrderStyles.closeButton}
@@ -438,7 +439,7 @@ const OrdersScreen = () => {
                 onPress={downloadReceipt}
               >
                 <Ionicons name="download" size={20} color="#fff" />
-                <Text style={OrderStyles.receiptButtonText}>Download</Text>
+                <Text style={OrderStyles.receiptButtonText}>{t("download")}</Text>
               </TouchableOpacity>
               
               <TouchableOpacity 
@@ -446,7 +447,7 @@ const OrdersScreen = () => {
                 onPress={shareReceipt}
               >
                 <Ionicons name="share" size={20} color="#fff" />
-                <Text style={OrderStyles.receiptButtonText}>Share</Text>
+                <Text style={OrderStyles.receiptButtonText}>{t("share")}</Text>
               </TouchableOpacity>
             </View>
             
@@ -460,7 +461,7 @@ const OrdersScreen = () => {
                 disabled={retryOrderMutation.isLoading}
               >
                 <Text style={OrderStyles.retryButtonText}>
-                  {retryOrderMutation.isLoading ? 'Processing...' : 'Retry Order'}
+                  {retryOrderMutation.isLoading ? t('processing...') : 'retryOrder'}
                 </Text>
               </TouchableOpacity>
             )}
@@ -521,7 +522,7 @@ const OrdersScreen = () => {
                 size={20} 
                 color={retryOrderMutation.isLoading ? '#ccc' : '#007AFF'} 
               />
-              <Text style={OrderStyles.actionButtonText}>Retry</Text>
+              <Text style={OrderStyles.actionButtonText}>{t("retry")}</Text>
             </TouchableOpacity>
           )}
           
@@ -530,7 +531,7 @@ const OrdersScreen = () => {
             onPress={() => handleResendOrder(item)}
           >
             <Ionicons name="return-up-forward" size={20} color={Colors.primary} />
-            <Text style={OrderStyles.actionButtonText}>Resend</Text>
+            <Text style={OrderStyles.actionButtonText}>{t("resend")}</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
@@ -538,7 +539,7 @@ const OrdersScreen = () => {
             onPress={() => handleViewDetails(item)}
           >
             <Ionicons name="receipt" size={20} color="#CD0202" />
-            <Text style={OrderStyles.actionButtonText}>Receipt</Text>
+            <Text style={OrderStyles.actionButtonText}>{t("receipt")}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -548,11 +549,11 @@ const OrdersScreen = () => {
   const renderEmptyState = () => (
     <View style={OrderStyles.emptyState}>
       <Ionicons name="receipt-outline" size={64} color="#ccc" />
-      <Text style={OrderStyles.emptyStateText}>No orders found</Text>
+      <Text style={OrderStyles.emptyStateText}>{t('noOrdersFound')}</Text>
       <Text style={OrderStyles.emptyStateSubText}>
         {filters.search || filters.status 
-          ? 'Try adjusting your search or filters' 
-          : 'Your orders will appear here'
+          ? t('tryAdjustingSearchOrFilters')
+          : t('yourOrdersWillAppearHere')
         }
       </Text>
     </View>
@@ -561,10 +562,10 @@ const OrdersScreen = () => {
   const renderErrorState = () => (
     <View style={OrderStyles.errorState}>
       <Ionicons name="alert-circle-outline" size={64} color="#f44336" />
-      <Text style={OrderStyles.errorStateText}>Failed to load orders</Text>
+      <Text style={OrderStyles.errorStateText}>{t('failedToLoadOrders')}</Text>
       <Text style={OrderStyles.errorStateSubText}>{error?.message}</Text>
       <TouchableOpacity style={OrderStyles.retryButton} onPress={refetch}>
-        <Text style={OrderStyles.retryButtonText}>Try Again</Text>
+        <Text style={OrderStyles.retryButtonText}>{t("tryAgain")}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -581,7 +582,7 @@ const OrdersScreen = () => {
         <Ionicons name="search" size={20} color="#999" style={OrderStyles.searchIcon} />
         <TextInput
           style={OrderStyles.searchInput}
-          placeholder="Search by Transaction ID or Receiver"
+          placeholder={t("searchByTransactionIDorReceiver")}
           value={filters.search}
           onChangeText={handleSearch}
         />

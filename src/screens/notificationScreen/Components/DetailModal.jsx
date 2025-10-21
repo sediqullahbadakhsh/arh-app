@@ -1,4 +1,3 @@
-// In Components/DetailModal.js
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -13,6 +12,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../../theme/colors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTranslation } from "react-i18next";
 
 const { height: screenHeight } = Dimensions.get('window');
 
@@ -27,6 +27,7 @@ function DetailModal({
   formatTime,
   getNotificationTypeName
 }) {
+  const { t } = useTranslation();
   const [modalSlideAnim] = useState(new Animated.Value(screenHeight));
   const insets = useSafeAreaInsets();
 
@@ -65,15 +66,15 @@ function DetailModal({
     switch (notiType) {
       case 'transaction':
       case 'payment':
-        return 'View Transactions';
+        return t('viewTransactions');
       case 'promotion':
-        return 'View Offers';
+        return t('viewOffers');
       case 'security_alert':
-        return 'Review Security';
+        return t('reviewSecurity');
       case 'low_balance':
-        return 'Top Up Now';
+        return t('topUpNow');
       default:
-        return 'View Details';
+        return t('viewDetails');
     }
   };
 
@@ -102,7 +103,7 @@ function DetailModal({
           ]}
         >
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Notification Details</Text>
+            <Text style={styles.modalTitle}>{t('notificationDetails')}</Text>
             <TouchableOpacity 
               onPress={onRequestClose}
               style={styles.closeButton}
@@ -125,7 +126,7 @@ function DetailModal({
                 <Text style={styles.detailTitleText}>{title}</Text>
                 <Text style={styles.detailTime}>{time}</Text>
                 <Text style={styles.notificationType}>
-                  Type: {notiType.charAt(0).toUpperCase() + notiType.slice(1)}
+                  {t('type')}: {notiType.charAt(0).toUpperCase() + notiType.slice(1)}
                 </Text>
               </View>
             </View>

@@ -108,7 +108,109 @@ skeletonLabel: {
   borderRadius: 4,
   marginBottom: 8,
 },
+ selectorWrapper: {
+    borderWidth: 1.5,
+    borderColor: "#E8E8E8",
+    borderRadius: 12,
+    backgroundColor: "#FAFAFA",
+    overflow: 'hidden',
+  },
+  selectorTrigger: {
+    height: 52,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  selectorSelected: {
+    flex: 1,
+  },
+  selectorText: {
+    fontSize: 16,
+    color: '#999',
+    fontWeight: "500",
+  },
+  disabled: {
+    opacity: 0.6,
+  },
 
+  // Bottom Sheet Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  modalCard: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
+    padding: 16,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+  },
+  modalTitle: { 
+    fontSize: 18, 
+    fontWeight: "700", 
+    color: Colors.textPrimary 
+  },
+  closeButton: {
+    padding: 4,
+  },
+  modalRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    marginBottom: 16,
+    height: 44,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: Colors.textPrimary,
+  },
+  contactSeparator: {
+    height: 1,
+    backgroundColor: '#F0F0F0',
+  },
+  emptyContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  emptyText: {
+    color: '#999',
+    fontSize: 16,
+  },
 skeletonInput: {
   width: '100%',
   height: 50,
@@ -128,7 +230,21 @@ shimmerContainer: {
   ...StyleSheet.absoluteFillObject,
   overflow: 'hidden',
 },
-
+updateButtonInactive: {
+  backgroundColor: '#CCCCCC',
+  shadowColor: '#CCCCCC',
+},
+inputDisabled: {
+  backgroundColor: '#F5F5F5',
+  borderColor: '#E0E0E0',
+},
+selectorDisabled: {
+  backgroundColor: '#F5F5F5',
+  borderColor: '#E0E0E0',
+},
+editBtnDisabled: {
+  backgroundColor: '#F5F5F5',
+},
 shimmer: {
   width: '100%',
   height: '100%',

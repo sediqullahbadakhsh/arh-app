@@ -10,7 +10,7 @@ function StepCountry({ country, onOpen }) {
 
   return (
     <View style={{ marginTop: 16 }}>
-      <Text style={DataStyles.sectionTitle}>Select country you want to send</Text>
+      <Text style={DataStyles.sectionTitle}>{t('selectCountryYouWantToSend')}</Text>
       <TouchableOpacity
         style={[
           DataStyles.dropField,

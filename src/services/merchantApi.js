@@ -148,3 +148,37 @@ export const updateLanguage = (agentId, payload)=>{
 
 }
 
+export const deleteDownlineAgent = (agentId) => {
+  return api.delete(`/merchant-downlineAgent/${agentId}?lang=en`).then((r) => r.data);
+};
+
+export const getAllSlabsForMerchant = async (params = {}) => {
+  const res = await api.get("/slabs/merchant", { params });
+  return res.data;
+};
+
+// export const getAllSlabsForMerchant = (filters = {}) => {
+//   const params = new URLSearchParams();
+//   params.append("lang", "en");
+  
+//   if (filters.slabFor) {
+//     params.append("slabFor", filters.slabFor);
+//   }
+//   if (filters.limit) {
+//     params.append("limit", filters.limit);
+//   }
+  
+//   return api.get(`/slab?${params.toString()}`).then((r) => r.data);
+// };
+
+export const setComission = (agentId, payload) => {
+  return api.patch(`/merchant-downlineAgent/${agentId}/set-commission?lang=en`, payload).then((r) => r.data);
+};
+
+export const updateAgentDetails = (agentId, payload) => {
+  return api.patch(`/merchant-downlineAgent/${agentId}?lang=en`, payload).then((r) => r.data);
+};
+
+export const getAgentById = (agentId) => {
+  return api.get(`/merchant-downlineAgent/agent/${agentId}?lang=en`).then((r) => r.data);
+};

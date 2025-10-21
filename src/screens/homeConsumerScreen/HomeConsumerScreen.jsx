@@ -24,16 +24,14 @@ import { useTranslation } from "react-i18next";
 import HomeStyles from "./Styles/HomeStyle";
 import HeaderBackgroundSVG from "../../../assets/top";
 import { getAppContents } from '../../services/appContentApi';
-import TopupIcon from '../../../assets/icons/Topup1.png';
-import BundleIcon from '../../../assets/icons/Bundle1.png';
-import GamesIcon from '../../../assets/icons/Games1.png';
+import TopupIcon from '../../../assets/icons/topup.png';
+import BundleIcon from '../../../assets/icons/Data bundle.png';
+import GamesIcon from '../../../assets/icons/game.png';
 
 const { width: screenWidth } = Dimensions.get('window');
 
-
-
-
 const CountdownTimer = ({ expiresAt }) => {
+  const { t } = useTranslation();
   const [timeLeft, setTimeLeft] = useState({
     days: 0,
     hours: 0,
@@ -63,15 +61,13 @@ const CountdownTimer = ({ expiresAt }) => {
       });
     };
 
-    // Calculate immediately
     calculateTimeLeft();
-    
-    // Set up interval only if not expired
+
     if (!isExpired) {
       const timer = setInterval(calculateTimeLeft, 1000);
       return () => clearInterval(timer);
     }
-  }, [expiresAt, isExpired]); // Add isExpired to dependencies
+  }, [expiresAt, isExpired]);
 
   const formatTimeUnit = (unit) => {
     return unit < 10 ? `0${unit}` : unit;
@@ -79,29 +75,29 @@ const CountdownTimer = ({ expiresAt }) => {
 
   return (
     <View style={HomeStyles.countdownContainer}>
-      <Text style={HomeStyles.countdownTitle}>Offer ends in:</Text>
+      <Text style={HomeStyles.countdownTitle}>{t('offerEndsIn')}</Text>
       <View style={HomeStyles.timerContainer}>
         {timeLeft.days > 0 && (
           <View style={HomeStyles.timeUnit}>
             <Text style={HomeStyles.timeValue}>{formatTimeUnit(timeLeft.days)}</Text>
-            <Text style={HomeStyles.timeLabel}>Days</Text>
+            <Text style={HomeStyles.timeLabel}>{t('days')}</Text>
           </View>
         )}
         <View style={HomeStyles.timeUnit}>
           <Text style={HomeStyles.timeValue}>{formatTimeUnit(timeLeft.hours)}</Text>
-          <Text style={HomeStyles.timeLabel}>Hours</Text>
+          <Text style={HomeStyles.timeLabel}>{t('hours')}</Text>
         </View>
         <View style={HomeStyles.timeUnit}>
           <Text style={HomeStyles.timeValue}>{formatTimeUnit(timeLeft.minutes)}</Text>
-          <Text style={HomeStyles.timeLabel}>Minutes</Text>
+          <Text style={HomeStyles.timeLabel}>{t('minutes')}</Text>
         </View>
         <View style={HomeStyles.timeUnit}>
           <Text style={HomeStyles.timeValue}>{formatTimeUnit(timeLeft.seconds)}</Text>
-          <Text style={HomeStyles.timeLabel}>Seconds</Text>
+          <Text style={HomeStyles.timeLabel}>{t('seconds')}</Text>
         </View>
       </View>
       {isExpired && (
-        <Text style={HomeStyles.expiredText}>Offer Expired</Text>
+        <Text style={HomeStyles.expiredText}>{t('offerExpired')}</Text>
       )}
     </View>
   );
@@ -113,68 +109,69 @@ export default function HomeConsumerScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [customerData, setCustomerData] = useState(null);
   const [profileImage, setProfileImage] = useState(null);
-  const [userName, setUserName] = useState(user?.fullName || user?.username || "Customer");
+  const [userName, setUserName] = useState(user?.fullName || user?.username || t('customer'));
   const [currentOfferIndex, setCurrentOfferIndex] = useState(0);
 
-const { data: appContentsData, isLoading: offersLoading, refetch: refetchOffers } = useQuery({
-  queryKey: ['app-contents'],
-  queryFn: () => getAppContents({ active: true }), 
-});
-console.log(appContentsData, "this is app content data")
-const offersData = useMemo(() => {
-  if (!appContentsData?.data) return [];
+  const { data: appContentsData, isLoading: offersLoading, refetch: refetchOffers } = useQuery({
+    queryKey: ['app-contents'],
+    queryFn: () => getAppContents({ active: true }), 
+  });
 
-  return appContentsData.data
-    .filter(content => content.active && (content.type === "offer" || content.type === "promotion"))
-    .map(content => {
-      const currentLang = i18n.language || 'en';
-      const title = content.title?.[currentLang] || content.title?.en || "Special Offer";
-      const subtitle = content.subTitle?.[currentLang] || content.subTitle?.en || "Limited time offer";
-      
-      // Get icon based on type
-      const getIconByType = (type) => {
-        switch (type) {
-          case 'offer':
-            return 'gift-outline';
-          case 'promotion':
-            return 'megaphone-outline';
-          case 'event':
-            return 'calendar-outline';
-          case 'distributor':
-            return 'storefront-outline';
-          default:
-            return 'gift-outline';
-        }
-      };
+  console.log(appContentsData, "this is app content data");
 
-      // Get background color based on type
-      const getBackgroundColor = (type) => {
-        switch (type) {
-          case 'offer':
-            return '#C40C02';
-          case 'promotion':
-            return '#E48D08';
-          case 'event':
-            return '#C40C02';
-          case 'distributor':
-            return '#E48D08';
-          default:
-            return '#C40C02';
-        }
-      };
+  const offersData = useMemo(() => {
+    if (!appContentsData?.data) return [];
 
-      return {
-        id: content.id,
-        title: title,
-        description: subtitle,
-        backgroundColor: getBackgroundColor(content.type),
-        icon: getIconByType(content.type),
-        expiresAt: content.expire_at,
-        type: content.type,
-        image: content.img
-      };
-    });
-}, [appContentsData?.data, i18n.language]);
+    return appContentsData.data
+      .filter(content => content.active && (content.type === "offer" || content.type === "promotion"))
+      .map(content => {
+        const currentLang = i18n.language || 'en';
+        const title = content.title?.[currentLang] || content.title?.en || t('specialOffer');
+        const subtitle = content.subTitle?.[currentLang] || content.subTitle?.en || t('limitedTimeOffer');
+        
+
+        const getIconByType = (type) => {
+          switch (type) {
+            case 'offer':
+              return 'gift-outline';
+            case 'promotion':
+              return 'megaphone-outline';
+            case 'event':
+              return 'calendar-outline';
+            case 'distributor':
+              return 'storefront-outline';
+            default:
+              return 'gift-outline';
+          }
+        };
+
+        const getBackgroundColor = (type) => {
+          switch (type) {
+            case 'offer':
+              return '#C40C02';
+            case 'promotion':
+              return '#E48D08';
+            case 'event':
+              return '#C40C02';
+            case 'distributor':
+              return '#E48D08';
+            default:
+              return '#C40C02';
+          }
+        };
+
+        return {
+          id: content.id,
+          title: title,
+          description: subtitle,
+          backgroundColor: getBackgroundColor(content.type),
+          icon: getIconByType(content.type),
+          expiresAt: content.expire_at,
+          type: content.type,
+          image: content.img
+        };
+      });
+  }, [appContentsData?.data, i18n.language, t]);
 
   const fetchCustomerProfile = async () => {
     try {
@@ -191,7 +188,7 @@ const offersData = useMemo(() => {
         if (response.data.profileImg) {
           const fullImageUrl = response.data.profileImg.startsWith('http') 
             ? response.data.profileImg 
-            : `http://192.168.0.115:8081/uploads/customer_pictures/${response.data.profileImg}`;
+            : `http://3.67.144.22/backend/uploads/customer_pictures/${response.data.profileImg}`;
           setProfileImage(fullImageUrl);
         }
         
@@ -273,19 +270,19 @@ const offersData = useMemo(() => {
       {
         key: "MobileTopup1",
         label: t('services.mobileTopup'),
-        icon: <Image source={TopupIcon} style={{ width: 45, height: 45 }} resizeMode="contain" />,
+        icon: <Image source={TopupIcon} style={{ width: 100, height: 100 }} resizeMode="contain" />,
         onPress: () => navigation.navigate("Topup1"),
       },
       {
         key: "DataBundle",
         label: t('services.dataBundle'),
-        icon: <Image source={BundleIcon}  style={{ width: 60, height: 60 }} resizeMode="contain" />,
+        icon: <Image source={BundleIcon}  style={{ width: 80, height: 80 }} resizeMode="contain" />,
         onPress: () => navigation.navigate("Data"),
       },
       {
         key: "GameCoins",
         label: t('services.gameCoins'),
-        icon: <Image source={GamesIcon}  style={{ width: 60, height: 60 }} resizeMode="contain" />,
+        icon: <Image source={GamesIcon}  style={{ width: 90, height: 90 }} resizeMode="contain" />,
         onPress: () => navigation.navigate("GameCoins"),
       },
     ],
@@ -312,46 +309,49 @@ const offersData = useMemo(() => {
     );
   };
 
-const PromotionalBanner = () => (
-  <TouchableOpacity 
-    style={HomeStyles.promoBanner}
-    onPress={() => navigation.navigate("MerchantApplication")} 
-    activeOpacity={0.9}
-  >
-    <LinearGradient
-      colors={['#C40C02', '#E48D08']}
-      style={HomeStyles.promoGradient}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
+  const PromotionalBanner = () => (
+    <TouchableOpacity 
+      style={HomeStyles.promoBanner}
+      onPress={() => navigation.navigate("MerchantApplication")} 
+      activeOpacity={0.9}
     >
-      <View style={HomeStyles.promoContent}>
-        <View style={HomeStyles.promoTextContainer}>
-          <Text style={HomeStyles.promoTitle}>Become a Merchant</Text>
-          <Text style={HomeStyles.promoSubtitle}>
-            Start your business with us and enjoy exclusive benefits
-          </Text>
+      <LinearGradient
+        colors={['#C40C02', '#E48D08']}
+        style={HomeStyles.promoGradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
+        <View style={HomeStyles.promoContent}>
+          <View style={HomeStyles.promoTextContainer}>
+            <Text style={HomeStyles.promoTitle}>{t('becomeMerchant')}</Text>
+            <Text style={HomeStyles.promoSubtitle}>
+              {t('merchantBenefits')}
+            </Text>
+          </View>
+          <View style={HomeStyles.promoButton}>
+            <Text style={HomeStyles.promoButtonText}>{t('getStarted')}</Text>
+            <Ionicons name="arrow-forward" size={16} color="#fff" />
+          </View>
         </View>
-        <View style={HomeStyles.promoButton}>
-          <Text style={HomeStyles.promoButtonText}>Get Started</Text>
-          <Ionicons name="arrow-forward" size={16} color="#fff" />
+        <View style={HomeStyles.promoIcon}>
+          <Ionicons name="storefront-outline" size={40} color="rgba(255,255,255,0.8)" />
         </View>
-      </View>
-      <View style={HomeStyles.promoIcon}>
-        <Ionicons name="storefront-outline" size={40} color="rgba(255,255,255,0.8)" />
-      </View>
-    </LinearGradient>
-  </TouchableOpacity>
-);
+      </LinearGradient>
+    </TouchableOpacity>
+  );
+
   const OffersSlider = () => {
+    const { t } = useTranslation();
+    
     if (offersLoading) {
       return (
         <View style={HomeStyles.offersContainer}>
           <View style={HomeStyles.offersHeader}>
-            <Text style={HomeStyles.offersTitle}>Limited Time Offers</Text>
+            <Text style={HomeStyles.offersTitle}>{t('limitedTimeOffers')}</Text>
           </View>
           <View style={HomeStyles.loadingContainer}>
             <ActivityIndicator size="small" color={Colors.primary} />
-            <Text style={HomeStyles.loadingText}>Loading offers...</Text>
+            <Text style={HomeStyles.loadingText}>{t('loadingOffers')}</Text>
           </View>
         </View>
       );
@@ -364,9 +364,9 @@ const PromotionalBanner = () => (
     return (
       <View style={HomeStyles.offersContainer}>
         <View style={HomeStyles.offersHeader}>
-          <Text style={HomeStyles.offersTitle}>Limited Time Offers</Text>
+          <Text style={HomeStyles.offersTitle}>{t('limitedTimeOffers')}</Text>
           <TouchableOpacity>
-            <Text style={HomeStyles.seeAll}>View All</Text>
+            <Text style={HomeStyles.seeAll}>{t('viewAll')}</Text>
           </TouchableOpacity>
         </View>
         

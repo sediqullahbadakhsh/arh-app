@@ -4,12 +4,14 @@ import { View } from "react-native";
 import TopUpStyles from "./TopupStyle";
 import { useState } from "react";
 import { Colors } from "../../theme/colors";
+import { useTranslation } from "react-i18next";
 
 function StepPay({
   summary,
   onEditAmount,
   onCardDetailsChange,
 }) {
+  const { t } = useTranslation();
   const [isFocused, setIsFocused] = useState(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
   const [cardDetails, setCardDetails] = useState({
@@ -21,19 +23,19 @@ function StepPay({
   const paymentMethods = [
     { 
       id: 'card', 
-      label: 'Credit/Debit Card', 
+      label: t('creditDebitCard'), 
       icon: require('../../../assets/images/credit-card.png'),
       showCardDetails: true
     },
     { 
       id: 'paypal', 
-      label: 'PayPal', 
+      label: t('paypal'), 
       icon: require('../../../assets/images/paypal.png'),
       showCardDetails: false
     },
     { 
       id: 'googlepay', 
-      label: 'Google Pay', 
+      label: t('googlePay'), 
       icon: require('../../../assets/images/google-pay.png'),
       showCardDetails: false
     },
@@ -42,7 +44,7 @@ function StepPay({
   const handlePaymentMethodSelect = (methodId) => {
     setSelectedPaymentMethod(methodId);
     
-    // Reset card details when switching away from card payment
+
     if (methodId !== 'card') {
       setCardDetails({ number: '', expiry: '', cvc: '' });
       onCardDetailsChange(false);
@@ -91,11 +93,10 @@ function StepPay({
     <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
       <View style={{ marginTop: 12 }}>
         <Text style={TopUpStyles.sectionTitle}>
-          {selectedPaymentMethod ? 'Card Details' : 'Payment Method'}
+          {selectedPaymentMethod ? t('cardDetails') : t('paymentMethod')}
         </Text>
 
         {!selectedPaymentMethod ? (
-      
           <View style={styles.paymentMethodContainer}>
             {paymentMethods.map((method) => (
               <TouchableOpacity
@@ -117,17 +118,13 @@ function StepPay({
             ))}
           </View>
         ) : (
-          // Selected Payment Method Details
+ 
           <View>
-            {/* Card Details Form (only for card payment) */}
+    
             {selectedPaymentMethod === 'card' && (
               <View style={styles.cardDetailsContainer}>
-                {/* <Text style={[TopUpStyles.smallLabel, { marginBottom: 16 }]}>
-                  Enter your card details
-                </Text> */}
-
                 <View style={styles.fieldContainer}>
-                  <Text style={styles.fieldLabel}>Card Number</Text>
+                  <Text style={styles.fieldLabel}>{t('cardNumber')}</Text>
                   <View style={[
                     styles.inputContainer,
                     isFocused && cardDetails.number === '' && styles.inputContainerFocused
@@ -155,7 +152,7 @@ function StepPay({
 
                 <View style={styles.row}>
                   <View style={[styles.fieldContainer, { flex: 1, marginRight: 8 }]}>
-                    <Text style={styles.fieldLabel}>Expiry Date</Text>
+                    <Text style={styles.fieldLabel}>{t('expiryDate')}</Text>
                     <View style={[
                       styles.inputContainer,
                       isFocused && cardDetails.expiry === '' && styles.inputContainerFocused
@@ -182,7 +179,7 @@ function StepPay({
                   </View>
 
                   <View style={[styles.fieldContainer, { flex: 1, marginLeft: 8 }]}>
-                    <Text style={styles.fieldLabel}>CVC</Text>
+                    <Text style={styles.fieldLabel}>{t('cvc')}</Text>
                     <View style={[
                       styles.inputContainer,
                       isFocused && cardDetails.cvc === '' && styles.inputContainerFocused
@@ -211,7 +208,7 @@ function StepPay({
                 </View>
 
                 <Text style={[TopUpStyles.smallLabel, { marginTop: 16 }]}>
-                  Payment will be processed securely using Stripe. Your card details are never stored on our servers.
+                  {t('securePaymentNotice')}
                 </Text>
               </View>
             )}
@@ -225,7 +222,7 @@ function StepPay({
                   resizeMode="contain"
                 />
                 <Text style={styles.altPaymentText}>
-                  You'll be redirected to PayPal to complete your payment securely.
+                  {t('paypalRedirect')}
                 </Text>
                 <TouchableOpacity style={[styles.paymentButton, { backgroundColor: '#0070BA' }]}>
                   <Image 
@@ -233,12 +230,12 @@ function StepPay({
                     style={styles.buttonIcon} 
                     resizeMode="contain"
                   />
-                  <Text style={styles.paymentButtonText}>Continue with PayPal</Text>
+                  <Text style={styles.paymentButtonText}>{t('continueWithPaypal')}</Text>
                 </TouchableOpacity>
               </View>
             )}
 
- 
+            {/* Google Pay Payment Method */}
             {selectedPaymentMethod === 'googlepay' && (
               <View style={styles.altPaymentContainer}>
                 <Image 
@@ -247,7 +244,7 @@ function StepPay({
                   resizeMode="contain"
                 />
                 <Text style={styles.altPaymentText}>
-                  Pay quickly and securely with your Google Pay account.
+                  {t('googlePayRedirect')}
                 </Text>
                 <TouchableOpacity style={[styles.paymentButton, { backgroundColor: '#4285F4' }]}>
                   <Image 
@@ -255,7 +252,7 @@ function StepPay({
                     style={styles.buttonIcon} 
                     resizeMode="contain"
                   />
-                  <Text style={styles.paymentButtonText}>Pay with Google Pay</Text>
+                  <Text style={styles.paymentButtonText}>{t('payWithGooglePay')}</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -265,20 +262,20 @@ function StepPay({
         {/* Order Summary - Always visible */}
         <View style={TopUpStyles.summaryCard}>
           <View style={TopUpStyles.summaryRow}>
-            <Text style={TopUpStyles.summaryKey}>Mobile Number</Text>
+            <Text style={TopUpStyles.summaryKey}>{t('mobileNumber')}</Text>
             <Text style={TopUpStyles.summaryValue}>{summary.mobile}</Text>
           </View>
           <View style={TopUpStyles.summaryRow}>
-            <Text style={TopUpStyles.summaryKey}>Amount to send</Text>
+            <Text style={TopUpStyles.summaryKey}>{t('amountToSend')}</Text>
             <Text style={TopUpStyles.summaryValue}>{summary.afn} AFN</Text>
           </View>
           <View style={TopUpStyles.summaryRow}>
-            <Text style={TopUpStyles.summaryKey}>Base Amount</Text>
+            <Text style={TopUpStyles.summaryKey}>{t('baseAmount')}</Text>
             <Text style={TopUpStyles.summaryValue}>${summary.calculateBaseAmount()} USD</Text>
           </View>
           {summary.slabPercentage > 0 && (
             <View style={TopUpStyles.summaryRow}>
-              <Text style={TopUpStyles.summaryKey}>Fee</Text>
+              <Text style={TopUpStyles.summaryKey}>{t('fee')}</Text>
               <Text style={TopUpStyles.summaryValue}>${summary.calculateFeeAmount()} USD</Text>
             </View>
           )}
@@ -294,7 +291,7 @@ function StepPay({
             ]}
           >
             <Text style={[TopUpStyles.summaryKey, { fontWeight: "700" }]}>
-              Total Amount
+              {t('totalAmount')}
             </Text>
             <Text
               style={[
@@ -307,7 +304,7 @@ function StepPay({
           </View>
           <TouchableOpacity onPress={onEditAmount} style={{ marginTop: 8 }}>
             <Text style={[TopUpStyles.editLink, { alignSelf: "flex-end" }]}>
-              Change amount
+              {t('changeAmount')}
             </Text>
           </TouchableOpacity>
         </View>

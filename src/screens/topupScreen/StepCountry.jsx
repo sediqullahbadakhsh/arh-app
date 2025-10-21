@@ -5,12 +5,15 @@ import { Colors } from "../../theme/colors";
 import { codeToFlag } from "../../utils/flag";
 import { DIAL_CODES } from "../../constants/dialing";
 import { Ionicons } from "@expo/vector-icons";
+import { useTranslation } from "react-i18next";
+
 function StepCountry({ country, onOpen }) {
+  const { t } = useTranslation();
   const [isFocused, setIsFocused] = useState(false);
 
   return (
     <View style={{ marginTop: 16 }}>
-      <Text style={TopUpStyles.sectionTitle}>Select country you want to send</Text>
+      <Text style={TopUpStyles.sectionTitle}>{t('selectCountry')}</Text>
       <TouchableOpacity
         style={[
           TopUpStyles.dropField,

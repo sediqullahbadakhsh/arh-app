@@ -11,8 +11,10 @@ import { Ionicons } from "@expo/vector-icons";
 
 import gameStyles from "./GameSyle";
 import ServiceHeader from "../../components/ServiceHeader";
+import { useTranslation } from "react-i18next";
 
 export default function GameCoinsScreen({ navigation }) {
+  const {t} = useTranslation();
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
       <ServiceHeader title="Game Coins" onBack={() => navigation.goBack()} />
@@ -24,14 +26,14 @@ export default function GameCoinsScreen({ navigation }) {
             color={Colors.primary}
           />
         </View>
-        <Text style={gameStyles.title}>Game Coins</Text>
-        <Text style={gameStyles.sub}>This feature is coming soon.</Text>
+        <Text style={gameStyles.title}>{t("gameCoins")}</Text>
+        <Text style={gameStyles.sub}>{t("thisFeatureComingSoon")}</Text>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={gameStyles.btn}
           activeOpacity={0.85}
         >
-          <Text style={gameStyles.btnText}>Go Back</Text>
+          <Text style={gameStyles.btnText}>{t("goBack")}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

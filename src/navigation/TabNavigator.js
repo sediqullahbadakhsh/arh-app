@@ -1,7 +1,7 @@
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { TouchableOpacity, View, Text, TabNavStylesheet, Platform } from "react-native";
+import { TouchableOpacity, View, Text } from "react-native";
 import Feather from "react-native-vector-icons/Feather";
 import HomeStackNavigator from "./HomeStackNavigator";
 import OrdersScreen from "../screens/orderScreen/OrdersScreen";
@@ -19,6 +19,7 @@ import NotificationsScreen from "../screens/notificationScreen/NotificationsScre
 import TabNavStyles from "./TabNavigatorStyle";
 import { scale as Schp } from "../utils/normalizeSize";
 import ProfileStackNavigatorMerchant from "./ProfileStackNavigatorMerchant";
+import { useTranslation } from "react-i18next";
 
 const Tab = createBottomTabNavigator();
 
@@ -34,10 +35,21 @@ const CustomMiddleButton = ({ onPress }) => (
   </TouchableOpacity>
 );
 
+const CustomTabBarButton = (props) => {
+  return (
+    <TouchableOpacity
+      {...props}
+      activeOpacity={1}
+      style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+    />
+  );
+};
+
 export default function TabNavigator() {
   const insets = useSafeAreaInsets();
   const access = useAccess();
   const { user } = useAuth();
+  const { t } = useTranslation();
   const role = user?.role === "b2b" ? "b2b" : "b2c";
 
   const can = (fn) => (typeof fn === "function" ? fn() : true);
@@ -46,77 +58,84 @@ export default function TabNavigator() {
 
   const TABS_B2C = [
     {
-      name: "HomeTab",
-      label: "Home",
+      name: "Home",
+      label: t('tabs.home'),
       icon: "home",
       component: HomeStackNavigator,
       show: can(() => canUse(SCREENS?.HOME)),
+      stackReset: true, 
     },
     {
       name: "Order",
-      label: "Order",
+      label: t('tabs.orders'),
       icon: "shopping-cart",
       component: OrdersScreen,
       show: can(() => access?.can?.(ACTIONS.SEE_CONTACTS) && canUse(SCREENS?.CONTACTS)),
     },
     {
       name: "TopupTab",
-      label: "Top-up",
+      label: t('tabs.topup'),
       icon: "zap",
       component: TopupFlowScreen,
       show: true,
     },
     {
       name: "Notifications",
-      label: "Notifications",
+      label: t('tabs.notifications'),
       icon: "bell",
       component: NotificationsScreen,
       show: true,
     },
     {
       name: "Setting",
-      label: "Setting",
+      label: t('tabs.settings'),
       icon: "settings",
       component: ProfileStackNavigator,
       show: can(() => canUse(SCREENS?.PROFILE)),
+      stackReset: true, 
     },
   ];
 
   const TABS_B2B = [
     {
-      name: "HomeTab",
-      label: "Home",
+      name: "Home",
+      label: t('tabs.home'),
       icon: "home",
       component: HomeStackNavigator,
       show: can(() => canUse(SCREENS?.HOME)),
+      stackReset: true,
     },
     {
       name: "Wallet",
-      label: "Wallet",
+      label: t('tabs.wallet'),
       icon: "credit-card",
       component: WalletStackNavigator,
       show: true,
+      stackReset: true,
     },
     {
       name: "Agent",
-      label: "Agent",
+      label: t('tabs.agents'),
       icon: "user-check",
       component: AgentStackNavigator,
       show: true,
+      stackReset: true,
     },
     {
       name: "Report",
-      label: "Report",
+      label: t('tabs.reports'),
       icon: "bar-chart-2",
       component: ReportStackNavigator,
       show: true,
+      stackReset: true,
     },
     {
       name: "Profile",
-      label: "Profile",
+      label: t('tabs.profile'),
       icon: "user",
       component: ProfileStackNavigatorMerchant,
       show: can(() => canUse(SCREENS?.PROFILE)),
+      stackReset: true,
     },
   ];
 
@@ -129,7 +148,7 @@ export default function TabNavigator() {
     <View style={TabNavStyles.navigatorWrapper}>
       <Tab.Navigator
         initialRouteName={initial}
-        screenOptions={({ route }) => {
+        screenOptions={({ route, navigation }) => {
           const tab = tabs.find((t) => t.name === route.name);
           const iconName = tab?.icon ?? "circle";
           const isMiddle = route.name === "TopupTab";
@@ -137,16 +156,17 @@ export default function TabNavigator() {
           return {
             headerShown: false,
             tabBarActiveTintColor: Colors.primary,
-            tabBarInactiveTintColor: "#BDBDBD",
+            tabBarInactiveTintColor: "#888",
             tabBarStyle: {
               height: 60 + insets.bottom,
               paddingTop: 6,
               paddingBottom: Math.max(insets.bottom, 8),
-              backgroundColor: "#fff",
+              backgroundColor: "#f9f9f9",
               zIndex: 9999,
               elevation: 10,
               position: "absolute",
-              borderTopWidth: 0,
+              borderTopWidth: 0.5,
+              borderTopColor: "#ddd",
             },
             tabBarIcon: ({ color, size }) => (
               <View style={{ alignItems: "center", justifyContent: "center" }}>
@@ -155,18 +175,43 @@ export default function TabNavigator() {
               </View>
             ),
             tabBarLabel: ({ color, children }) => (
-              <Text style={{ color, fontSize: Schp.hp(1.2),  }}>{children}</Text>
+              <Text style={{ color, fontSize: Schp.hp(1.2) }}>{children}</Text>
             ),
             tabBarButton: (props) =>
-              isMiddle ? <CustomMiddleButton {...props} /> : <TouchableOpacity {...props} activeOpacity={1} />,
+              isMiddle ? (
+                <CustomMiddleButton {...props} />
+              ) : (
+                <CustomTabBarButton {...props} />
+              ),
           };
         }}
       >
         {tabs.map((t) => (
-          <Tab.Screen key={t.name} name={t.name} component={t.component} />
+          <Tab.Screen 
+            key={t.name} 
+            name={t.name} 
+            component={t.component}
+            options={{
+              title: t.label,
+            }}
+            listeners={({ navigation, route }) => ({
+              tabPress: (e) => {
+                const state = navigation.getState();
+                const currentTabRoutes = state.routes.find(r => r.name === route.name);
+                
+                if (t.stackReset && currentTabRoutes?.state?.index > 0) {
+                  e.preventDefault();
+                  
+                  navigation.reset({
+                    index: 0,
+                    routes: [{ name: route.name }],
+                  });
+                }
+              },
+            })}
+          />
         ))}
       </Tab.Navigator>
     </View>
   );
 }
-

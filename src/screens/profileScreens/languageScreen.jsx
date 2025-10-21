@@ -7,11 +7,13 @@ import { useLanguage } from "../../context/LanguageContext";
 import { useUser } from "../../context/userContext";
 import { updateLanguage } from "../../services/merchantApi";
 import RTLTransitionHandler from '../../components/RTLTransitionHandler';
+import { useTranslation } from "react-i18next";
 
 export default function LanguageScreen({ navigation }) {
   const { user } = useUser();
   const { selectedLang, LANGS, changeLanguage, isChangingLanguage } = useLanguage();
   const [updatingBackend, setUpdatingBackend] = useState(false);
+  const {t} = useTranslation();
 
   const handleLanguageChange = async (lang) => {
     if (isChangingLanguage || updatingBackend) return;
@@ -42,7 +44,7 @@ export default function LanguageScreen({ navigation }) {
     <RTLTransitionHandler>
       <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
         <ServiceHeader 
-          title="Manage Language" 
+          title={t('manageLanguage')}
           onBack={() => navigation.goBack()} 
         />
         <ScrollView contentContainerStyle={{ padding: 24 }}>
@@ -57,7 +59,7 @@ export default function LanguageScreen({ navigation }) {
             <View style={{ marginTop: 20, alignItems: 'center' }}>
               <ActivityIndicator size="large" color={Colors.primary} />
               <Text style={{ marginTop: 10, color: Colors.textSecondary }}>
-                {updatingBackend ? "Updating preferences..." : "Changing language..."}
+                {updatingBackend ? t("updatingPreferences") : t("ChangingLanguage")}
               </Text>
             </View>
           )}

@@ -12,6 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../theme/colors";
 import { getSetaraganMnoId } from "../../utils/getCompanyIdForSetaragan";
 import { getMnoLogo } from "../../utils/getMnoLogo";
+import { useTranslation } from "react-i18next";
 
 export default function StepNumber({
   dial,
@@ -23,6 +24,7 @@ export default function StepNumber({
   onEditCountry,
   openContacts,
 }) {
+  const { t } = useTranslation();
   const formatted = formatLocal(value);
   const operatorId = getSetaraganMnoId(value);
 
@@ -30,8 +32,8 @@ export default function StepNumber({
     const trimmed = value.trim();
     if (text.startsWith("0") && trimmed.length === 0) {
       Alert.alert(
-        "Invalid Number",
-        "Please start your phone number with 7 instead of 0, as the 0 is already included in your country code."
+        t('invalidNumber'),
+        t('phoneNumberStartWith7')
       );
       const numeric = trimmed.replace(/^0+/, "");
       onChange(numeric);
@@ -43,13 +45,13 @@ export default function StepNumber({
   return (
     <View style={styles.container}>
       <View style={styles.editHeader}>
-        <Text style={styles.sectionTitle}>Mobile Number</Text>
+        <Text style={styles.sectionTitle}>{t('mobileNumber')}</Text>
         <View style={styles.editLinks}>
           <TouchableOpacity onPress={openContacts}>
-            <Text style={styles.editLink}>Contacts</Text>
+            <Text style={styles.editLink}>{t('contacts')}</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={onEditCountry}>
-            <Text style={styles.editLink}>Change country</Text>
+            <Text style={styles.editLink}>{t('changeCountry')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -89,13 +91,13 @@ export default function StepNumber({
           </View>
         ) : (
           <Text style={styles.autoDetectText}>
-            We'll detect the operator automatically
+            {t('autoDetectOperator')}
           </Text>
         )}
       </View>
 
       <View style={styles.amountSection}>
-        <Text style={styles.sectionTitle}>Amount</Text>
+        <Text style={styles.sectionTitle}>{t('amount')}</Text>
         <TextInput
           value={amountAfn}
           onChangeText={onAmountChange}

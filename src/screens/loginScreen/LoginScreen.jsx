@@ -11,8 +11,10 @@ import { useAuth } from "../../auth/AuthProvider";
 import RoundedInput from "../../components/RoundedInput";
 import WhiteSpinner from "../../components/Spinner";
 import { KeyboardAvoidingView, Platform, ScrollView } from "react-native";
+import { useTranslation } from "react-i18next";
 
 export default function LoginScreen({ navigation }) {
+  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [canUsePassword, setCanUsePassword] = useState(false);
   const [canUseOtp, setCanUseOtp] = useState(false);
@@ -34,7 +36,7 @@ export default function LoginScreen({ navigation }) {
         mode: "login",
       });
     } catch (e) {
-      Alert.alert("OTP", e?.message || "Failed to send OTP.");
+      Alert.alert(t('otp'), e?.message || t('failedToSendOtp'));
     } finally {
       setLoading(false);
     }
@@ -43,7 +45,7 @@ export default function LoginScreen({ navigation }) {
   const start = async () => {
     const identifier = email.trim();
     if (!identifier) {
-      Alert.alert("Login", "Please enter your email address.");
+      Alert.alert(t('login'), t('enterEmailAddress'));
       return;
     }
     try {
@@ -52,7 +54,6 @@ export default function LoginScreen({ navigation }) {
       const pw = !!data?.canUsePassword;
       const otp = !!data?.canUseOtp;
 
-  
       if (data?.nextStep === "password" && pw && !otp) {
         navigatePassword();
         return;
@@ -62,19 +63,16 @@ export default function LoginScreen({ navigation }) {
         return;
       }
 
-  
       setCanUsePassword(pw);
       setCanUseOtp(otp);
       setNextReady(true);
 
-   
       if (!pw && otp)
-        setHint("This account signs in via a one-time code (OTP).");
-      else if (pw && !otp) setHint("This account signs in with a password.");
-      else if (pw && otp) setHint("Choose Password or One-Time Code (OTP).");
-      else setHint("No available sign-in method. Contact support.");
+        setHint(t('signInWithOtpHint'));
+      else if (pw && !otp) setHint(t('signInWithPasswordHint'));
+      else if (pw && otp) setHint(t('chooseSignInMethod'));
+      else setHint(t('noSignInMethod'));
     } catch (e) {
-   
       const nextStep = e?.response?.data?.nextStep || e?.nextStep;
       const canPw = !!e?.response?.data?.canUsePassword;
       const canO = !!e?.response?.data?.canUseOtp;
@@ -87,7 +85,7 @@ export default function LoginScreen({ navigation }) {
         await navigateOtp();
         return;
       }
-      Alert.alert("Login", e?.message || "Unable to start sign in.");
+      Alert.alert(t('login'), e?.message || t('unableToStartSignIn'));
     } finally {
       setLoading(false);
     }
@@ -98,7 +96,6 @@ export default function LoginScreen({ navigation }) {
 
   const goSignupChooser = () => navigation.navigate("SignUpChooser");
 
-
   const editEmail = () => {
     setNextReady(false);
     setCanUsePassword(false);
@@ -108,123 +105,114 @@ export default function LoginScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-        <KeyboardAvoidingView
-    style={{ flex: 1 }}
-    behavior={Platform.OS === "ios" ? "padding" : "height"}
-    keyboardVerticalOffset={hp(2)} 
-  > 
- <ScrollView
-      contentContainerStyle={{ flexGrow: 1 }}
-      keyboardShouldPersistTaps="handled"
-    > 
-    
-         <AuthHeader
-        title={"Sign in to your\nAccount"}
-        onBack={() => navigation.goBack()}
-      />
-
-      <View style={styles.container}>
-       <View style={{marginVertical: 20}}>
-   
-         <Text style={styles.label}>Email Address</Text>
-        <RoundedInput
-          value={email}
-          onChangeText={setEmail}
-          placeholder="ahmad@example.com"
-          keyboardType="email-address"
-          rightIcon={<Ionicons name="mail-outline" size={24} color="#344054" />}
-          returnKeyType={nextReady ? "done" : "go"}
-          onSubmitEditing={nextReady ? undefined : start}
-        />
-        {hint && (
-          <Text style={styles.helperText} accessibilityRole="text">
-            {hint}{" "}
-            <Text onPress={editEmail} style={styles.helperLink}>
-              Change email
-            </Text>
-          </Text>
-        )}
-       </View>
-
- 
-        {!nextReady ? (
-          <PrimaryButton
-            label={loading ? <WhiteSpinner/> : "Continue"}
-            onPress={start}
-            style={{ marginTop: 6, marginBottom: 14,}}
-            disabled={loading}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={hp(2)} 
+      > 
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
+        > 
+          <AuthHeader
+            title={t('signInToAccount')}
+            onBack={() => navigation.goBack()}
           />
-        ) : (
-          <>
-            {canUsePassword && (
+
+          <View style={styles.container}>
+            <View style={{marginVertical: 20}}>
+              <Text style={styles.label}>{t('emailAddress')}</Text>
+              <RoundedInput
+                value={email}
+                onChangeText={setEmail}
+                placeholder={t('emailPlaceholder')}
+                keyboardType="email-address"
+                rightIcon={<Ionicons name="mail-outline" size={24} color="#344054" />}
+                returnKeyType={nextReady ? "done" : "go"}
+                onSubmitEditing={nextReady ? undefined : start}
+              />
+              {hint && (
+                <Text style={styles.helperText} accessibilityRole="text">
+                  {hint}{" "}
+                  <Text onPress={editEmail} style={styles.helperLink}>
+                    {t('changeEmail')}
+                  </Text>
+                </Text>
+              )}
+            </View>
+
+            {!nextReady ? (
               <PrimaryButton
-                label="Continue with Password"
-                onPress={goPassword}
-                style={{ marginTop: 24, marginBottom: canUseOtp ? 10 : 20 }}
+                label={loading ? <WhiteSpinner/> : t('continue')}
+                onPress={start}
+                style={{ marginTop: 6, marginBottom: 14,}}
                 disabled={loading}
               />
+            ) : (
+              <>
+                {canUsePassword && (
+                  <PrimaryButton
+                    label={t('continueWithPassword')}
+                    onPress={goPassword}
+                    style={{ marginTop: 24, marginBottom: canUseOtp ? 10 : 20 }}
+                    disabled={loading}
+                  />
+                )}
+                {canUseOtp && (
+                  <OutlineButton
+                    label={loading ? t('sendingOtp') : t('signInWithOtp')}
+                    onPress={goOtp}
+                    disabled={loading}
+                  />
+                )}
+              </>
             )}
-            {canUseOtp && (
-              <OutlineButton
-                label={loading ? "Sending OTP..." : "Sign in with OTP"}
-                onPress={goOtp}
-                disabled={loading}
+
+            <View style={styles.dividerRow}>
+              <View style={styles.divider} />
+              <Text style={styles.dividerText}>{t('merchantAccountHint')}</Text>
+              <View style={styles.divider} />
+            </View>
+
+            <PrimaryButton
+              label={t('signInWithEmailPassword')}
+              onPress={goPassword}
+              style={{ marginTop: 10, marginBottom:10 }}
+              disabled={loading}
+            />
+
+            <View style={{ height: 16 }} />
+            <OutlineButton
+              style={{borderColor: "#DB8510", fontFamily: "dmsansRegulars", color: "#E20E02"}}
+              label={t('registerAsCustomerMerchant')}
+              onPress={goSignupChooser}
+            />
+
+            <View style={styles.dividerRow}>
+              <View style={styles.divider} />
+              <Text style={styles.dividerText}>{t('orContinueWith')}</Text>
+              <View style={styles.divider} />
+            </View>
+
+            <View style={styles.socialRow}>
+              <SocialButton
+                label={t('google')}
+                icon={<Ionicons name="logo-google" size={20} color={Colors.primary} />}
+                onPress={() => {}}
               />
-            )}
-          </>
-        )}
-
-        <View style={styles.dividerRow}>
-          <View style={styles.divider} />
-          <Text style={styles.dividerText}>if you have a merchant account</Text>
-          <View style={styles.divider} />
-        </View>
-
-         <PrimaryButton
-                label="Sign in with Email and Password"
-                onPress={goPassword}
-                style={{ marginTop: 10, marginBottom:10 }}
-                disabled={loading}
+              <View style={{ width: 16 }} />
+              <SocialButton
+                label={t('facebook')}
+                icon={<Ionicons name="logo-facebook" size={22} color={"#1877F2"} />}
+                onPress={() => {}}
               />
-
-
-        <View style={{ height: 16 }} />
-        <OutlineButton
-        style={{borderColor: "#DB8510", fontFamily: "dmsansRegulars", color: "#E20E02"}}
-          label="Register as Customer or Merchant"
-          onPress={goSignupChooser}
-        />
-
-  
-        <View style={styles.dividerRow}>
-          <View style={styles.divider} />
-          <Text style={styles.dividerText}>Or Continue with</Text>
-          <View style={styles.divider} />
-        </View>
-
-   
-        <View style={styles.socialRow}>
-          <SocialButton
-            label="Google"
-            icon={<Ionicons name="logo-google" size={20} color={Colors.primary} />}
-            onPress={() => {}}
-          />
-          <View style={{ width: 16 }} />
-          <SocialButton
-            label="Facebook"
-            icon={<Ionicons name="logo-facebook" size={22} color={"#1877F2"} />}
-            onPress={() => {}}
-          />
-        </View>
-      </View>
-     
-    </ScrollView>
-
-  </KeyboardAvoidingView>
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
-
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.white },

@@ -8,12 +8,12 @@ import {
   TextInput,
   Modal,
   FlatList,
-  Image,
   ScrollView,
   Alert,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import * as DocumentPicker from "expo-document-picker";
+import * as ImagePicker from "expo-image-picker";
 import { Colors } from "../../theme/colors";
 import ServiceHeader from "../../components/ServiceHeader";
 import InputField from "../../components/InputField";
@@ -21,10 +21,11 @@ import PrimaryButton from "../../components/PrimaryButton";
 import { COUNTRIES } from "../../constants/countries";
 import { codeToFlag } from "../../utils/flag";
 import { 
-  createDownlineAgent, 
+  updateAgentDetails, 
   getCountries, 
   getDistricts, 
-  getProvinces 
+  getProvinces,
+  getAgentById 
 } from "../../services/merchantApi";
 import { useUser } from "../../context/userContext";
 
@@ -37,6 +38,7 @@ const LANGS = [
 const STATUSES = [
   { label: "Active", value: "active" },
   { label: "Inactive", value: "inactive" },
+  { label: "Suspended", value: "suspended" },
 ];
 
 const ACCOUNT_TYPES = [
@@ -46,12 +48,14 @@ const ACCOUNT_TYPES = [
 
 const GAP = 1;
 
-export default function AgentCreateScreen({ navigation, route }) {
+export default function AgentEditScreen({ navigation, route }) {
   const { user } = useUser();
+  const { agent, refreshAgentList } = route.params || {};
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [updating, setUpdating] = useState(false);
 
-
+  // Form state
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -64,17 +68,20 @@ export default function AgentCreateScreen({ navigation, route }) {
   const [messageLanguage, setMessageLanguage] = useState("");
   const [status, setStatus] = useState("active");
   const [accountType, setAccountType] = useState("retailer");
+  const [commissionRate, setCommissionRate] = useState("");
+  const [profilePicture, setProfilePicture] = useState(null);
   
   const [countries, setCountries] = useState([]);
   const [provinces, setProvinces] = useState([]);
   const [districts, setDistricts] = useState([]);
   const [picker, setPicker] = useState({ open: false, type: null });
 
-  const { refreshAgentList } = route.params || {};
-
   useEffect(() => {
+    if (agent) {
+      loadAgentData();
+    }
     getAllCountries();
-  }, []);
+  }, [agent]);
 
   useEffect(() => {
     if (country?.id) {
@@ -88,10 +95,53 @@ export default function AgentCreateScreen({ navigation, route }) {
     }
   }, [province?.id]);
 
+  const loadAgentData = () => {
+    if (!agent) return;
+
+    // Extract first and last name from username
+    const nameParts = agent.user?.username?.split(' ') || [];
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+
+    setFirstName(firstName);
+    setLastName(lastName);
+    setEmail(agent.user?.email || '');
+    setMobileNumber(agent.user?.mobileNumber || '');
+    setAlternativeContact(agent.alternativeContact || '');
+    setAddress(agent.address || '');
+    setMessageLanguage(agent.messageLanguage || '');
+    setStatus(agent.user?.status || 'active');
+    setAccountType(agent.accountType || 'retailer');
+    setCommissionRate(agent.commissionRateDetails?.percentage?.toString() || '');
+    
+    // Set location data (these will be properly set when countries/provinces/districts load)
+    if (agent.countryDetails) {
+      setCountry(agent.countryDetails);
+    }
+    if (agent.provinceDetails) {
+      setProvince(agent.provinceDetails);
+    }
+    if (agent.districtDetails) {
+      setDistrict(agent.districtDetails);
+    }
+
+    // Set profile picture if available
+    if (agent.user?.profile_picture) {
+      const IMG_BASE_URL = "YOUR_IMAGE_BASE_URL"; // Replace with your actual image base URL
+      setProfilePicture(`${IMG_BASE_URL}${agent.user.profile_picture}`);
+    }
+  };
+
   const getAllCountries = async () => {
     try {
       const res = await getCountries();
       setCountries(res?.data || []);
+      
+      // After countries load, set the agent's country
+      if (agent?.countryDetails) {
+        const agentCountry = res?.data?.find(c => c.id === agent.countryDetails.id);
+        if (agentCountry) setCountry(agentCountry);
+      }
     } catch (error) {
       console.error("Error fetching countries:", error);
     }
@@ -101,8 +151,12 @@ export default function AgentCreateScreen({ navigation, route }) {
     try {
       const res = await getProvinces(countryId);
       setProvinces(res?.data || []);
-      setProvince(null);
-      setDistrict(null);
+      
+      // After provinces load, set the agent's province
+      if (agent?.provinceDetails && countryId === agent.countryDetails?.id) {
+        const agentProvince = res?.data?.find(p => p.id === agent.provinceDetails.id);
+        if (agentProvince) setProvince(agentProvince);
+      }
     } catch (error) {
       console.error("Error fetching provinces:", error);
     }
@@ -112,7 +166,12 @@ export default function AgentCreateScreen({ navigation, route }) {
     try {
       const res = await getDistricts(provinceId);
       setDistricts(res?.data || []);
-      setDistrict(null);
+      
+      // After districts load, set the agent's district
+      if (agent?.districtDetails && provinceId === agent.provinceDetails?.id) {
+        const agentDistrict = res?.data?.find(d => d.id === agent.districtDetails.id);
+        if (agentDistrict) setDistrict(agentDistrict);
+      }
     } catch (error) {
       console.error("Error fetching districts:", error);
     }
@@ -170,15 +229,59 @@ export default function AgentCreateScreen({ navigation, route }) {
     return true;
   };
 
-  const submit = async () => {
+  const validateCommissionRate = () => {
+    if (commissionRate) {
+      const rate = parseFloat(commissionRate);
+      if (isNaN(rate)) {
+        Alert.alert("Error", "Commission rate must be a valid number");
+        return false;
+      }
+      if (rate < 0) {
+        Alert.alert("Error", "Commission rate cannot be negative");
+        return false;
+      }
+      if (rate > 100) {
+        Alert.alert("Error", "Commission rate cannot exceed 100%");
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const pickImage = async () => {
     try {
-      setLoading(true);
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission required', 'Sorry, we need camera roll permissions to change profile picture.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setProfilePicture(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error("Image picker error:", error);
+      Alert.alert("Error", "Failed to pick image");
+    }
+  };
+
+  const submit = async () => {
+    if (!validateCommissionRate()) return;
+
+    try {
+      setUpdating(true);
       
       const payload = {
         username: `${firstName} ${lastName}`.trim(),
         email: email.trim(),
         mobileNumber: mobileNumber.trim(),
-        user_type: "agent",
         status: status,
         country: country?.id,
         province: province?.id,
@@ -187,15 +290,16 @@ export default function AgentCreateScreen({ navigation, route }) {
         alternativeContact: alternativeContact.trim(),
         messageLanguage: messageLanguage,
         accountType: accountType,
-        registrationType: "indirect",
-        parentAgentId: user?.id,
+        commission_rate: commissionRate ? parseFloat(commissionRate) : 0,
+        // Note: Profile picture upload would require FormData and separate handling
+        // For now, we're not including it in the update
       };
 
-      await createDownlineAgent(payload);
+      await updateAgentDetails(agent.id, payload);
       
       Alert.alert(
         "Success", 
-        "Agent created successfully! Credentials have been sent to the agent's email.",
+        "Agent updated successfully!",
         [
           {
             text: "OK",
@@ -207,40 +311,24 @@ export default function AgentCreateScreen({ navigation, route }) {
         ]
       );
     } catch (error) {
-      console.error("Create agent error:", error);
+      console.error("Update agent error:", error);
       Alert.alert(
         "Error", 
-        error.response?.data?.error || "Failed to create agent. Please try again."
+        error.response?.data?.error || "Failed to update agent. Please try again."
       );
     } finally {
-      setLoading(false);
+      setUpdating(false);
     }
-  };
-
-  const resetForm = () => {
-    setStep(0);
-    setFirstName("");
-    setLastName("");
-    setEmail("");
-    setMobileNumber("");
-    setAlternativeContact("");
-    setCountry(null);
-    setProvince(null);
-    setDistrict(null);
-    setAddress("");
-    setMessageLanguage("");
-    setStatus("active");
-    setAccountType("retailer");
   };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
       <ServiceHeader
-        title="Create Agent"
-        onBack={() => (step === 0 ? navigation.goBack() : back())}
+        title="Edit Agent"
+        onBack={() => navigation.goBack()}
       />
 
- 
+      {/* Step indicator */}
       <View style={styles.stepperWrap}>
         <StepDot index={0} current={step} label="Personal" />
         <StepLine active={step >= 1} />
@@ -256,6 +344,23 @@ export default function AgentCreateScreen({ navigation, route }) {
         {step === 0 && (
           <>
             <Text style={styles.sectionTitle}>Personal Information</Text>
+
+            {/* Profile Picture */}
+            <View style={styles.profileSection}>
+              <TouchableOpacity onPress={pickImage} style={styles.profileImageContainer}>
+                {profilePicture ? (
+                  <Image source={{ uri: profilePicture }} style={styles.profileImage} />
+                ) : (
+                  <View style={styles.profilePlaceholder}>
+                    <Ionicons name="person" size={32} color="#9E9E9E" />
+                  </View>
+                )}
+                <View style={styles.cameraIcon}>
+                  <Ionicons name="camera" size={16} color="#fff" />
+                </View>
+              </TouchableOpacity>
+              <Text style={styles.profileHint}>Tap to change photo</Text>
+            </View>
 
             <LabeledInput
               label="First Name"
@@ -377,8 +482,16 @@ export default function AgentCreateScreen({ navigation, route }) {
               required
             />
 
+            <LabeledInput
+              label="Commission Rate (%)"
+              value={commissionRate}
+              onChangeText={setCommissionRate}
+              placeholder="Enter Commission Rate"
+              keyboardType="decimal-pad"
+            />
+
             <View style={styles.infoBox}>
-              <Text style={styles.infoTitle}>Agent Summary</Text>
+              <Text style={styles.infoTitle}>Update Summary</Text>
               <InfoRow label="Name" value={`${firstName} ${lastName}`} />
               <InfoRow label="Email" value={email} />
               <InfoRow label="Mobile" value={mobileNumber} />
@@ -389,6 +502,7 @@ export default function AgentCreateScreen({ navigation, route }) {
               <InfoRow label="Language" value={messageLanguage} />
               <InfoRow label="Account Type" value={accountType} />
               <InfoRow label="Status" value={status} />
+              <InfoRow label="Commission Rate" value={commissionRate ? `${commissionRate}%` : "Not set"} />
             </View>
 
             <View style={styles.rowButtons}>
@@ -396,20 +510,20 @@ export default function AgentCreateScreen({ navigation, route }) {
                 label="Back"
                 onPress={back}
                 style={styles.halfButton}
-                disabled={loading}
+                disabled={updating}
               />
               <PrimaryButton
-                label={loading ? "Creating..." : "Create Agent"}
+                label={updating ? "Updating..." : "Update Agent"}
                 onPress={submit}
                 style={styles.halfButton}
-                disabled={loading}
+                disabled={updating}
               />
             </View>
           </>
         )}
       </ScrollView>
 
-
+      {/* Picker modal */}
       <Modal
         transparent
         visible={picker.open}
@@ -735,5 +849,48 @@ const styles = StyleSheet.create({
     textAlign: "right",
     flex: 1,
     marginLeft: 8,
+  },
+  profileSection: {
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  profileImageContainer: {
+    position: "relative",
+    marginBottom: 8,
+  },
+  profileImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 3,
+    borderColor: Colors.primary,
+  },
+  profilePlaceholder: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: "#E5E7EB",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 3,
+    borderColor: Colors.primary,
+  },
+  cameraIcon: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    backgroundColor: Colors.primary,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: Colors.white,
+  },
+  profileHint: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontStyle: "italic",
   },
 });

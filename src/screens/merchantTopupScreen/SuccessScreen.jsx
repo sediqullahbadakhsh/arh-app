@@ -9,44 +9,46 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../theme/colors";
 import PrimaryButton from "../../components/PrimaryButton";
-
+import { useTranslation } from "react-i18next";
 
 export default function SuccessScreen({ success, onDone, onTopupMore }) {
+  const { t } = useTranslation();
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.successCircle}>
         <Ionicons name="checkmark" size={56} color="#4CAF50" />
       </View>
-      <Text style={styles.successTitle}>Topup Successful!</Text>
+      <Text style={styles.successTitle}>{t('topupSuccessful')}</Text>
 
       <View style={styles.kv}>
-        <Text style={styles.k}>Receiver Number</Text>
+        <Text style={styles.k}>{t('receiverNumber')}</Text>
         <Text style={styles.v}>{success.mobile}</Text>
       </View>
       <View style={styles.kv}>
-        <Text style={styles.k}>Transaction ID</Text>
+        <Text style={styles.k}>{t('transactionId')}</Text>
         <Text style={styles.v}>{success.txId}</Text>
       </View>
       <View style={styles.kv}>
-        <Text style={styles.k}>Date</Text>
+        <Text style={styles.k}>{t('date')}</Text>
         <Text style={styles.v}>
           {new Date(success.date).toLocaleString()}
         </Text>
       </View>
 
       <View style={styles.totalBox}>
-        <Text style={styles.totalLabel}>Total Amount</Text>
+        <Text style={styles.totalLabel}>{t('totalAmount')}</Text>
         <Text style={styles.totalValue}>{success.amountUsd} AFN</Text>
       </View>
 
       <PrimaryButton
-        label="Done"
+        label={t('done')}
         onPress={onDone}
         style={{ width: "100%" }}
       />
       <TouchableOpacity onPress={onTopupMore}>
         <Text style={styles.topupMoreText}>
-          Topup More
+          {t('topupMore')}
         </Text>
       </TouchableOpacity>
     </ScrollView>

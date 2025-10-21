@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   View,
   Text,
@@ -13,6 +14,7 @@ import {
   Animated,
   Easing,
   Dimensions,
+  FlatList,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -27,6 +29,7 @@ import {
   getDistrictsByProvince
 } from "../../services/merchantProfileService";
 import ProfileStyles from "./Styles/ProfileStyle";
+import { useTranslation } from "react-i18next";
 
 const { height: screenHeight } = Dimensions.get('window');
 
@@ -59,11 +62,156 @@ const SkeletonLoader = () => (
   </View>
 );
 
-const Shimmer = () => (
-  <View style={ProfileStyles.shimmerContainer}>
-    <Animated.View style={ProfileStyles.shimmer} />
-  </View>
-);
+const BottomSheetSelector = ({ 
+  title, 
+  selectedValue, 
+  onSelect, 
+  data, 
+  loading = false, 
+  getDisplayName,
+  placeholder = "Select...",
+  editable = true
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const insets = useSafeAreaInsets();
+  const [modalSlideAnim] = useState(new Animated.Value(screenHeight));
+
+  useEffect(() => {
+    if (isOpen) {
+      Animated.timing(modalSlideAnim, {
+        toValue: 0,
+        duration: 350,
+        easing: Easing.out(Easing.back(1)),
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(modalSlideAnim, {
+        toValue: screenHeight,
+        duration: 250,
+        easing: Easing.in(Easing.ease),
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [isOpen]);
+
+  const filteredData = searchQuery
+    ? data.filter(item =>
+        getDisplayName(item)?.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : data;
+
+  const handleSelect = (item) => {
+    onSelect(item);
+    setIsOpen(false);
+    setSearchQuery('');
+  };
+
+  const renderItem = ({ item }) => (
+    <TouchableOpacity style={ProfileStyles.modalRow} onPress={() => handleSelect(item)}>
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: Colors.textPrimary, fontSize: 16, fontWeight: '500' }}>
+          {getDisplayName(item)}
+        </Text>
+      </View>
+      {selectedValue?.id === item.id && (
+        <Ionicons name="checkmark" size={20} color={Colors.primary} />
+      )}
+    </TouchableOpacity>
+  );
+
+  return (
+    <View style={{ marginBottom: 10 }}>
+      <TouchableOpacity
+        style={[
+          ProfileStyles.selectorTrigger, 
+          loading && ProfileStyles.disabled,
+          !editable && ProfileStyles.selectorDisabled
+        ]}
+        onPress={() => !loading && editable && setIsOpen(true)}
+        activeOpacity={editable ? 0.8 : 1}
+        disabled={loading || !editable}
+      >
+        <View style={ProfileStyles.selectorSelected}>
+          <Text style={[
+            ProfileStyles.selectorText,
+            selectedValue && { color: Colors.textPrimary },
+            !editable && { color: '#999' }
+          ]}>
+            {selectedValue ? getDisplayName(selectedValue) : placeholder}
+          </Text>
+        </View>
+        
+        {loading ? (
+          <ActivityIndicator size="small" color="#7A7A7A" />
+        ) : (
+          <Ionicons name="chevron-down" size={20} color={editable ? "#7A7A7A" : "#CCCCCC"} />
+        )}
+      </TouchableOpacity>
+
+      <Modal
+        visible={isOpen}
+        transparent={true}
+        animationType="none"
+        statusBarTranslucent={true}
+        onRequestClose={() => setIsOpen(false)}
+      >
+        <View style={ProfileStyles.modalOverlay}>
+          <TouchableOpacity 
+            style={ProfileStyles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setIsOpen(false)}
+          />
+          <Animated.View 
+            style={[
+              ProfileStyles.modalCard,
+              { 
+                transform: [{ translateY: modalSlideAnim }],
+                height: '70%',
+                marginBottom: -insets.bottom
+              }
+            ]}
+          >
+            <View style={ProfileStyles.modalHeader}>
+              <Text style={ProfileStyles.modalTitle}>{title}</Text>
+              <TouchableOpacity 
+                onPress={() => setIsOpen(false)}
+                style={ProfileStyles.closeButton}
+              >
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={ProfileStyles.searchContainer}>
+              <Ionicons name="search" size={20} color="#999" style={ProfileStyles.searchIcon} />
+              <TextInput
+                placeholder={`Search ${title.toLowerCase()}...`}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                style={ProfileStyles.searchInput}
+                placeholderTextColor="#999"
+              />
+            </View>
+
+            <FlatList
+              data={filteredData}
+              keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
+              renderItem={renderItem}
+              ItemSeparatorComponent={() => <View style={ProfileStyles.contactSeparator} />}
+              ListEmptyComponent={
+                <View style={ProfileStyles.emptyContainer}>
+                  <Text style={ProfileStyles.emptyText}>
+                    {loading ? 'Loading...' : 'No items found'}
+                  </Text>
+                </View>
+              }
+            />
+          </Animated.View>
+        </View>
+      </Modal>
+    </View>
+  );
+};
 
 export default function ProfileDetailsScreenMerchant({ navigation }) {
   const { user, updateUser } = useAuth();
@@ -82,19 +230,24 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
     messageLanguage: "english",
     profile_picture: null,
   });
+  const [originalData, setOriginalData] = useState({});
   const [errors, setErrors] = useState({});
   const [showImagePicker, setShowImagePicker] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [scaleAnim] = useState(new Animated.Value(0));
   const [slideAnim] = useState(new Animated.Value(screenHeight));
-
-  // Location data states
+  const [isEditing, setIsEditing] = useState(false);
+  const {t} = useTranslation();
   const [countries, setCountries] = useState([]);
   const [provinces, setProvinces] = useState([]);
   const [districts, setDistricts] = useState([]);
   const [loadingCountries, setLoadingCountries] = useState(false);
   const [loadingProvinces, setLoadingProvinces] = useState(false);
   const [loadingDistricts, setLoadingDistricts] = useState(false);
+
+  const [selectedCountry, setSelectedCountry] = useState(null);
+  const [selectedProvince, setSelectedProvince] = useState(null);
+  const [selectedDistrict, setSelectedDistrict] = useState(null);
 
   console.log(user, "this is user");
 
@@ -117,23 +270,46 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
         
         if (merchantData) {
           const userInfo = merchantData.user || {};
-          const agentDetail = merchantData.agentDetail || {};
           
-          setFormData({
+     
+          const addressData = {
+            alternativeContact: merchantData.alternativeContact || "",
+            address: merchantData.address || "",
+            country: merchantData.country ? merchantData.country.toString() : "",
+            province: merchantData.province ? merchantData.province.toString() : "",
+            district: merchantData.district ? merchantData.district.toString() : "",
+            messageLanguage: merchantData.messageLanguage || "english",
+          };
+          
+          console.log("Address data:", addressData);
+          
+          const newFormData = {
             username: userInfo.username || "",
             mobileNumber: userInfo.mobileNumber || "",
-            alternativeContact: agentDetail.alternativeContact || "",
-            address: agentDetail.address || "",
             email: userInfo.email || "",
-            country: agentDetail.country ? agentDetail.country.toString() : "",
-            province: agentDetail.province ? agentDetail.province.toString() : "",
-            district: agentDetail.district ? agentDetail.district.toString() : "",
-            messageLanguage: agentDetail.messageLanguage || "english",
             profile_picture: null,
-          });
+            ...addressData
+          };
+          
+          setFormData(newFormData);
+          setOriginalData(newFormData); 
           
           if (userInfo.profile_picture) {
-            setAvatar(userInfo.profile_picture);
+            const fullImageUrl = userInfo.profile_picture.startsWith('http') 
+              ? userInfo.profile_picture
+              : `http://3.67.144.22/uploads/profile_pictures/${userInfo.profile_picture}`;
+            setAvatar(fullImageUrl);
+          }
+
+ 
+          if (merchantData.countryDetails) {
+            setSelectedCountry(merchantData.countryDetails);
+          }
+          if (merchantData.provinceDetails) {
+            setSelectedProvince(merchantData.provinceDetails);
+          }
+          if (merchantData.districtDetails) {
+            setSelectedDistrict(merchantData.districtDetails);
           }
         }
 
@@ -149,6 +325,43 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
 
     fetchMerchantData();
   }, []);
+
+
+  const hasChanges = () => {
+    return JSON.stringify(formData) !== JSON.stringify(originalData) || 
+           avatar !== (user?.profile_picture ? `http://192.168.0.107:8081/uploads/profile_pictures/${user.profile_picture}` : null);
+  };
+
+
+  useEffect(() => {
+    if (countries.length > 0 && formData.country && !selectedCountry) {
+      const country = countries.find(c => c.id.toString() === formData.country);
+      if (country) {
+        console.log("Setting selected country:", country);
+        setSelectedCountry(country);
+      }
+    }
+  }, [countries, formData.country]);
+
+  useEffect(() => {
+    if (provinces.length > 0 && formData.province && !selectedProvince) {
+      const province = provinces.find(p => p.id.toString() === formData.province);
+      if (province) {
+        console.log("Setting selected province:", province);
+        setSelectedProvince(province);
+      }
+    }
+  }, [provinces, formData.province]);
+
+  useEffect(() => {
+    if (districts.length > 0 && formData.district && !selectedDistrict) {
+      const district = districts.find(d => d.id.toString() === formData.district);
+      if (district) {
+        console.log("Setting selected district:", district);
+        setSelectedDistrict(district);
+      }
+    }
+  }, [districts, formData.district]);
 
   useEffect(() => {
     requestPermissions();
@@ -197,7 +410,7 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
     }
   }, [showSuccess]);
 
-  // Load countries for dropdown
+
   const loadCountries = async () => {
     setLoadingCountries(true);
     try {
@@ -205,6 +418,7 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
       if (response.status === true || response.success) {
         const countriesData = response.data || response.data?.data || [];
         setCountries(countriesData);
+        console.log("Countries loaded:", countriesData.length);
       }
     } catch (error) {
       console.error("Error loading countries:", error);
@@ -213,13 +427,15 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
     }
   };
 
-  // Load provinces when country changes
+
   useEffect(() => {
     if (formData.country) {
       loadProvinces(formData.country);
     } else {
       setProvinces([]);
       setDistricts([]);
+      setSelectedProvince(null);
+      setSelectedDistrict(null);
     }
   }, [formData.country]);
 
@@ -239,6 +455,7 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
         }
         
         setProvinces(provincesData);
+        console.log("Provinces loaded:", provincesData.length);
       }
     } catch (error) {
       console.error("Error loading provinces:", error);
@@ -247,12 +464,13 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
     }
   };
 
-  // Load districts when province changes
+
   useEffect(() => {
     if (formData.province) {
       loadDistricts(formData.province);
     } else {
       setDistricts([]);
+      setSelectedDistrict(null);
     }
   }, [formData.province]);
 
@@ -272,6 +490,7 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
         }
         
         setDistricts(districtsData);
+        console.log("Districts loaded:", districtsData.length);
       }
     } catch (error) {
       console.error("Error loading districts:", error);
@@ -290,6 +509,8 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
   };
 
   const handleEditAvatar = async () => {
+    if (!isEditing) return;
+    
     setShowImagePicker(false);
     try {
       const { status } = await ImagePicker.getMediaLibraryPermissionsAsync();
@@ -324,6 +545,8 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
   };
 
   const takePhoto = async () => {
+    if (!isEditing) return;
+    
     setShowImagePicker(false);
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -353,6 +576,8 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
   };
 
   const removePhoto = () => {
+    if (!isEditing) return;
+    
     setShowImagePicker(false);
     setAvatar(null);
     setFormData(prev => ({
@@ -373,7 +598,7 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
     if (!formData.mobileNumber.trim()) {
       newErrors.mobileNumber = "Mobile number is required";
       valid = false;
-    } else if (!/^\+?[\d\s\-\(\)]{10,}$/.test(formData.mobileNumber)) {
+    } else if (!/^\+?[\d\s\-\(\)]{9,}$/.test(formData.mobileNumber)) {
       newErrors.mobileNumber = "Please enter a valid mobile number";
       valid = false;
     }
@@ -403,6 +628,12 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
   };
 
   const handleUpdateProfile = async () => {
+    if (!isEditing) {
+      setIsEditing(true);
+      return;
+    }
+
+
     if (!validateForm()) return;
 
     setLoading(true);
@@ -419,7 +650,6 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
       
       if (response.status === "success") {
         if (updateUser && typeof updateUser === 'function') {
-          // Update user context with new data
           const updatedProfile = await getCurrentMerchantProfile();
           if (updatedProfile) {
             updateUser({
@@ -430,6 +660,9 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
           }
         }
         
+
+        setOriginalData(formData);
+        setIsEditing(false);
         setShowSuccess(true);
       } else {
         Alert.alert("Error", response.message || "Failed to update profile");
@@ -444,27 +677,49 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
 
   const handleChange = (field, value) => {
     setFormData({ ...formData, [field]: value });
+    
     if (errors[field]) {
       setErrors({ ...errors, [field]: "" });
     }
 
-    // Reset dependent fields when country or province changes
+
     if (field === 'country') {
       setFormData(prev => ({
         ...prev,
         province: "",
         district: ""
       }));
+      setSelectedProvince(null);
+      setSelectedDistrict(null);
     } else if (field === 'province') {
       setFormData(prev => ({
         ...prev,
         district: ""
       }));
+      setSelectedDistrict(null);
     }
   };
 
+
+  const handleCountrySelect = (country) => {
+    setSelectedCountry(country);
+    handleChange("country", country.id.toString());
+  };
+
+
+  const handleProvinceSelect = (province) => {
+    setSelectedProvince(province);
+    handleChange("province", province.id.toString());
+  };
+
+
+  const handleDistrictSelect = (district) => {
+    setSelectedDistrict(district);
+    handleChange("district", district.id.toString());
+  };
+
   const getOptionDisplayName = (item, nameField = "countryName") => {
-    if (!item) return "Select";
+    if (!item) return "";
     
     const nameObj = item[nameField];
     if (typeof nameObj === 'object') {
@@ -494,7 +749,7 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
           ]}
         >
           <View style={ProfileStyles.pickerHeader}>
-            <Text style={ProfileStyles.pickerTitle}>Choose Profile Photo</Text>
+            <Text style={ProfileStyles.pickerTitle}>{t('chooseProfilePhoto')}</Text>
             <TouchableOpacity 
               onPress={() => setShowImagePicker(false)}
               style={ProfileStyles.closeButton}
@@ -511,7 +766,7 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
               <View style={[ProfileStyles.optionIcon, { backgroundColor: '#007AFF' }]}>
                 <Ionicons name="camera" size={24} color="#fff" />
               </View>
-              <Text style={ProfileStyles.optionText}>Take Photo</Text>
+              <Text style={ProfileStyles.optionText}>{t('takePhoto')}</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
@@ -521,7 +776,7 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
               <View style={[ProfileStyles.optionIcon, { backgroundColor: '#34C759' }]}>
                 <Ionicons name="images" size={24} color="#fff" />
               </View>
-              <Text style={ProfileStyles.optionText}>Choose from Gallery</Text>
+              <Text style={ProfileStyles.optionText}>{t('chooseFromGallery')}</Text>
             </TouchableOpacity>
             
             {avatar && (
@@ -532,7 +787,7 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
                 <View style={[ProfileStyles.optionIcon, { backgroundColor: '#FF3B30' }]}>
                   <Ionicons name="trash" size={24} color="#fff" />
                 </View>
-                <Text style={ProfileStyles.optionText}>Remove Photo</Text>
+                <Text style={ProfileStyles.optionText}>{t('removePhoto')}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -559,8 +814,8 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
           <View style={ProfileStyles.successIcon}>
             <Ionicons name="checkmark-done" size={48} color="#fff" />
           </View>
-          <Text style={ProfileStyles.successTitle}>Success!</Text>
-          <Text style={ProfileStyles.successMessage}>Your profile has been updated successfully</Text>
+          <Text style={ProfileStyles.successTitle}>{t('success!')}</Text>
+          <Text style={ProfileStyles.successMessage}>{t('profileUpdateSuccess')}</Text>
         </Animated.View>
       </View>
     </Modal>
@@ -595,10 +850,14 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
               </View>
             )}
             <TouchableOpacity 
-              style={ProfileStyles.editBtn} 
-              onPress={() => setShowImagePicker(true)}
+              style={[
+                ProfileStyles.editBtn,
+                !isEditing && ProfileStyles.editBtnDisabled
+              ]} 
+              onPress={() => isEditing && setShowImagePicker(true)}
+              disabled={!isEditing}
             >
-              <Ionicons name="camera" size={16} color="#000" />
+              <Ionicons name="camera" size={16} color={isEditing ? "#000" : "#999"} />
             </TouchableOpacity>
           </View>
         </View>
@@ -606,25 +865,30 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
 
       <View style={ProfileStyles.formContainer}>
         <ScrollView style={ProfileStyles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={ProfileStyles.scrollContent}>
-          <Text style={ProfileStyles.sectionTitle}>Personal Information</Text>
+          <Text style={ProfileStyles.sectionTitle}>{t('personalInformation')}</Text>
           
           <View style={ProfileStyles.inputGroup}>
-            <Text style={ProfileStyles.label}>Username</Text>
-            <View style={[ProfileStyles.inputContainer, errors.username && ProfileStyles.inputError]}>
+            <Text style={ProfileStyles.label}>{t('userName')}</Text>
+            <View style={[
+              ProfileStyles.inputContainer, 
+              errors.username && ProfileStyles.inputError,
+              !isEditing && ProfileStyles.inputDisabled
+            ]}>
               <Ionicons name="person-outline" size={20} color="#666" style={ProfileStyles.inputIcon} />
               <TextInput
                 style={ProfileStyles.input}
                 placeholder="Enter your username"
                 value={formData.username}
                 onChangeText={(text) => handleChange("username", text)}
+                editable={isEditing}
               />
             </View>
             {errors.username ? <Text style={ProfileStyles.errorText}>{errors.username}</Text> : null}
           </View>
 
           <View style={ProfileStyles.inputGroup}>
-            <Text style={ProfileStyles.label}>Email Address</Text>
-            <View style={ProfileStyles.inputContainer}>
+            <Text style={ProfileStyles.label}>{t('emailAddress')}</Text>
+            <View style={[ProfileStyles.inputContainer, ProfileStyles.inputDisabled]}>
               <Ionicons name="mail-outline" size={20} color="#666" style={ProfileStyles.inputIcon} />
               <TextInput
                 style={[ProfileStyles.input, { color: '#999' }]}
@@ -636,8 +900,12 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
           </View>
 
           <View style={ProfileStyles.inputGroup}>
-            <Text style={ProfileStyles.label}>Mobile Number</Text>
-            <View style={[ProfileStyles.inputContainer, errors.mobileNumber && ProfileStyles.inputError]}>
+            <Text style={ProfileStyles.label}>{t('mobilenumber')}</Text>
+            <View style={[
+              ProfileStyles.inputContainer, 
+              errors.mobileNumber && ProfileStyles.inputError,
+              !isEditing && ProfileStyles.inputDisabled
+            ]}>
               <Ionicons name="call-outline" size={20} color="#666" style={ProfileStyles.inputIcon} />
               <TextInput
                 style={ProfileStyles.input}
@@ -645,14 +913,18 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
                 value={formData.mobileNumber}
                 onChangeText={(text) => handleChange("mobileNumber", text)}
                 keyboardType="phone-pad"
+                editable={isEditing}
               />
             </View>
             {errors.mobileNumber ? <Text style={ProfileStyles.errorText}>{errors.mobileNumber}</Text> : null}
           </View>
 
           <View style={ProfileStyles.inputGroup}>
-            <Text style={ProfileStyles.label}>Alternative Contact</Text>
-            <View style={ProfileStyles.inputContainer}>
+            <Text style={ProfileStyles.label}>{t('alternativeContact')}</Text>
+            <View style={[
+              ProfileStyles.inputContainer,
+              !isEditing && ProfileStyles.inputDisabled
+            ]}>
               <Ionicons name="call-outline" size={20} color="#666" style={ProfileStyles.inputIcon} />
               <TextInput
                 style={ProfileStyles.input}
@@ -660,133 +932,119 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
                 value={formData.alternativeContact}
                 onChangeText={(text) => handleChange("alternativeContact", text)}
                 keyboardType="phone-pad"
+                editable={isEditing}
               />
             </View>
           </View>
 
           <View style={ProfileStyles.inputGroup}>
-            <Text style={ProfileStyles.label}>Message Language</Text>
-            <View style={ProfileStyles.inputContainer}>
+            <Text style={ProfileStyles.label}>{t('messageLanguage')}</Text>
+            <View style={[
+              ProfileStyles.inputContainer,
+              !isEditing && ProfileStyles.inputDisabled
+            ]}>
               <Ionicons name="chatbubble-outline" size={20} color="#666" style={ProfileStyles.inputIcon} />
               <TextInput
                 style={ProfileStyles.input}
                 placeholder="Message language"
                 value={formData.messageLanguage}
                 onChangeText={(text) => handleChange("messageLanguage", text)}
+                editable={isEditing}
               />
             </View>
           </View>
 
-          <Text style={ProfileStyles.sectionTitle}>Address Information</Text>
+          <Text style={ProfileStyles.sectionTitle}>{t('addressInformation')}</Text>
 
           <View style={ProfileStyles.inputGroup}>
-            <Text style={ProfileStyles.label}>Country</Text>
-            <View style={[ProfileStyles.inputContainer, errors.country && ProfileStyles.inputError]}>
-              <Ionicons name="location-outline" size={20} color="#666" style={ProfileStyles.inputIcon} />
-              <View style={ProfileStyles.selectContainer}>
-                <Text style={ProfileStyles.selectValue}>
-                  {formData.country 
-                    ? getOptionDisplayName(countries.find(c => c.id.toString() === formData.country), "countryName")
-                    : "Select Country"
-                  }
-                </Text>
-                <Ionicons name="chevron-down" size={20} color="#666" />
-              </View>
-              <View style={ProfileStyles.dropdownOptions}>
-                {countries.map((country) => (
-                  <TouchableOpacity
-                    key={country.id}
-                    style={ProfileStyles.dropdownOption}
-                    onPress={() => handleChange("country", country.id.toString())}
-                  >
-                    <Text style={ProfileStyles.dropdownOptionText}>
-                      {getOptionDisplayName(country, "countryName")}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+            <Text style={ProfileStyles.label}>{t('country')}</Text>
+            <View style={[
+              ProfileStyles.selectorWrapper, 
+              errors.country && ProfileStyles.inputError,
+              !isEditing && ProfileStyles.selectorDisabled
+            ]}>
+              <BottomSheetSelector
+                title="Select Country"
+                selectedValue={selectedCountry}
+                onSelect={handleCountrySelect}
+                data={countries}
+                loading={loadingCountries}
+                getDisplayName={(item) => getOptionDisplayName(item, "countryName")}
+                placeholder="Select Country"
+                editable={isEditing}
+              />
             </View>
             {errors.country ? <Text style={ProfileStyles.errorText}>{errors.country}</Text> : null}
           </View>
 
           <View style={ProfileStyles.inputGroup}>
-            <Text style={ProfileStyles.label}>Province</Text>
-            <View style={[ProfileStyles.inputContainer, errors.province && ProfileStyles.inputError]}>
-              <Ionicons name="location-outline" size={20} color="#666" style={ProfileStyles.inputIcon} />
-              <View style={ProfileStyles.selectContainer}>
-                <Text style={ProfileStyles.selectValue}>
-                  {formData.province 
-                    ? getOptionDisplayName(provinces.find(p => p.id.toString() === formData.province), "provinceName")
-                    : "Select Province"
-                  }
-                </Text>
-                <Ionicons name="chevron-down" size={20} color="#666" />
-              </View>
-              <View style={ProfileStyles.dropdownOptions}>
-                {provinces.map((province) => (
-                  <TouchableOpacity
-                    key={province.id}
-                    style={ProfileStyles.dropdownOption}
-                    onPress={() => handleChange("province", province.id.toString())}
-                  >
-                    <Text style={ProfileStyles.dropdownOptionText}>
-                      {getOptionDisplayName(province, "provinceName")}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+            <Text style={ProfileStyles.label}>{t('province')}</Text>
+            <View style={[
+              ProfileStyles.selectorWrapper, 
+              errors.province && ProfileStyles.inputError,
+              !isEditing && ProfileStyles.selectorDisabled
+            ]}>
+              <BottomSheetSelector
+                title="Select Province"
+                selectedValue={selectedProvince}
+                onSelect={handleProvinceSelect}
+                data={provinces}
+                loading={loadingProvinces}
+                getDisplayName={(item) => getOptionDisplayName(item, "provinceName")}
+                placeholder="Select Province"
+                editable={isEditing}
+              />
             </View>
             {errors.province ? <Text style={ProfileStyles.errorText}>{errors.province}</Text> : null}
           </View>
 
           <View style={ProfileStyles.inputGroup}>
-            <Text style={ProfileStyles.label}>District</Text>
-            <View style={[ProfileStyles.inputContainer, errors.district && ProfileStyles.inputError]}>
-              <Ionicons name="location-outline" size={20} color="#666" style={ProfileStyles.inputIcon} />
-              <View style={ProfileStyles.selectContainer}>
-                <Text style={ProfileStyles.selectValue}>
-                  {formData.district 
-                    ? getOptionDisplayName(districts.find(d => d.id.toString() === formData.district), "districtName")
-                    : "Select District"
-                  }
-                </Text>
-                <Ionicons name="chevron-down" size={20} color="#666" />
-              </View>
-              <View style={ProfileStyles.dropdownOptions}>
-                {districts.map((district) => (
-                  <TouchableOpacity
-                    key={district.id}
-                    style={ProfileStyles.dropdownOption}
-                    onPress={() => handleChange("district", district.id.toString())}
-                  >
-                    <Text style={ProfileStyles.dropdownOptionText}>
-                      {getOptionDisplayName(district, "districtName")}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+            <Text style={ProfileStyles.label}>{t("district")}</Text>
+            <View style={[
+              ProfileStyles.selectorWrapper, 
+              errors.district && ProfileStyles.inputError,
+              !isEditing && ProfileStyles.selectorDisabled
+            ]}>
+              <BottomSheetSelector
+                title="Select District"
+                selectedValue={selectedDistrict}
+                onSelect={handleDistrictSelect}
+                data={districts}
+                loading={loadingDistricts}
+                getDisplayName={(item) => getOptionDisplayName(item, "districtName")}
+                placeholder="Select District"
+                editable={isEditing}
+              />
             </View>
             {errors.district ? <Text style={ProfileStyles.errorText}>{errors.district}</Text> : null}
           </View>
 
           <View style={ProfileStyles.inputGroup}>
             <Text style={ProfileStyles.label}>Address</Text>
-            <View style={[ProfileStyles.inputContainer, errors.address && ProfileStyles.inputError]}>
+            <View style={[
+              ProfileStyles.inputContainer, 
+              errors.address && ProfileStyles.inputError,
+              !isEditing && ProfileStyles.inputDisabled
+            ]}>
               <Ionicons name="location-outline" size={20} color="#666" style={ProfileStyles.inputIcon} />
               <TextInput
-                style={ProfileStyles.input}
-                placeholder="Enter your address"
+                style={[ProfileStyles.input, { height: 80, textAlignVertical: 'top' }]}
+                placeholder="Enter your complete address"
                 value={formData.address}
                 onChangeText={(text) => handleChange("address", text)}
                 multiline
-                numberOfLines={3}
+                numberOfLines={4}
+                editable={isEditing}
               />
             </View>
             {errors.address ? <Text style={ProfileStyles.errorText}>{errors.address}</Text> : null}
           </View>
 
           <TouchableOpacity 
-            style={[ProfileStyles.updateButton, loading && ProfileStyles.updateButtonDisabled]} 
+            style={[
+              ProfileStyles.updateButton, 
+              loading && ProfileStyles.updateButtonDisabled,
+            ]} 
             onPress={handleUpdateProfile}
             disabled={loading}
           >
@@ -794,8 +1052,10 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
               <ActivityIndicator color="#fff" />
             ) : (
               <>
-                <Ionicons name="checkmark-circle" size={20} color="#fff" />
-                <Text style={ProfileStyles.updateButtonText}>Update Profile</Text>
+                <Ionicons name={isEditing ? "save" : "create"} size={20} color="#fff" />
+                <Text style={ProfileStyles.updateButtonText}>
+                  {isEditing ? "Save Changes" : "Update Profile"}
+                </Text>
               </>
             )}
           </TouchableOpacity>
