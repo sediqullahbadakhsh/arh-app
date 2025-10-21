@@ -102,12 +102,12 @@ export default function CountrySelectScreen({ navigation }) {
             },
           ]}
         >
-          <Text style={styles.title}>Welcome</Text>
+          <Text style={styles.title}>{t("welcome")}</Text>
 
 
           <View style={styles.selectBox}>
             <Text style={styles.selectLabel}>
-              {selected ? selected.name : "Select your country"}
+              {selected ? selected.name : t("selectYourCountry")}
             </Text>
             <Ionicons name="chevron-down" size={18} color="#fff" />
           </View>
@@ -142,7 +142,7 @@ export default function CountrySelectScreen({ navigation }) {
               end={{ x: 1, y: 1 }}
               style={[styles.cta, !selected && { opacity: 0.5 }]}
             >
-              <Text style={styles.ctaText}>Continue</Text>
+              <Text style={styles.ctaText}>{t("continue")}</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>

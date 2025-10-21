@@ -3,14 +3,25 @@ import { useSocket } from '../context/SocketContext';
 import { useAuth } from '../auth/AuthProvider';
 
 export const useNotifications = () => {
-  const { socket, isConnected, notifications, unreadCount, markAsRead, markAllAsRead, getNotifications } = useSocket();
+  const { 
+    socket, 
+    isConnected, 
+    notifications, 
+    unreadCount, 
+    markAsRead, 
+    markAllAsRead, 
+    deleteNotification,
+    getNotifications,
+    refreshNotifications: socketRefreshNotifications
+  } = useSocket();
+  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const { user } = useAuth();
 
   const loadNotifications = async () => {
-    if (!isConnected || !user?.id) {
-      setError('Not connected to server or user not available');
+    if (!user?.id) {
+      setError('User not available');
       return;
     }
 
@@ -18,9 +29,14 @@ export const useNotifications = () => {
     setError(null);
     
     try {
-
       console.log('📋 Loading notifications for user:', user.id);
-      getNotifications();
+      
+      if (isConnected) {
+        getNotifications();
+      } else {
+        console.log('📱 Offline - loading notifications from local storage');
+        await socketRefreshNotifications();
+      }
     } catch (err) {
       setError('Failed to load notifications');
       console.error('Error loading notifications:', err);
@@ -30,13 +46,12 @@ export const useNotifications = () => {
   };
 
   const handleMarkAsRead = async (notificationId) => {
-    if (!isConnected) {
-      setError('Not connected to server');
-      return false;
-    }
-
     try {
-      markAsRead(notificationId);
+      const success = await markAsRead(notificationId);
+      if (!success) {
+        setError('Failed to mark notification as read');
+        return false;
+      }
       return true;
     } catch (err) {
       setError('Failed to mark notification as read');
@@ -46,13 +61,12 @@ export const useNotifications = () => {
   };
 
   const handleMarkAllAsRead = async () => {
-    if (!isConnected) {
-      setError('Not connected to server');
-      return false;
-    }
-
     try {
-      markAllAsRead();
+      const success = await markAllAsRead();
+      if (!success) {
+        setError('Failed to mark all notifications as read');
+        return false;
+      }
       return true;
     } catch (err) {
       setError('Failed to mark all notifications as read');
@@ -61,32 +75,91 @@ export const useNotifications = () => {
     }
   };
 
-  // Format notification for display
+  const handleDeleteNotification = async (notificationId) => {
+    try {
+      const success = await deleteNotification(notificationId);
+      if (!success) {
+        setError('Failed to delete notification');
+        return false;
+      }
+      return true;
+    } catch (err) {
+      setError('Failed to delete notification');
+      console.error('Error deleting notification:', err);
+      return false;
+    }
+  };
+
+  const refreshNotifications = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      await socketRefreshNotifications();
+    } catch (err) {
+      setError('Failed to refresh notifications');
+      console.error('Error refreshing notifications:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
   const formatNotification = (notification) => {
     return {
-      ...notification,
+      id: notification.id,
       title: notification.title?.en || notification.title || 'Notification',
       description: notification.description?.en || notification.description || '',
       isRead: notification.isRead || notification.read || false,
+      createdAt: notification.createdAt || notification.created_at || notification.time,
+      notificationType: notification.notificationType,
+      notiType: notification.notiType,
+      ...notification
     };
   };
 
   const formattedNotifications = notifications.map(formatNotification);
 
+
+  const sortedNotifications = formattedNotifications.sort((a, b) => {
+    const dateA = new Date(a.createdAt || 0);
+    const dateB = new Date(b.createdAt || 0);
+    return dateB - dateA;
+  });
+
   useEffect(() => {
-    if (isConnected && user?.id) {
+    if (user?.id) {
       loadNotifications();
     }
   }, [isConnected, user?.id]);
 
+
+  useEffect(() => {
+    if (isConnected && error) {
+      setError(null);
+    }
+  }, [isConnected]);
+
   return {
-    notifications: formattedNotifications,
+
+    notifications: sortedNotifications,
     unreadCount,
+    
+
     loading,
     error,
+    
+    
+    isConnected,
+    
+
     markAsRead: handleMarkAsRead,
     markAllAsRead: handleMarkAllAsRead,
-    refreshNotifications: loadNotifications,
-    isConnected,
+    deleteNotification: handleDeleteNotification,
+    refreshNotifications,
+    
+ 
+    hasNotifications: sortedNotifications.length > 0,
+    hasUnreadNotifications: unreadCount > 0,
   };
 };

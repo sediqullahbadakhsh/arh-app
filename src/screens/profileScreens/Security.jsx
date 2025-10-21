@@ -3,9 +3,10 @@ import { Colors } from "../../theme/colors";
 import ServiceHeader from "../../components/ServiceHeader";
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, use } from 'react';
 import * as LocalAuthentication from 'expo-local-authentication';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useTranslation } from "react-i18next";
 
 const { width, height } = Dimensions.get('window');
 
@@ -20,6 +21,7 @@ const SecurityScreen = ({ navigation }) => {
     const [fadeAnim] = useState(new Animated.Value(0));
     const [confirmScaleAnim] = useState(new Animated.Value(0));
     const [toggleAnim] = useState(new Animated.Value(0));
+    const { t } = useTranslation();
     
     const goBack = () => navigation.goBack();
 
@@ -249,7 +251,7 @@ const SecurityScreen = ({ navigation }) => {
                             <Ionicons name={modalIcon} size={48} color="#fff" />
                         </View>
                         
-                        <Text style={styles.successTitle}>Success!</Text>
+                        <Text style={styles.successTitle}>{t('success!')}</Text>
                         <Text style={styles.successMessage}>
                             {modalMessage}
                         </Text>
@@ -309,9 +311,9 @@ const SecurityScreen = ({ navigation }) => {
                         
                      
                         <View style={styles.confirmContent}>
-                            <Text style={styles.confirmTitle}>Disable Biometric Authentication?</Text>
+                            <Text style={styles.confirmTitle}>{t('disableBiometricAuth')}</Text>
                             <Text style={styles.confirmMessage}>
-                                You'll need to use your password to log in. You can always re-enable biometric authentication later.
+                           {t("you'llNeedPassword")}
                             </Text>
                         </View>
                         
@@ -322,7 +324,7 @@ const SecurityScreen = ({ navigation }) => {
                                 onPress={hideConfirmModal}
                                 activeOpacity={0.8}
                             >
-                                <Text style={[styles.confirmButtonText, styles.cancelButtonText]}>Cancel</Text>
+                                <Text style={[styles.confirmButtonText, styles.cancelButtonText]}>{t('cancel')}</Text>
                             </TouchableOpacity>
                             
                             <TouchableOpacity 
@@ -330,7 +332,7 @@ const SecurityScreen = ({ navigation }) => {
                                 onPress={handleConfirm}
                                 activeOpacity={0.8}
                             >
-                                <Text style={[styles.confirmButtonText, styles.disableButtonText]}>Disable</Text>
+                                <Text style={[styles.confirmButtonText, styles.disableButtonText]}>{t("disable")}</Text>
                             </TouchableOpacity>
                         </View>
                     </Animated.View>
@@ -358,17 +360,14 @@ const SecurityScreen = ({ navigation }) => {
                             />
                         </View>
                         <View style={styles.optionText}>
-                            <Text style={styles.optionTitle}>Biometric Authentication</Text>
+                            <Text style={styles.optionTitle}>{t("biometricAuthentication")}</Text>
                             <Text style={styles.optionSubtitle}>
-                                {isBiometricEnabled ? 'Use fingerprint or face ID to log in' : 'Enable for faster, secure access'}
+                                {isBiometricEnabled ? t('useFingerprintFaceID') : Text('enableForFasterAccess')}
                             </Text>
                         </View>
                     </View>
                     <CustomToggle isEnabled={isBiometricEnabled} onToggle={handleBiometricToggle} />
-                </Pressable>
-
-     
-              
+                </Pressable> 
             </View>
 
             <SuccessModal />

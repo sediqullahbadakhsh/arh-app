@@ -1,3 +1,4 @@
+// src/screens/HomeMerchantScreen.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import {
   SafeAreaView,
@@ -24,15 +25,17 @@ import HeaderBackgroundSVG from "../../../assets/top";
 import TopupIcon from '../../../assets/icons/Topup1.png';
 import BundleIcon from '../../../assets/icons/Bundle1.png';
 import GamesIcon from '../../../assets/icons/Games1.png';
-import StockTransferIcon from '../../../assets/icons/StockTransfer.png'; 
-
+import StockTransferIcon from '../../../assets/icons/StockTransfer.png';
+import { useTranslation } from "react-i18next";
 
 export default function HomeMerchantScreen({ navigation }) {
   const { user, setUser } = useUser();
+  const { t, i18n } = useTranslation();
+  
   const [recentTransaction, setRecentTransactions] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [profileImage, setProfileImage] = useState(null);
-  const [userName, setUserName] = useState(user?.username || "Merchant");
+  const [userName, setUserName] = useState(user?.username || t('merchant'));
 
   useEffect(() => {
     const getRecentTransactions = async () => {
@@ -44,12 +47,11 @@ export default function HomeMerchantScreen({ navigation }) {
     getRecentTransactions();
   }, []);
 
-
   useEffect(() => {
     if (user?.profileImg) {
       const fullImageUrl = user.profileImg.startsWith('http') 
         ? user.profileImg 
-        : `http://192.168.0.115:8081/uploads/merchant_pictures/${user.profileImg}`;
+        : `http://3.67.144.22/backend/uploads/merchant_pictures/${user.profileImg}`;
       setProfileImage(fullImageUrl);
     }
   }, [user]);
@@ -58,30 +60,30 @@ export default function HomeMerchantScreen({ navigation }) {
     () => [
       {
         key: "StockTransfer",
-        label: "Stock Transfer",
+        label: t('services.stockTransfer'),
         icon: <Image source={StockTransferIcon} style={{ width: 45, height: 45 }} resizeMode="contain" />,
         onPress: () => navigation.navigate("StockTransfer"),
       },
       {
         key: "MobileTopup",
-        label: "Mobile Top-up",
+        label: t('services.mobileTopup'),
         icon: <Image source={TopupIcon} style={{ width: 45, height: 45 }} resizeMode="contain" />,
         onPress: () => navigation.navigate("Topup"),
       },
       { 
         key: "DataBundle", 
-        label: "Data Bundle", 
+        label: t('services.dataBundle'), 
         icon: <Image source={BundleIcon} style={{ width: 60, height: 60 }} resizeMode="contain" />,
         onPress: () => navigation.navigate("DataMerchant"),
       },
       {
         key: "GameCoins",
-        label: "Game Coins",
+        label: t('services.gameCoins'),
         icon: <Image source={GamesIcon} style={{ width: 60, height: 60 }} resizeMode="contain" />,
         onPress: () => navigation.navigate("GameCoins"),
       },
     ],
-    [navigation]
+    [navigation, t]
   );
 
   const onRefresh = async () => {
@@ -98,6 +100,32 @@ export default function HomeMerchantScreen({ navigation }) {
 
   const goToNotifications = () => navigation.navigate("Notifications");
   const goToProfile = () => navigation.navigate("MerchantProfile");
+
+  const getStatusText = (status) => {
+    switch (status) {
+      case 'completed':
+        return t('status.completed');
+      case 'failed':
+        return t('status.failed');
+      case 'pending':
+        return t('status.pending');
+      default:
+        return capitalizeFirstLetter(status || 'pending');
+    }
+  };
+
+  const getServiceName = (type) => {
+    switch (type) {
+      case 'recharge':
+        return t('services.mobileTopup');
+      case 'data_bundle':
+        return t('services.dataBundle');
+      case 'game_coins':
+        return t('services.gameCoins');
+      default:
+        return t('transaction');
+    }
+  };
 
   const TransactionRow = ({ item }) => (
     <TouchableOpacity
@@ -120,7 +148,7 @@ export default function HomeMerchantScreen({ navigation }) {
         </View>
         <View style={styles.txInfo}>
           <Text style={styles.txTitle}>
-            {capitalizeFirstLetter(item?.type || 'Transaction')}
+            {getServiceName(item?.type)}
           </Text>
           <Text style={styles.txSub}>{formatDateTime(item?.createdAt)}</Text>
           <Text style={styles.txPhone}>{item.receiver ? `(+93) ${item.receiver}` : 'N/A'}</Text>
@@ -144,7 +172,7 @@ export default function HomeMerchantScreen({ navigation }) {
             { color: item.status === 'completed' ? '#4CAF50' : 
                    item.status === 'failed' ? '#F44336' : '#FFC107' }
           ]}>
-            {capitalizeFirstLetter(item?.status || 'Pending')}
+            {getStatusText(item?.status)}
           </Text>
         </View>
       </View>
@@ -154,7 +182,6 @@ export default function HomeMerchantScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" />
-
 
       <View style={styles.header}>
         <View style={styles.svgContainer}>
@@ -183,7 +210,7 @@ export default function HomeMerchantScreen({ navigation }) {
               )}
             </View>
             <View style={styles.userTextContainer}>
-              <Text style={styles.greeting}>Hi,</Text>
+              <Text style={styles.greeting}>{t('greeting.hi')},</Text>
               <Text style={styles.userName} numberOfLines={1}>
                 {userName}
               </Text>
@@ -217,7 +244,6 @@ export default function HomeMerchantScreen({ navigation }) {
           ))}
         </View>
 
-     
         <TouchableOpacity 
           style={styles.promoBanner}
           onPress={() => navigation.navigate("MerchantAnalytics")}
@@ -231,13 +257,13 @@ export default function HomeMerchantScreen({ navigation }) {
           >
             <View style={styles.promoContent}>
               <View style={styles.promoTextContainer}>
-                <Text style={styles.promoTitle}>Business Analytics</Text>
+                <Text style={styles.promoTitle}>{t('analytics.businessAnalytics')}</Text>
                 <Text style={styles.promoSubtitle}>
-                  View your sales performance and customer insights
+                  {t('analytics.viewPerformance')}
                 </Text>
               </View>
               <View style={styles.promoButton}>
-                <Text style={styles.promoButtonText}>View Dashboard</Text>
+                <Text style={styles.promoButtonText}>{t('analytics.viewDashboard')}</Text>
                 <Ionicons name="arrow-forward" size={16} color="#fff" />
               </View>
             </View>
@@ -249,16 +275,16 @@ export default function HomeMerchantScreen({ navigation }) {
 
         <View style={styles.recentContainer}>
           <View style={styles.recentHeader}>
-            <Text style={styles.recentTitle}>Recent Transactions</Text>
+            <Text style={styles.recentTitle}>{t('transactions.recent')}</Text>
             <TouchableOpacity onPress={() => navigation.navigate("MerchantOrders")}>
-              <Text style={styles.seeAll}>See All</Text>
+              <Text style={styles.seeAll}>{t('common.seeAll')}</Text>
             </TouchableOpacity>
           </View>
 
           {recentTransaction.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons name="receipt-outline" size={40} color="#ccc" />
-              <Text style={styles.emptyStateText}>No transactions yet</Text>
+              <Text style={styles.emptyStateText}>{t('transactions.noTransactions')}</Text>
             </View>
           ) : (
             recentTransaction.map((tx) => (
@@ -277,7 +303,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white 
   },
   header: {
-    height: 180,
+    height: 170,
     position: 'relative', 
   },
   svgContainer: {
@@ -350,7 +376,6 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
 
-  // Promotional Banner
   promoBanner: {
     marginHorizontal: 20,
     marginTop: 20,
@@ -409,7 +434,6 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
 
-  // Services
   servicesHeader: { 
     paddingHorizontal: 24, 
     marginBottom: 12, 
@@ -422,25 +446,22 @@ const styles = StyleSheet.create({
   },
   servicesGrid: {
     flexDirection: "row",
-    marginTop: 25,
     flexWrap: "wrap",
-    shadowOffset: {
-      width: 0,
-      height: 0,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
-    borderRadius: 16,
+    // shadowOffset: {
+    //   width: 0,
+    //   height: 0,
+    // },
+    // shadowOpacity: 0.1,
+    // shadowRadius: 6,
+    // elevation: 3,
     marginHorizontal: 20,
-    marginTop: 10,
-    backgroundColor: "#fff",
-    padding: 10,
+    marginTop: 30,
+    // backgroundColor: "#fff",
+    // padding: 10,
     justifyContent: "space-between", 
     marginBottom: 24,
   },
 
-  // Recent Transactions
   recentContainer: {
     backgroundColor: "#fff",
     borderRadius: 16,

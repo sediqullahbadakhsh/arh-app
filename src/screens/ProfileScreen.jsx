@@ -16,14 +16,18 @@ import { Colors } from "../theme/colors";
 import * as ImagePicker from "expo-image-picker";
 import { useAuth } from "../auth/AuthProvider";
 import { getCustomerProfile, updateCustomerProfile } from "../services/authApi";
+import { useTranslation } from "react-i18next";
+import { isRTL } from "../utils/rtl";
+import ValidationModal from "../components/ValidationModal";
 
 export default function ProfileScreen({ navigation }) {
   const { user, logout } = useAuth();
+  const { t } = useTranslation();
   const [avatar, setAvatar] = useState(null);
   const [customerData, setCustomerData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
-
+  const {showModal, modal, hideModal} = useModal();
   const fetchCustomerProfile = async () => {
     try {
       setFetching(true);
@@ -34,13 +38,14 @@ export default function ProfileScreen({ navigation }) {
         if (response.data.profileImg) {
           const fullImageUrl = response.data.profileImg.startsWith('http') 
             ? response.data.profileImg 
-            : `http://192.168.0.115:8081/uploads/customer_pictures/${response.data.profileImg}`;
+            : `http://3.67.144.22/backend/uploads/customer_pictures/${response.data.profileImg}`;
           setAvatar(fullImageUrl);
         }
       }
     } catch (error) {
       console.error("Error fetching customer profile:", error);
-      Alert.alert("Error", "Failed to load profile data");
+      showModal(t('error'), t('errors.loadTransactions'));
+      // Alert.alert(t('error'), t('errors.loadTransactions'));
     } finally {
       setFetching(false);
     }
@@ -54,7 +59,7 @@ export default function ProfileScreen({ navigation }) {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert("Permission required", "Please allow access to your photos to change your profile picture.");
+        Alert.alert(t('error'), t('errors.loadTransactions'));
         return;
       }
 
@@ -71,7 +76,7 @@ export default function ProfileScreen({ navigation }) {
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert("Error", "Failed to open image gallery. Please try again.");
+      Alert.alert(t('error'), t('errors.loadTransactions'));
     }
   };
 
@@ -94,30 +99,30 @@ export default function ProfileScreen({ navigation }) {
 
       const response = await updateCustomerProfile(data);
       if (response.success) {
-        Alert.alert("Success", "Profile picture updated successfully");
+        Alert.alert(t('success'), t('status.succeeded'));
         fetchCustomerProfile();
       } else {
-        Alert.alert("Error", response.message || "Failed to update profile picture");
+        Alert.alert(t('error'), response.message || t('errors.loadTransactions'));
       }
     } catch (error) {
       console.error("Update profile image error:", error);
-      Alert.alert("Error", "An error occurred while updating your profile picture");
+      Alert.alert(t('error'), t('errors.loadTransactions'));
     } finally {
       setLoading(false);
     }
   };
 
   const goProfileDetails = () =>
-    navigation.navigate("profileDetails", { title: "Profile Details" });
+    navigation.navigate("profileDetails", { title: t('profileDetails') });
   const goManageLanguage = () =>
-    navigation.navigate("languageScreen", { title: "Manage Language" });
+    navigation.navigate("languageScreen", { title: t('manageLanguage') });
   const goSecurity = () =>
-    navigation.navigate("securityScreen", { title: "Security" });
-    const goMerchant = () =>
-    navigation.navigate("MerchantApplication", { title: "Apply For Merchant Account" });
-  const goAboutApp = () => navigation.navigate("aboutAppScreen", { title: "About App" });
-  const goContactUs = () => navigation.navigate("contactUsScreen", { title: "Contact Us" });
-  const goAboutUs = () => navigation.navigate("AboutUsScreen", { title: "About Us" });
+    navigation.navigate("securityScreen", { title: t('security') });
+  const goMerchant = () =>
+    navigation.navigate("MerchantApplication", { title: t('applyForMerchant') });
+  const goAboutApp = () => navigation.navigate("aboutAppScreen", { title: t('aboutApp') });
+  const goContactUs = () => navigation.navigate("contactUsScreen", { title: t('contactUs') });
+  const goAboutUs = () => navigation.navigate("AboutUsScreen", { title: t('aboutUs') });
 
   const handleLogout = async () => {
     try {
@@ -133,13 +138,17 @@ export default function ProfileScreen({ navigation }) {
     if (customerData?.username) return customerData.username;
     if (user?.fullName) return user.fullName;
     if (user?.username) return user.username;
-    return "Customer";
+    return t('customer');
   };
-
 
   const SkeletonLoader = () => (
     <SafeAreaView style={styles.safeArea}>
-   
+           <ValidationModal
+              visible={modal.visible}
+              title={modal.title}
+              message={modal.message}
+              onClose={hideModal}
+            />
       <LinearGradient
         colors={["#9F0901", "#E20E02"]}
         start={{ x: 0, y: 0 }}
@@ -158,14 +167,12 @@ export default function ProfileScreen({ navigation }) {
 
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.body}>
-   
           <View style={styles.nameRow}>
             <View style={styles.skeletonName} />
             <View style={styles.skeletonCheckmark} />
           </View>
 
-    
-          <View style={styles.card}>
+          <View style={styles.skeletonCard}>
             {[1, 2, 3, 4, 5, 6, 7].map((item) => (
               <View key={item} style={styles.skeletonRow}>
                 <View style={styles.skeletonRowLeft}>
@@ -212,7 +219,7 @@ export default function ProfileScreen({ navigation }) {
             </View>
           )}
 
-           <View style={styles.nameRow}>
+          <View style={styles.nameRow}>
             <Text style={styles.nameText}>{getUserName()}</Text>
             <Ionicons
               name="checkmark-circle"
@@ -226,105 +233,105 @@ export default function ProfileScreen({ navigation }) {
         <View style={styles.decoration1}></View>
         <View style={styles.decoration2}></View>
       </LinearGradient>
-      <View style={styles.menuWrapper}>
-
       
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={styles.body}>
-          <View style={styles.card}>
-            <ProfileRow
-              icon={
-                <Ionicons
-                  name="person-circle-outline"
-                  size={22}
-                  color={Colors.primary}
-                />
-              }
-              title="Profile"
-              subtitle="View Your Profile and update"
-              onPress={goProfileDetails}
-            />
+      <View style={styles.menuWrapper}>
+        <ScrollView showsVerticalScrollIndicator={false}>
+          <View style={styles.body}>
+            <View style={styles.card}>
+              <ProfileRow
+                icon={
+                  <Ionicons
+                    name="person-circle-outline"
+                    size={22}
+                    color={Colors.primary}
+                  />
+                }
+                title={t('profile')}
+                subtitle={t('services.title')}
+                onPress={goProfileDetails}
+              />
 
-            <ProfileRow
-              icon={
-                <Ionicons
-                  name="globe-outline"
-                  size={22}
-                  color={Colors.primary}
-                />
-              }
-              title="Language"
-              subtitle="Manage your language"
-              onPress={goManageLanguage}
-            />
+              <ProfileRow
+                icon={
+                  <Ionicons
+                    name="globe-outline"
+                    size={22}
+                    color={Colors.primary}
+                  />
+                }
+                title={t('language')}
+                subtitle={t('services.title')}
+                onPress={goManageLanguage}
+              />
 
-            <ProfileRow
-              icon={
-                <Ionicons
-                  name="key-outline"
-                  size={22}
-                  color={Colors.primary}
-                />
-              }
-              title="Security"
-              subtitle="setup your security"
-              onPress={goSecurity}
-            />
-                <ProfileRow
-              icon={
-                <Ionicons
-                  name="key-outline"
-                  size={22}
-                  color={Colors.primary}
-                />
-              }
-              title="Apply for merchant account"
-              subtitle="setup your security"
-              onPress={goMerchant}
-            />
+              <ProfileRow
+                icon={
+                  <Ionicons
+                    name="key-outline"
+                    size={22}
+                    color={Colors.primary}
+                  />
+                }
+                title={t('security')}
+                subtitle={t('services.title')}
+                onPress={goSecurity}
+              />
+              
+              <ProfileRow
+                icon={
+                  <Ionicons
+                    name="business-outline"
+                    size={22}
+                    color={Colors.primary}
+                  />
+                }
+                title={t('applyForMerchant')}
+                subtitle={t('services.title')}
+                onPress={goMerchant}
+              />
 
-            <ProfileRow
-              icon={
-                <Ionicons name="refresh-circle-outline" size={22} color={Colors.primary} />
-              }
-              title="About App"
-              subtitle="Access additional features and informations."
-              onPress={goAboutApp}
-            />
-            
-            <ProfileRow
-              icon={
-                <Ionicons name="headset-outline" size={22} color={Colors.primary} />
-              }
-              title="Contact Us"
-              subtitle="Access additional features and informations."
-              onPress={goContactUs}
-            />
-            
-            <ProfileRow
-              icon={
-                <Ionicons name="information-circle-outline" size={22} color={Colors.primary} />
-              }
-              title="About Us"
-              subtitle="Access additional features and informations."
-              onPress={goAboutUs}
-            />
+              <ProfileRow
+                icon={
+                  <Ionicons name="refresh-circle-outline" size={22} color={Colors.primary} />
+                }
+                title={t('aboutApp')}
+                subtitle={t('services.title')}
+                onPress={goAboutApp}
+              />
+              
+              <ProfileRow
+                icon={
+                  <Ionicons name="headset-outline" size={22} color={Colors.primary} />
+                }
+                title={t('contactUs')}
+                subtitle={t('services.title')}
+                onPress={goContactUs}
+              />
+              
+              <ProfileRow
+                icon={
+                  <Ionicons name="information-circle-outline" size={22} color={Colors.primary} />
+                }
+                title={t('aboutUs')}
+                subtitle={t('services.title')}
+                onPress={goAboutUs}
+              />
 
-            <ProfileRow
-              icon={
-                <Ionicons
-                  name="log-out-outline"
-                  size={22}
-                  color={Colors.primary}
-                />
-              }
-              title="Logout"
-              subtitle="Logout form eWallet"
-              onPress={handleLogout}
-            />
+              <ProfileRow
+                icon={
+                  <Ionicons
+                    name="log-out-outline"
+                    size={22}
+                    color={Colors.primary}
+                  />
+                }
+                title={t('logout')}
+                subtitle={t('services.title')}
+                onPress={handleLogout}
+              />
+            </View>
           </View>
-        </View>
-      </ScrollView>
+        </ScrollView>
       </View>
     </SafeAreaView>
   );
@@ -343,7 +350,7 @@ function ProfileRow({ icon, title, subtitle, onPress }) {
           <Text style={styles.rowSubtitle}>{subtitle}</Text>
         </View>
       </View>
-      <Ionicons name="chevron-forward" size={18} color="#BDBDBD" />
+      <Ionicons name={isRTL ? "chevron-forward" : "chevron-forward"}  size={18} color="#BDBDBD" />
     </TouchableOpacity>
   );
 }
@@ -359,7 +366,7 @@ const styles = StyleSheet.create({
   menuWrapper: {
     flex: 1,
     backgroundColor: Colors.white,
-    marginTop:   100,
+    marginTop: 100,
   },
   header: {
     height: 150,
@@ -391,6 +398,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#000",
     borderWidth: 3,
     borderColor: "#fff",
+    zIndex: 99,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -458,8 +466,13 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "600",
   },
+    skeletonCard: {
+    paddingVertical: 10,
+    marginTop: 50,
+    overflow: "hidden",
+  },
   card: {
-    paddingVertical: 8,
+    paddingVertical: 10,
     overflow: "hidden",
   },
   row: {
@@ -500,7 +513,7 @@ const styles = StyleSheet.create({
     marginTop: 2 
   },
 
-  // Skeleton Styles
+
   skeletonAvatar: {
     backgroundColor: '#E0E0E0',
     borderColor: '#E0E0E0',

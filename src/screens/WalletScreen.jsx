@@ -25,41 +25,12 @@ const { width } = Dimensions.get("window");
 const CARD_WIDTH = width - 48;
 const CARD_MARGIN = 16;
 
-const WALLETS = [
-  { key: "primary", label: "Primary Wallet", balance: 2400 },
-  { key: "commission", label: "Commission Wallet", balance: 240 },
-];
-
-const TX = [
-  {
-    id: "1",
-    title: " to primary wallet",
-    amount: +100000,
-    wallet: "Primary Wallet",
-    date: "Nov 17",
-  },
-  {
-    id: "2",
-    title: "commission wallet",
-    amount: +4000,
-    wallet: "Commission Wallet",
-    date: "Nov 17",
-  },
-  {
-    id: "3",
-    title: "Transfer amount to agent [id]",
-    amount: -105000,
-    wallet: "Primary Wallet",
-    date: "Nov 17",
-  },
-  {
-    id: "4",
-    title: "Transfer amount to agent [id]",
-    amount: -105000,
-    wallet: "Primary Wallet",
-    date: "Nov 17",
-  },
-];
+// Skeleton Loader Component
+const SkeletonLoader = ({ style }) => (
+  <View style={[styles.skeleton, style]}>
+    <View style={styles.skeletonShimmer} />
+  </View>
+);
 
 export default function WalletScreen({ navigation }) {
   const [index, setIndex] = useState(0);
@@ -67,6 +38,8 @@ export default function WalletScreen({ navigation }) {
   const flatRef = useRef(null);
   const [wallets, setWallets] = useState([]);
   const [tx, setTx] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [txLoading, setTxLoading] = useState(true);
   const scrollX = useRef(new Animated.Value(0)).current;
 
   const onViewableItemsChanged = useRef(({ viewableItems }) => {
@@ -81,49 +54,99 @@ export default function WalletScreen({ navigation }) {
   );
 
   useEffect(() => {
-    console.log("💖💖💖💖 before: ");
-    const getStock = async () => {
-      const stockRes = await getStockInOut();
-      console.log("💖💖💖💖: ", stockRes);
+    const fetchData = async () => {
+      setLoading(true);
+      setTxLoading(true);
+      
+      try {
+        const [walletsRes, stockRes] = await Promise.all([
+          getUserWallets(user?.id),
+          getStockInOut()
+        ]);
+
+        // Process wallets data
+        const commissionWallet = {
+          ...walletsRes?.comissionWallet,
+          key: "commission",
+          label: "Commission Wallet",
+        };
+        const primaryWallet = {
+          ...walletsRes?.primaryWallet,
+          key: "primary",
+          label: "Primary Wallet",
+        };
+        const data = [primaryWallet, commissionWallet];
+        setWallets(data);
+
+        // Process transactions data
+        setTx(stockRes?.data || []);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      } finally {
+        setLoading(false);
+        setTxLoading(false);
+      }
     };
 
-    getStock();
-  }, []);
-
-  useEffect(() => {
-    const getWalletsInfo = async () => {
-      const res = await getUserWallets(user?.id);
-      const commissionWallet = {
-        ...res?.comissionWallet,
-        key: "commission",
-        label: "Commission Wallet",
-      };
-      const primaryWallet = {
-        ...res?.primaryWallet,
-        key: "primary",
-        label: "Primary Wallet",
-      };
-      const data = [primaryWallet, commissionWallet];
-
-      setWallets(data);
-    };
-
-    getWalletsInfo();
-  }, []);
-
-  useEffect(() => {
-    console.log("💖💖💖💖 before: ");
-    const getStock = async () => {
-      const stockRes = await getStockInOut();
-      setTx(stockRes?.data);
-      console.log("💖💖💖💖: ", "later");
-    };
-
-    getStock();
-  }, []);
+    fetchData();
+  }, [user?.id]);
 
   const goBack = () => {
     navigation.goBack();
+  };
+
+  // Skeleton for Wallet Card
+  const renderSkeletonCard = ({ item, index }) => {
+    const inputRange = [
+      (index - 1) * (CARD_WIDTH + CARD_MARGIN),
+      index * (CARD_WIDTH + CARD_MARGIN),
+      (index + 1) * (CARD_WIDTH + CARD_MARGIN),
+    ];
+
+    const scale = scrollX.interpolate({
+      inputRange,
+      outputRange: [0.9, 1, 0.9],
+      extrapolate: "clamp",
+    });
+
+    const opacity = scrollX.interpolate({
+      inputRange,
+      outputRange: [0.7, 1, 0.7],
+      extrapolate: "clamp",
+    });
+
+    return (
+      <Animated.View
+        style={[
+          styles.walletCardContainer,
+          {
+            transform: [{ scale }],
+            opacity,
+          },
+        ]}
+      >
+        <View style={styles.skeletonCard}>
+          <View style={styles.cardPattern}>
+            <View style={styles.patternCircle1} />
+            <View style={styles.patternCircle2} />
+          </View>
+
+          <View style={styles.cardHeader}>
+            <View style={styles.balanceSection}>
+              <SkeletonLoader style={styles.skeletonLabel} />
+              <SkeletonLoader style={styles.skeletonBalance} />
+              <SkeletonLoader style={styles.skeletonWalletName} />
+            </View>
+
+            <View style={styles.walletIcon}>
+              <SkeletonLoader style={styles.skeletonIcon} />
+            </View>
+          </View>
+
+          <SkeletonLoader style={styles.skeletonButton} />
+        </View>
+      </Animated.View>
+    );
   };
 
   const renderWalletCard = ({ item, index }) => {
@@ -161,7 +184,7 @@ export default function WalletScreen({ navigation }) {
           end={{ x: 1, y: 1 }}
           style={styles.walletCard}
         >
-          {/* Background Pattern */}
+    
           <View style={styles.cardPattern}>
             <View style={styles.patternCircle1} />
             <View style={styles.patternCircle2} />
@@ -181,7 +204,7 @@ export default function WalletScreen({ navigation }) {
             </View>
           </View>
 
-          {/* "Transfer To Primary" button only for commission wallet */}
+    
           {item.key === "commission" && (
             <TouchableOpacity
               onPress={() =>
@@ -214,6 +237,20 @@ export default function WalletScreen({ navigation }) {
       </Animated.View>
     );
   };
+
+  // Skeleton for Transaction Item
+  const renderSkeletonTransaction = ({ item, index }) => (
+    <View style={styles.txRow}>
+      <View style={styles.txLeft}>
+        <SkeletonLoader style={styles.skeletonTxIcon} />
+        <View style={styles.txInfo}>
+          <SkeletonLoader style={styles.skeletonTxTitle} />
+          <SkeletonLoader style={styles.skeletonTxSub} />
+        </View>
+      </View>
+      <SkeletonLoader style={styles.skeletonTxAmount} />
+    </View>
+  );
 
   const renderTransactionItem = ({ item }) => (
     <View style={styles.txRow}>
@@ -259,15 +296,15 @@ export default function WalletScreen({ navigation }) {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Wallet Cards Carousel */}
+
         <View style={styles.carouselContainer}>
           <Animated.FlatList
             ref={flatRef}
-            data={wallets}
+            data={loading ? [...Array(2)] : wallets}
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
-            keyExtractor={(item) => item.key}
+            keyExtractor={(item, index) => item?.key || `skeleton-${index}`}
             contentContainerStyle={styles.carouselContent}
             snapToInterval={CARD_WIDTH + CARD_MARGIN}
             decelerationRate="fast"
@@ -278,31 +315,43 @@ export default function WalletScreen({ navigation }) {
               { useNativeDriver: true }
             )}
             scrollEventThrottle={16}
-            renderItem={renderWalletCard}
+            renderItem={loading ? renderSkeletonCard : renderWalletCard}
           />
-          
-          {/* Dot Indicators */}
-          <View style={styles.indicatorsContainer}>
-            <DotIndicators total={wallets.length} activeIndex={index} />
-          </View>
+  
+          {!loading && (
+            <View style={styles.indicatorsContainer}>
+              <DotIndicators total={wallets.length} activeIndex={index} />
+            </View>
+          )}
         </View>
 
-        {/* Recent Transactions */}
         <View style={styles.recentContainer}>
           <View style={styles.recentHeader}>
             <Text style={styles.recentTitle}>Recent Transactions</Text>
-            <TouchableOpacity>
-              <Text style={styles.seeAllText}>See All</Text>
-            </TouchableOpacity>
+            {!txLoading && (
+              <TouchableOpacity>
+                <Text style={styles.seeAllText}>See All</Text>
+              </TouchableOpacity>
+            )}
           </View>
           
           <FlatList
-            data={tx}
-            keyExtractor={(item) => item.id}
-            renderItem={renderTransactionItem}
+            data={txLoading ? [...Array(5)] : tx}
+            keyExtractor={(item, index) => item?.id || `skeleton-tx-${index}`}
+            renderItem={txLoading ? renderSkeletonTransaction : renderTransactionItem}
             scrollEnabled={false}
             showsVerticalScrollIndicator={false}
           />
+
+          {!txLoading && tx.length === 0 && (
+            <View style={styles.emptyState}>
+              <Ionicons name="receipt-outline" size={48} color="#CCCCCC" />
+              <Text style={styles.emptyStateText}>No transactions yet</Text>
+              <Text style={styles.emptyStateSubText}>
+                Your transactions will appear here
+              </Text>
+            </View>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -348,6 +397,14 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 20,
     overflow: "hidden",
+  },
+  skeletonCard: {
+    height: 200,
+    borderRadius: 24,
+    padding: 20,
+    overflow: "hidden",
+    backgroundColor: "#F0F0F0",
+    position: "relative",
   },
   cardPattern: {
     position: "absolute",
@@ -448,6 +505,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
+    minHeight: 200,
   },
   recentHeader: {
     flexDirection: "row",
@@ -509,5 +567,86 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700",
     marginLeft: 8,
+  },
+  // Skeleton Styles
+  skeleton: {
+    backgroundColor: "#E0E0E0",
+    borderRadius: 4,
+    overflow: "hidden",
+    position: "relative",
+  },
+  skeletonShimmer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "#F5F5F5",
+  },
+  skeletonLabel: {
+    width: 120,
+    height: 14,
+    marginBottom: 8,
+    borderRadius: 7,
+  },
+  skeletonBalance: {
+    width: 160,
+    height: 32,
+    marginBottom: 12,
+    borderRadius: 8,
+  },
+  skeletonWalletName: {
+    width: 140,
+    height: 16,
+    borderRadius: 8,
+  },
+  skeletonIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+  },
+  skeletonButton: {
+    height: 44,
+    borderRadius: 12,
+    marginTop: 16,
+  },
+  skeletonTxIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
+  },
+  skeletonTxTitle: {
+    width: 180,
+    height: 15,
+    marginBottom: 6,
+    borderRadius: 4,
+  },
+  skeletonTxSub: {
+    width: 140,
+    height: 12,
+    borderRadius: 4,
+  },
+  skeletonTxAmount: {
+    width: 80,
+    height: 15,
+    borderRadius: 4,
+  },
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 40,
+  },
+  emptyStateText: {
+    color: "#666",
+    fontSize: 16,
+    fontWeight: "600",
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  emptyStateSubText: {
+    color: "#999",
+    fontSize: 14,
+    textAlign: "center",
   },
 });

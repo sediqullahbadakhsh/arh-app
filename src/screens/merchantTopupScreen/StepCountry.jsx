@@ -3,13 +3,15 @@ import { Text, TouchableOpacity, View, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../theme/colors";
 import { codeToFlag } from "../../utils/flag";
+import { useTranslation } from "react-i18next";
 
 function StepCountry({ country, onOpen }) {
+  const { t } = useTranslation();
   const [isFocused, setIsFocused] = useState(false);
 
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionTitle}>Select country you want to send</Text>
+      <Text style={styles.sectionTitle}>{t('selectCountryToSend')}</Text>
       <TouchableOpacity
         style={[
           styles.dropField,
@@ -33,7 +35,7 @@ function StepCountry({ country, onOpen }) {
             {codeToFlag(country?.countryCode)}
           </Text>
           <Text style={styles.countryName}>
-            {country?.countryName || "Select country"}
+            {country?.countryName || t('selectCountry')}
           </Text>
         </View>
         <Ionicons name="chevron-down" size={18} color="#7A7A7A" />

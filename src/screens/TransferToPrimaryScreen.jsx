@@ -235,38 +235,7 @@ export default function TransferToPrimaryScreen({ navigation, route }) {
           </View>
 
     
-          <View style={TopUpStyles.quickAmountsContainer}>
-            <Text style={TopUpStyles.quickAmountsTitle}>Quick Amounts</Text>
-            <View style={TopUpStyles.quickAmountsGrid}>
-              {[100, 500, 1000, 2000, 5000, 10000].map((quickAmount) => {
-                if (quickAmount > startBalance) return null;
-                
-                return (
-                  <TouchableOpacity
-                    key={quickAmount}
-                    style={[
-                      TopUpStyles.quickAmountButton,
-                      Number(amount) === quickAmount && TopUpStyles.quickAmountButtonSelected
-                    ]}
-                    onPress={() => setAmount(String(quickAmount))}
-                  >
-                    <Text style={[
-                      TopUpStyles.quickAmountText,
-                      Number(amount) === quickAmount && TopUpStyles.quickAmountTextSelected
-                    ]}>
-                      {quickAmount}
-                    </Text>
-                    <Text style={[
-                      TopUpStyles.quickAmountSubtext,
-                      Number(amount) === quickAmount && TopUpStyles.quickAmountSubtextSelected
-                    ]}>
-                      AFN
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
+
 
     
           <PrimaryButton
@@ -353,6 +322,7 @@ const styles = {
     marginTop: 32,
     backgroundColor: '#F0F9FF',
     borderRadius: 12,
+    marginBottom: 100,
     padding: 16,
     borderWidth: 1,
     borderColor: '#E0F2FE',

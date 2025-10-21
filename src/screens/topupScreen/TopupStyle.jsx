@@ -37,7 +37,9 @@ const TopUpStyles = StyleSheet.create({
     marginBottom: 12,
   },
   editLink: { color: Colors.primary, fontSize: 16, fontWeight: "600" },
-
+  phoneRowRTL: {
+    flexDirection: "row-reverse",
+  },
   phoneRow: {
     flexDirection: "row",
     height: 65,

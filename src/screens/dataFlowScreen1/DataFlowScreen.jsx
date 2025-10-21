@@ -32,6 +32,7 @@ import StepCountry from "./StepCountry";
 import StepNumber from "./StepNumber";
 import StepProducts from "./StepProducts";
 import StepPay from "./StepPay";
+import { useTranslation } from "react-i18next";
 const { height: screenHeight } = Dimensions.get('window');
 const BASE_STEPS = { COUNTRY: 0, NUMBER: 1, PRODUCT: 2, PAY: 3 };
 export default function DataFlowScreenMerchant({ navigation }) {
@@ -54,7 +55,7 @@ export default function DataFlowScreenMerchant({ navigation }) {
   const [category, setCategory] = useState("Data");
   const [product, setProduct] = useState(null);
   const [search, setSearch] = useState("");
-
+  const {t} = useTranslation();  
   const [contactsSlideAnim] = useState(new Animated.Value(screenHeight));
   const [countriesSlideAnim] = useState(new Animated.Value(screenHeight));
   const insets = useSafeAreaInsets();
@@ -267,7 +268,7 @@ export default function DataFlowScreenMerchant({ navigation }) {
           ]}
         >
           <View style={DataStyles.modalHeader}>
-            <Text style={DataStyles.modalTitle}>Select Contact</Text>
+            <Text style={DataStyles.modalTitle}>{t("selectContact")}</Text>
             <TouchableOpacity 
               onPress={() => setContactsModalVisible(false)}
               style={DataStyles.closeButton}
@@ -318,7 +319,7 @@ export default function DataFlowScreenMerchant({ navigation }) {
           ) : (
             <View style={DataStyles.emptyContainer}>
               <Ionicons name="people-outline" size={48} color="#999" />
-              <Text style={DataStyles.emptyText}>No contacts found</Text>
+              <Text style={DataStyles.emptyText}>{t("noContactsFound")}</Text>
             </View>
           )}
         </Animated.View>

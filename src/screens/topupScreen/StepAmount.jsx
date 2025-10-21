@@ -5,6 +5,7 @@ import { Colors } from "../../theme/colors";
 import { TouchableOpacity, View, Text, TextInput } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import PrimaryButton from "../../components/PrimaryButton";
+import { useTranslation } from "react-i18next";
 
 function StepAmount({
   product,
@@ -29,6 +30,7 @@ function StepAmount({
   onContinue,
   canContinue,
 }) {
+  const { t } = useTranslation();
   const [isFocused, setIsFocused] = useState(false);
   
   const rechargeAmounts = [
@@ -40,13 +42,13 @@ function StepAmount({
     { afn: 1000, usd: calculateUsdAmount(1000, exchangeRate, slabPercentage) },
   ];
 
-  // Check if user has entered custom amount
+
   const hasCustomAmount = customAfn && customAfn.trim() !== "";
   
-  // Handle popular amount selection - navigate immediately
+
   const handlePopularAmountSelect = (amount) => {
     onSelectPopularAmount(amount);
-    // Navigate immediately after selecting popular amount
+
     setTimeout(() => {
       if (canContinue) {
         onContinue();
@@ -54,7 +56,7 @@ function StepAmount({
     }, 100);
   };
 
-  // Safe animation value - fallback to 1 if continueButtonAnim is undefined
+
   const safeAnimationValue = continueButtonAnim || new Animated.Value(1);
 
   return (
@@ -71,7 +73,7 @@ function StepAmount({
             TopUpStyles.toggleText,
             serviceType === 'recharge' && TopUpStyles.toggleTextActive
           ]}>
-            Recharge
+            {t('recharge')}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -85,16 +87,16 @@ function StepAmount({
             TopUpStyles.toggleText,
             serviceType === 'bundle' && TopUpStyles.toggleTextActive
           ]}>
-            Bundle
+            {t('bundle')}
           </Text>
         </TouchableOpacity>
       </View>
 
       {serviceType === 'recharge' ? (
         <>
-          <Text style={TopUpStyles.sectionTitle}>Enter Amount</Text>
+          <Text style={TopUpStyles.sectionTitle}>{t('enterAmount')}</Text>
           
-          {/* Custom Amount Input */}
+   
           <View style={[
             TopUpStyles.customRow,
             {
@@ -138,20 +140,20 @@ function StepAmount({
             </TouchableOpacity>
           </View>
 
-          {/* Show Continue Button when custom amount is entered */}
+   
           {hasCustomAmount && canContinue && (
             <View style={{ marginTop: 24 }}>
               <PrimaryButton
-                label="Continue"
+                label={t('continue')}
                 onPress={onContinue}
               />
             </View>
           )}
 
-          {/* Show Popular Amounts only when no custom amount is entered */}
+      
           {showPopularAmounts && !hasCustomAmount && (
             <View style={TopUpStyles.quickAmountsContainer}>
-              <Text style={TopUpStyles.quickAmountsTitle}>Popular amounts</Text>
+              <Text style={TopUpStyles.quickAmountsTitle}>{t('popularAmounts')}</Text>
               <View style={TopUpStyles.quickAmountsList}>
                 {rechargeAmounts.map((amount) => {
                   const isSelected = afn === amount.afn;
@@ -190,7 +192,7 @@ function StepAmount({
           {showContinueButton && !hasCustomAmount && canContinue && (
             <View style={{ marginTop: 24 }}>
               <PrimaryButton
-                label="Continue"
+                label={t('continue')}
                 onPress={onContinue}
               />
             </View>
@@ -199,9 +201,9 @@ function StepAmount({
       ) : (
         <View style={TopUpStyles.comingSoonContainer}>
           <Ionicons name="time-outline" size={64} color={Colors.primary} />
-          <Text style={TopUpStyles.comingSoonTitle}>Coming Soon</Text>
+          <Text style={TopUpStyles.comingSoonTitle}>{t('comingSoon')}</Text>
           <Text style={TopUpStyles.comingSoonText}>
-            Bundle packages will be available soon. Stay tuned for exciting data and call bundles!
+            {t('bundleComingSoon')}
           </Text>
         </View>
       )}

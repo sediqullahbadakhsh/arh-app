@@ -15,6 +15,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../theme/colors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { t } from "i18next";
 
 const { height: screenHeight } = Dimensions.get('window');
 
@@ -97,7 +98,7 @@ export default function LanguageSelector({ selectedLang, onChange, langs, loadin
               </View>
             </>
           ) : (
-            <Text style={{ color: "#6B7280", fontSize: 16 }}>Select language...</Text>
+            <Text style={{ color: "#6B7280", fontSize: 16 }}>{t('selectLanguage')}</Text>
           )}
         </View>
         
@@ -132,7 +133,7 @@ export default function LanguageSelector({ selectedLang, onChange, langs, loadin
             ]}
           >
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Language</Text>
+              <Text style={styles.modalTitle}>{t('selectLanguage1')}</Text>
               <TouchableOpacity 
                 onPress={() => setIsOpen(false)}
                 style={styles.closeButton}

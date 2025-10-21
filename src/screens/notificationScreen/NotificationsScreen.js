@@ -18,10 +18,12 @@ import SettingModal from './Components/SettingModal';
 import DetailModal from './Components/DetailModal';
 import NotificationsHeader from './Components/NotificationsHeader';
 import { useNotifications } from '../../hooks/useNotifications';
+import { useTranslation } from 'react-i18next';
 
 const { width } = Dimensions.get('window');
 
 const NotificationsScreen = () => {
+  const { t } = useTranslation();
   const [refreshing, setRefreshing] = useState(false);
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
   const [selectedNotification, setSelectedNotification] = useState(null);
@@ -29,7 +31,7 @@ const NotificationsScreen = () => {
   
   const navigation = useNavigation();
   
-  // Use the real notifications hook
+
   const {
     notifications,
     unreadCount,
@@ -38,7 +40,10 @@ const NotificationsScreen = () => {
     markAsRead,
     markAllAsRead,
     refreshNotifications,
-    isConnected
+    deleteNotification,
+    isConnected,
+    hasNotifications,
+    hasUnreadNotifications
   } = useNotifications();
 
   const goBack = () => {
@@ -54,55 +59,97 @@ const NotificationsScreen = () => {
   const handleNotificationPress = async (notification) => {
     setSelectedNotification(notification);
     setDetailModalVisible(true);
-    
-    // Mark as read if not already read
+
     if (!notification.isRead) {
       await markAsRead(notification.id);
     }
   };
 
   const handleMarkAllAsRead = async () => {
-    const success = await markAllAsRead();
-    if (success) {
-      Alert.alert('Success', 'All notifications marked as read');
-    } else {
-      Alert.alert('Error', 'Failed to mark all notifications as read');
+    if (!hasUnreadNotifications) {
+      Alert.alert(t('info'), t('allNotificationsRead'));
+      return;
     }
-  };
 
-  const handleDeleteNotification = (notification, event) => {
-    event.stopPropagation();
     Alert.alert(
-      'Delete Notification',
-      'Are you sure you want to delete this notification?',
+      t('markAllAsRead'),
+      t('markAllAsReadConfirm'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('cancel'), style: 'cancel' },
         { 
-          text: 'Delete', 
-          style: 'destructive',
-          onPress: () => {
-            console.log('Delete notification:', notification.id);
-            Alert.alert('Info', 'Delete functionality to be implemented');
+          text: t('markAsRead'), 
+          style: 'default',
+          onPress: async () => {
+            const success = await markAllAsRead();
+            if (success) {
+              Alert.alert(t('success'), t('allNotificationsMarkedRead'));
+            } else {
+              Alert.alert(t('error'), t('failedToMarkAllRead'));
+            }
           }
         }
       ]
     );
   };
 
-  // Safe function to get notification type name
+  const handleDeleteNotification = async (notification, event) => {
+    event.stopPropagation();
+    Alert.alert(
+      t('deleteNotification'),
+      t('deleteNotificationConfirm'),
+      [
+        { text: t('cancel'), style: 'cancel' },
+        { 
+          text: t('delete'), 
+          style: 'destructive',
+          onPress: async () => {
+            const success = await deleteNotification(notification.id);
+            if (success) {
+              console.log('Notification deleted successfully:', notification.id);
+              // Show success message if needed
+              // Alert.alert(t('success'), t('notificationDeleted'));
+            } else {
+              Alert.alert(t('error'), t('failedToDeleteNotification'));
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleDeleteAllNotifications = () => {
+    if (!hasNotifications) {
+      Alert.alert(t('info'), t('noNotificationsToDelete'));
+      return;
+    }
+
+    Alert.alert(
+      t('deleteAllNotifications'),
+      t('deleteAllNotificationsConfirm'),
+      [
+        { text: t('cancel'), style: 'cancel' },
+        { 
+          text: t('deleteAll'), 
+          style: 'destructive',
+          onPress: () => {
+            // This would need to be implemented in the SocketProvider
+            Alert.alert(t('info'), t('deleteAllFunctionalityComing'));
+          }
+        }
+      ]
+    );
+  };
+
   const getNotificationTypeName = (notification) => {
     try {
       const notiType = notification.notificationType?.name;
-      
-      // Handle both string and object formats
+
       if (typeof notiType === 'string') {
         return notiType.toLowerCase();
       } else if (typeof notiType === 'object' && notiType !== null) {
-        // Get English name from multi-language object
         return (notiType.en || notiType.ar || 'system').toLowerCase();
       }
       
-      // Fallback to notiType field or default
       return (notification.notiType || 'system').toString().toLowerCase();
     } catch (error) {
       console.log('Error getting notification type:', error);
@@ -110,7 +157,6 @@ const NotificationsScreen = () => {
     }
   };
 
-  // Map notiType to icons and colors
   const getNotificationIcon = (notification) => {
     const notiType = getNotificationTypeName(notification);
 
@@ -159,7 +205,7 @@ const NotificationsScreen = () => {
   };
 
   const formatTime = (timeString) => {
-    if (!timeString) return 'Recently';
+    if (!timeString) return t('recently');
     
     try {
       const time = new Date(timeString);
@@ -169,14 +215,14 @@ const NotificationsScreen = () => {
       const diffHours = Math.floor(diffMs / 3600000);
       const diffDays = Math.floor(diffMs / 86400000);
 
-      if (diffMins < 1) return 'Just now';
-      if (diffMins < 60) return `${diffMins}m ago`;
-      if (diffHours < 24) return `${diffHours}h ago`;
-      if (diffDays < 7) return `${diffDays}d ago`;
+      if (diffMins < 1) return t('justNow');
+      if (diffMins < 60) return t('minutesAgo', { count: diffMins });
+      if (diffHours < 24) return t('hoursAgo', { count: diffHours });
+      if (diffDays < 7) return t('daysAgo', { count: diffDays });
       
       return time.toLocaleDateString();
     } catch (error) {
-      return 'Recently';
+      return t('recently');
     }
   };
 
@@ -185,9 +231,9 @@ const NotificationsScreen = () => {
       if (typeof notification.title === 'string') {
         return notification.title;
       }
-      return notification.title?.en || notification.title || 'Notification';
+      return notification.title?.en || notification.title || t('notification');
     } catch (error) {
-      return 'Notification';
+      return t('notification');
     }
   };
 
@@ -202,15 +248,20 @@ const NotificationsScreen = () => {
     }
   };
 
-  const renderNotificationItem = ({ item }) => {
+  const renderNotificationItem = ({ item, index }) => {
     const icon = getNotificationIcon(item);
     const title = getNotificationTitle(item);
     const description = getNotificationDescription(item);
     
     return (
       <TouchableOpacity 
-        style={[notificationStyles.notificationItem, !item.isRead && notificationStyles.unreadItem]}
+        style={[
+          notificationStyles.notificationItem, 
+          !item.isRead && notificationStyles.unreadItem,
+          index === 0 && notificationStyles.firstItem
+        ]}
         onPress={() => handleNotificationPress(item)}
+        activeOpacity={0.7}
       >
         <View style={notificationStyles.notificationContent}>
           <View style={[notificationStyles.iconContainer, { backgroundColor: `${icon.color}15` }]}>
@@ -218,23 +269,37 @@ const NotificationsScreen = () => {
           </View>
           
           <View style={notificationStyles.notificationText}>
-            <Text style={notificationStyles.notificationTitle}>{title}</Text>
-            <Text style={notificationStyles.notificationMessage} numberOfLines={2}>
-              {description}
+            <Text style={[
+              notificationStyles.notificationTitle,
+              !item.isRead && notificationStyles.unreadTitle
+            ]}>
+              {title}
             </Text>
+            {description ? (
+              <Text style={notificationStyles.notificationMessage} numberOfLines={2}>
+                {description}
+              </Text>
+            ) : null}
             <Text style={notificationStyles.notificationTime}>
-              {formatTime(item.createdAt || item.created_at || item.time)}
+              {formatTime(item.createdAt)}
             </Text>
           </View>
           
-          {!item.isRead && <View style={notificationStyles.unreadDot} />}
-          
-          <TouchableOpacity 
-            style={notificationStyles.deleteButton}
-            onPress={(e) => handleDeleteNotification(item, e)}
-          >
-            <Ionicons name="close" size={20} color="#999" />
-          </TouchableOpacity>
+          <View style={notificationStyles.notificationActions}>
+            {!item.isRead && (
+              <View style={notificationStyles.unreadIndicator}>
+                <View style={notificationStyles.unreadDot} />
+              </View>
+            )}
+            
+            <TouchableOpacity 
+              style={notificationStyles.deleteButton}
+              onPress={(e) => handleDeleteNotification(item, e)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="close" size={18} color="#999" />
+            </TouchableOpacity>
+          </View>
         </View>
       </TouchableOpacity>
     );
@@ -243,16 +308,19 @@ const NotificationsScreen = () => {
   const renderEmptyState = () => (
     <View style={notificationStyles.emptyState}>
       <Ionicons name="notifications-off-outline" size={64} color="#ccc" />
-      <Text style={notificationStyles.emptyStateText}>No notifications</Text>
+      <Text style={notificationStyles.emptyStateText}>{t('noNotifications')}</Text>
       <Text style={notificationStyles.emptyStateSubText}>
         {isConnected 
-          ? "You're all caught up! New notifications will appear here."
-          : "Connect to the internet to receive notifications."
+          ? t('allCaughtUp')
+          : t('connectForNotifications')
         }
       </Text>
       {!isConnected && (
-        <TouchableOpacity style={notificationStyles.retryButton} onPress={refreshNotifications}>
-          <Text style={notificationStyles.retryButtonText}>Retry Connection</Text>
+        <TouchableOpacity 
+          style={notificationStyles.retryButton} 
+          onPress={refreshNotifications}
+        >
+          <Text style={notificationStyles.retryButtonText}>{t('retryConnection')}</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -261,39 +329,60 @@ const NotificationsScreen = () => {
   const renderErrorState = () => (
     <View style={notificationStyles.errorState}>
       <Ionicons name="alert-circle-outline" size={64} color="#f44336" />
-      <Text style={notificationStyles.errorStateText}>Failed to load notifications</Text>
-      <Text style={notificationStyles.errorStateSubText}>{error}</Text>
-      <TouchableOpacity style={notificationStyles.retryButton} onPress={refreshNotifications}>
-        <Text style={notificationStyles.retryButtonText}>Try Again</Text>
+      <Text style={notificationStyles.errorStateText}>{t('failedToLoadNotifications')}</Text>
+      <Text style={notificationStyles.errorStateSubText}>
+        {error || t('checkConnectionAndTryAgain')}
+      </Text>
+      <TouchableOpacity 
+        style={notificationStyles.retryButton} 
+        onPress={refreshNotifications}
+      >
+        <Text style={notificationStyles.retryButtonText}>{t('tryAgain')}</Text>
       </TouchableOpacity>
+    </View>
+  );
+
+  const renderLoadingState = () => (
+    <View style={notificationStyles.loadingContainer}>
+      <Ionicons name="notifications-outline" size={48} color={Colors.primary} />
+      <Text style={notificationStyles.loadingText}>{t('loadingNotifications')}</Text>
     </View>
   );
 
   const handleNotificationAction = (notification) => {
     setDetailModalVisible(false);
     
-    // You can add navigation logic based on notification type or content
     const notiType = getNotificationTypeName(notification);
     
     switch (notiType) {
       case 'transaction':
       case 'payment':
+      case 'transaction_success':
         navigation.navigate('TransactionHistory');
         break;
       case 'promotion':
+      case 'promotional':
       case 'offer':
         navigation.navigate('Promotions');
         break;
+      case 'security':
       case 'security_alert':
+      case 'login_alert':
         navigation.navigate('Security');
         break;
       case 'low_balance':
+      case 'warning':
         navigation.navigate('Topup');
         break;
       default:
-        // Default action or no action
+  
+        console.log('No specific action for notification type:', notiType);
         break;
     }
+  };
+
+  const handleSettingsPress = () => {
+    setSettingsModalVisible(true);
   };
 
   return (
@@ -301,50 +390,67 @@ const NotificationsScreen = () => {
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
       
       <NotificationsHeader 
-        title="Notifications" 
+        title={t('notifications')} 
         onBack={goBack} 
-        onOpenModal={() => setSettingsModalVisible(true)} 
+        onOpenModal={handleSettingsPress} 
+        unreadCount={unreadCount}
+        onMarkAllAsRead={handleMarkAllAsRead}
+        hasUnreadNotifications={hasUnreadNotifications}
       />
       
-      {/* Connection Status Indicator */}
+   
       {!isConnected && (
         <View style={notificationStyles.connectionStatus}>
           <Ionicons name="cloud-offline" size={16} color="#fff" />
-          <Text style={notificationStyles.connectionStatusText}>Offline</Text>
+          <Text style={notificationStyles.connectionStatusText}>{t('offline')}</Text>
+          <Text style={notificationStyles.connectionStatusSubText}>
+            {t('showingCachedNotifications')}
+          </Text>
         </View>
       )}
 
-      {error ? (
-        renderErrorState()
-      ) : (
+
+      {error && !loading && renderErrorState()}
+
+
+      {loading && !refreshing && renderLoadingState()}
+
+
+      {!error && !loading && (
         <FlatList
           data={notifications}
           renderItem={renderNotificationItem}
-          keyExtractor={(item) => item.id?.toString()}
+          keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
           refreshControl={
             <RefreshControl 
-              refreshing={refreshing || loading} 
+              refreshing={refreshing} 
               onRefresh={onRefresh} 
               colors={[Colors.primary]}
+              tintColor={Colors.primary}
             />
           }
           ListEmptyComponent={!loading ? renderEmptyState() : null}
-          contentContainerStyle={notifications.length === 0 ? notificationStyles.emptyList : notificationStyles.listContainer}
+          contentContainerStyle={
+            notifications.length === 0 
+              ? notificationStyles.emptyList 
+              : notificationStyles.listContainer
+          }
           showsVerticalScrollIndicator={false}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={5}
         />
       )}
 
-      {loading && !refreshing && (
-        <View style={notificationStyles.loadingContainer}>
-          <Text>Loading notifications...</Text>
-        </View>
-      )}
 
       <SettingModal 
         visible={settingsModalVisible} 
-        onRequestClose={() => setSettingsModalVisible(false)} 
+        onRequestClose={() => setSettingsModalVisible(false)}
+        onDeleteAll={handleDeleteAllNotifications}
+        hasNotifications={hasNotifications}
       />
      
+
       <DetailModal
         visible={detailModalVisible}
         onRequestClose={() => setDetailModalVisible(false)}
@@ -355,6 +461,7 @@ const NotificationsScreen = () => {
         getNotificationDescription={getNotificationDescription}
         formatTime={formatTime}
         getNotificationTypeName={getNotificationTypeName}
+        onMarkAsRead={markAsRead}
       />
     </SafeAreaView>
   );

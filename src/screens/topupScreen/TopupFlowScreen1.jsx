@@ -31,6 +31,7 @@ import StepAmount from "./StepAmount";
 import StepPay from "./StepPay";
 import TopUpStyles from "./TopupStyle";
 import formatLocal from "../../utils/formatLocal";
+import { useTranslation } from "react-i18next";
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 const BASE_STEPS = { COUNTRY: 0, NUMBER: 1, AMOUNT: 2, PAY: 3 };
@@ -74,15 +75,16 @@ const ProgressBar = ({ duration = 2000, onComplete, color = Colors.primary }) =>
 const ProgressModal = ({
   visible = false,
   onCancel,
-  title = "Processing",
-  message = "Please wait...",
+  title = "processingPayment",
+  message = "processingPaymentMessage",
   duration = 3000,
   progressColor = Colors.primary,
   icon = "sync-outline",
   iconColor = Colors.primary,
   onComplete,
-  cancelText = "Cancel"
+  cancelText = "cancel"
 }) => {
+  const { t } = useTranslation();
   const spinValue = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -116,8 +118,8 @@ const ProgressModal = ({
             <Animated.View style={{ transform: [{ rotate: spin }] }}>
               <Ionicons name={icon} size={52} color={iconColor} />
             </Animated.View>
-            <Text style={progressStyles.progressTitle}>{title}</Text>
-            <Text style={progressStyles.progressText}>{message}</Text>
+            <Text style={progressStyles.progressTitle}>{t(title)}</Text>
+            <Text style={progressStyles.progressText}>{t(message)}</Text>
             
             <ProgressBar 
               duration={duration} 
@@ -130,7 +132,7 @@ const ProgressModal = ({
                 style={progressStyles.cancelButton}
                 onPress={onCancel}
               >
-                <Text style={progressStyles.cancelButtonText}>{cancelText}</Text>
+                <Text style={progressStyles.cancelButtonText}>{t(cancelText)}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -145,12 +147,13 @@ const SuccessModal = ({
   visible = false,
   onClose,
   onShare,
-  title = "Success!",
-  subtitle = "Operation completed successfully",
+  title = "topupSuccessful",
+  subtitle = "topupSuccessfulMessage",
   details = [],
-  primaryButtonText = "Continue",
-  shareButtonText = "Share Receipt",
+  primaryButtonText = "done",
+  shareButtonText = "shareReceipt",
 }) => {
+  const { t } = useTranslation();
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -227,8 +230,8 @@ const SuccessModal = ({
               </View>
             </View>
             
-            <Text style={successStyles.successTitle}>{title}</Text>
-            <Text style={successStyles.successSubtitle}>{subtitle}</Text>
+            <Text style={successStyles.successTitle}>{t(title)}</Text>
+            <Text style={successStyles.successSubtitle}>{t(subtitle)}</Text>
             
             {details.length > 0 && (
               <View style={successStyles.successDetails}>
@@ -236,7 +239,7 @@ const SuccessModal = ({
                   <View key={index} style={successStyles.detailRow}>
                     {renderDetailIcon(detail.type)}
                     <View style={successStyles.detailTextContainer}>
-                      <Text style={successStyles.detailLabel}>{detail.label}</Text>
+                      <Text style={successStyles.detailLabel}>{t(detail.label)}</Text>
                       <Text style={successStyles.detailValue}>{detail.value}</Text>
                     </View>
                   </View>
@@ -251,12 +254,12 @@ const SuccessModal = ({
                   onPress={onShare}
                 >
                   <Ionicons name="share-outline" size={20} color={Colors.primary} />
-                  <Text style={successStyles.shareButtonText}>{shareButtonText}</Text>
+                  <Text style={successStyles.shareButtonText}>{t(shareButtonText)}</Text>
                 </TouchableOpacity>
               )}
               
               <PrimaryButton
-                label={primaryButtonText}
+                label={t(primaryButtonText)}
                 onPress={onClose}
                 style={{ 
                   flex: onShare ? 1 : undefined, 
@@ -277,12 +280,13 @@ const FailedModal = ({
   visible, 
   onClose, 
   onRetry,
-  title = "Payment Failed",
-  subtitle = "We couldn't process your payment. Please try again.",
+  title = "paymentFailed",
+  subtitle = "paymentFailedMessage",
   errorDetails = "",
-  primaryButtonText = "Try Again",
-  secondaryButtonText = "Cancel"
+  primaryButtonText = "tryAgain",
+  secondaryButtonText = "cancel"
 }) => {
+  const { t } = useTranslation();
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const shakeAnim = useRef(new Animated.Value(0)).current;
 
@@ -333,8 +337,8 @@ const FailedModal = ({
               <Ionicons name="close-circle" size={80} color="#FF6B6B" />
             </View>
             
-            <Text style={failedStyles.failedTitle}>{title}</Text>
-            <Text style={failedStyles.failedSubtitle}>{subtitle}</Text>
+            <Text style={failedStyles.failedTitle}>{t(title)}</Text>
+            <Text style={failedStyles.failedSubtitle}>{t(subtitle)}</Text>
             
             {errorDetails ? (
               <View style={failedStyles.errorDetails}>
@@ -348,14 +352,14 @@ const FailedModal = ({
                 onPress={onRetry}
               >
                 <Ionicons name="refresh" size={20} color="white" />
-                <Text style={failedStyles.retryButtonText}>{primaryButtonText}</Text>
+                <Text style={failedStyles.retryButtonText}>{t(primaryButtonText)}</Text>
               </TouchableOpacity>
               
               <TouchableOpacity 
                 style={failedStyles.cancelButton}
                 onPress={onClose}
               >
-                <Text style={failedStyles.cancelButtonText}>{secondaryButtonText}</Text>
+                <Text style={failedStyles.cancelButtonText}>{t(secondaryButtonText)}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -369,10 +373,11 @@ const FailedModal = ({
 const PendingModal = ({ 
   visible, 
   onClose, 
-  title = "Payment Processing", 
-  message = "Your payment is being processed. This may take a few moments.",
+  title = "paymentProcessing", 
+  message = "paymentProcessingMessage",
   estimatedTime = "2-5 minutes"
 }) => {
+  const { t } = useTranslation();
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -410,13 +415,13 @@ const PendingModal = ({
               <Ionicons name="time" size={60} color="#FFA500" />
             </Animated.View>
             
-            <Text style={pendingStyles.pendingTitle}>{title}</Text>
-            <Text style={pendingStyles.pendingMessage}>{message}</Text>
+            <Text style={pendingStyles.pendingTitle}>{t(title)}</Text>
+            <Text style={pendingStyles.pendingMessage}>{t(message)}</Text>
             
             <View style={pendingStyles.timeEstimate}>
               <Ionicons name="information-circle" size={16} color="#666" />
               <Text style={pendingStyles.timeEstimateText}>
-                Estimated time: {estimatedTime}
+                {t('estimatedTime')}: {estimatedTime}
               </Text>
             </View>
 
@@ -430,7 +435,7 @@ const PendingModal = ({
               style={pendingStyles.closeButton}
               onPress={onClose}
             >
-              <Text style={pendingStyles.closeButtonText}>I Understand</Text>
+              <Text style={pendingStyles.closeButtonText}>{t('iUnderstand')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -441,6 +446,7 @@ const PendingModal = ({
 
 // Main TopupFlowScreen Component
 export default function TopupFlowScreen({ navigation }) {
+  const { t } = useTranslation();
   const lastStep = BASE_STEPS.PAY;
   const [countries, setCountries] = useState([])
   const [step, setStep] = useState(0);
@@ -623,11 +629,11 @@ export default function TopupFlowScreen({ navigation }) {
           setFilteredContacts(data);
         }
       } else {
-        Alert.alert('Permission denied', 'Cannot access contacts without permission');
+        Alert.alert(t('permissionDenied'), t('contactsPermissionDenied'));
       }
     } catch (error) {
       console.error('Error loading contacts:', error);
-      Alert.alert('Error', 'Failed to load contacts');
+      Alert.alert(t('error'), t('failedToLoadContacts'));
     }
   };
 
@@ -688,7 +694,7 @@ export default function TopupFlowScreen({ navigation }) {
   const goNext = () => {
     if (!canNext) return;
     if (step === BASE_STEPS.AMOUNT && serviceType === 'bundle') {
-      Alert.alert("Coming Soon", "Bundle packages will be available soon!");
+      Alert.alert(t('comingSoon'), t('bundleComingSoon'));
       return;
     }
     setStep(step + 1);
@@ -730,7 +736,7 @@ export default function TopupFlowScreen({ navigation }) {
     } else if (randomOutcome === 'pending') {
       setShowPendingModal(true);
     } else {
-      setErrorDetails("Insufficient funds or network error. Please check your balance and try again.");
+      setErrorDetails(t('insufficientFundsError'));
       setShowFailedModal(true);
     }
   };
@@ -753,7 +759,7 @@ export default function TopupFlowScreen({ navigation }) {
       const operatorId = getSetaraganMnoId(localNumber);
 
       if (!operatorId) {
-        setErrorDetails("The number you have added is not matching with any mobile network in Afghanistan");
+        setErrorDetails(t('invalidMobileNetwork'));
         setShowProgressModal(false);
         setShowFailedModal(true);
         setLoading(false);
@@ -783,7 +789,7 @@ export default function TopupFlowScreen({ navigation }) {
 
     } catch (error) {
       console.log("Payment error: ", error);
-      const message = error.response?.data?.error || error.message || "Failed to process payment";
+      const message = error.response?.data?.error || error.message || t('paymentFailedGeneric');
       setErrorDetails(message);
       setShowProgressModal(false);
       setShowFailedModal(true);
@@ -798,7 +804,7 @@ export default function TopupFlowScreen({ navigation }) {
 
   const handleContactSelect = (phoneNumber) => {
     if (!phoneNumber) {
-      Alert.alert('Error', 'Invalid phone number selected');
+      Alert.alert(t('error'), t('invalidPhoneNumber'));
       return;
     }
 
@@ -815,171 +821,179 @@ export default function TopupFlowScreen({ navigation }) {
   };
 
   // Fixed ContactsModal Component
-  const ContactsModal = () => (
-    <Modal
-      visible={contactsModalVisible}
-      transparent={true}
-      animationType="none"
-      statusBarTranslucent={true}
-      onRequestClose={() => setContactsModalVisible(false)}
-    >
-      <View style={modalStyles.modalOverlay}>
-        <TouchableOpacity 
-          style={modalStyles.modalBackdrop}
-          activeOpacity={1}
-          onPress={() => setContactsModalVisible(false)}
-        />
-        <Animated.View 
-          style={[
-            modalStyles.modalCard,
-            { 
-              transform: [{ translateY: contactsSlideAnim }],
-              height: '80%',
-              marginBottom: -insets.bottom
-            }
-          ]}
-        >
-          <View style={modalStyles.modalHeader}>
-            <Text style={modalStyles.modalTitle}>Select Contact</Text>
-            <TouchableOpacity 
-              onPress={() => setContactsModalVisible(false)}
-              style={modalStyles.closeButton}
-            >
-              <Ionicons name="close" size={24} color="#666" />
-            </TouchableOpacity>
-          </View>
+  const ContactsModal = () => {
+    const { t } = useTranslation();
+    
+    return (
+      <Modal
+        visible={contactsModalVisible}
+        transparent={true}
+        animationType="none"
+        statusBarTranslucent={true}
+        onRequestClose={() => setContactsModalVisible(false)}
+      >
+        <View style={modalStyles.modalOverlay}>
+          <TouchableOpacity 
+            style={modalStyles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setContactsModalVisible(false)}
+          />
+          <Animated.View 
+            style={[
+              modalStyles.modalCard,
+              { 
+                transform: [{ translateY: contactsSlideAnim }],
+                height: '80%',
+                marginBottom: -insets.bottom
+              }
+            ]}
+          >
+            <View style={modalStyles.modalHeader}>
+              <Text style={modalStyles.modalTitle}>{t('selectContact')}</Text>
+              <TouchableOpacity 
+                onPress={() => setContactsModalVisible(false)}
+                style={modalStyles.closeButton}
+              >
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
 
-          <View style={modalStyles.searchContainer}>
-            <Ionicons name="search" size={20} color="#999" style={modalStyles.searchIcon} />
-            <TextInput
-              placeholder="Search contacts..."
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              style={modalStyles.searchInput}
-              placeholderTextColor="#999"
-            />
-          </View>
+            <View style={modalStyles.searchContainer}>
+              <Ionicons name="search" size={20} color="#999" style={modalStyles.searchIcon} />
+              <TextInput
+                placeholder={t('searchContacts')}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                style={modalStyles.searchInput}
+                placeholderTextColor="#999"
+              />
+            </View>
 
-          {filteredContacts.length > 0 ? (
+            {filteredContacts.length > 0 ? (
+              <FlatList
+                data={filteredContacts}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={modalStyles.contactItem}
+                    onPress={() => {
+                      if (item.phoneNumbers && item.phoneNumbers.length > 0) {
+                        handleContactSelect(item.phoneNumbers[0].number);
+                      }
+                    }}
+                  >
+                    <View style={modalStyles.contactAvatar}>
+                      <Text style={modalStyles.contactAvatarText}>
+                        {item.name ? item.name.charAt(0).toUpperCase() : '?'}
+                      </Text>
+                    </View>
+                    <View style={modalStyles.contactInfo}>
+                      <Text style={modalStyles.contactName}>{item.name}</Text>
+                      {item.phoneNumbers && item.phoneNumbers.length > 0 && (
+                        <Text style={modalStyles.contactPhone}>{item.phoneNumbers[0].number}</Text>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                )}
+                ItemSeparatorComponent={() => <View style={modalStyles.contactSeparator} />}
+              />
+            ) : (
+              <View style={modalStyles.emptyContainer}>
+                <Ionicons name="people-outline" size={48} color="#999" />
+                <Text style={modalStyles.emptyText}>{t('noContactsFound')}</Text>
+              </View>
+            )}
+          </Animated.View>
+        </View>
+      </Modal>
+    );
+  };
+
+  // Fixed CountriesModal Component
+  const CountriesModal = () => {
+    const { t } = useTranslation();
+    
+    return (
+      <Modal
+        visible={countryOpen}
+        transparent={true}
+        animationType="none"
+        statusBarTranslucent={true}
+        onRequestClose={() => setCountryOpen(false)}
+      >
+        <View style={modalStyles.modalOverlay}>
+          <TouchableOpacity 
+            style={modalStyles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setCountryOpen(false)}
+          />
+          <Animated.View 
+            style={[
+              modalStyles.modalCard,
+              { 
+                transform: [{ translateY: countriesSlideAnim }],
+                height: '80%',
+                marginBottom: -insets.bottom
+              }
+            ]}
+          >
+            <View style={modalStyles.modalHeader}>
+              <Text style={modalStyles.modalTitle}>{t('selectCountry')}</Text>
+              <TouchableOpacity 
+                onPress={() => setCountryOpen(false)}
+                style={modalStyles.closeButton}
+              >
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={modalStyles.searchContainer}>
+              <Ionicons name="search" size={20} color="#999" style={modalStyles.searchIcon} />
+              <TextInput
+                placeholder={t('searchCountries')}
+                value={countrySearch}
+                onChangeText={setCountrySearch}
+                style={modalStyles.searchInput}
+                placeholderTextColor="#999"
+              />
+            </View>
+
             <FlatList
-              data={filteredContacts}
+              data={filteredCountries}
               keyExtractor={(item) => item.id}
               renderItem={({ item }) => (
                 <TouchableOpacity
-                  style={modalStyles.contactItem}
+                  style={modalStyles.modalRow}
                   onPress={() => {
-                    if (item.phoneNumbers && item.phoneNumbers.length > 0) {
-                      handleContactSelect(item.phoneNumbers[0].number);
-                    }
+                    setCountry(item);
+                    setCountryOpen(false);
+                    setCountrySearch('');
                   }}
                 >
-                  <View style={modalStyles.contactAvatar}>
-                    <Text style={modalStyles.contactAvatarText}>
-                      {item.name ? item.name.charAt(0).toUpperCase() : '?'}
+                  <Text style={{ fontSize: 24, marginRight: 12 }}>
+                    {codeToFlag(item.countryCode)}
+                  </Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: Colors.textPrimary, fontSize: 16, fontWeight: '500' }}>
+                      {item.countryName}
                     </Text>
-                  </View>
-                  <View style={modalStyles.contactInfo}>
-                    <Text style={modalStyles.contactName}>{item.name}</Text>
-                    {item.phoneNumbers && item.phoneNumbers.length > 0 && (
-                      <Text style={modalStyles.contactPhone}>{item.phoneNumbers[0].number}</Text>
-                    )}
+                    <Text style={{ color: Colors.textSecondary, fontSize: 14 }}>
+                      {DIAL_CODES[item.countryCode] || ""}
+                    </Text>
                   </View>
                 </TouchableOpacity>
               )}
               ItemSeparatorComponent={() => <View style={modalStyles.contactSeparator} />}
             />
-          ) : (
-            <View style={modalStyles.emptyContainer}>
-              <Ionicons name="people-outline" size={48} color="#999" />
-              <Text style={modalStyles.emptyText}>No contacts found</Text>
-            </View>
-          )}
-        </Animated.View>
-      </View>
-    </Modal>
-  );
-
-  // Fixed CountriesModal Component
-  const CountriesModal = () => (
-    <Modal
-      visible={countryOpen}
-      transparent={true}
-      animationType="none"
-      statusBarTranslucent={true}
-      onRequestClose={() => setCountryOpen(false)}
-    >
-      <View style={modalStyles.modalOverlay}>
-        <TouchableOpacity 
-          style={modalStyles.modalBackdrop}
-          activeOpacity={1}
-          onPress={() => setCountryOpen(false)}
-        />
-        <Animated.View 
-          style={[
-            modalStyles.modalCard,
-            { 
-              transform: [{ translateY: countriesSlideAnim }],
-              height: '80%',
-              marginBottom: -insets.bottom
-            }
-          ]}
-        >
-          <View style={modalStyles.modalHeader}>
-            <Text style={modalStyles.modalTitle}>Select Country</Text>
-            <TouchableOpacity 
-              onPress={() => setCountryOpen(false)}
-              style={modalStyles.closeButton}
-            >
-              <Ionicons name="close" size={24} color="#666" />
-            </TouchableOpacity>
-          </View>
-
-          <View style={modalStyles.searchContainer}>
-            <Ionicons name="search" size={20} color="#999" style={modalStyles.searchIcon} />
-            <TextInput
-              placeholder="Search countries..."
-              value={countrySearch}
-              onChangeText={setCountrySearch}
-              style={modalStyles.searchInput}
-              placeholderTextColor="#999"
-            />
-          </View>
-
-          <FlatList
-            data={filteredCountries}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={modalStyles.modalRow}
-                onPress={() => {
-                  setCountry(item);
-                  setCountryOpen(false);
-                  setCountrySearch('');
-                }}
-              >
-                <Text style={{ fontSize: 24, marginRight: 12 }}>
-                  {codeToFlag(item.countryCode)}
-                </Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: Colors.textPrimary, fontSize: 16, fontWeight: '500' }}>
-                    {item.countryName}
-                  </Text>
-                  <Text style={{ color: Colors.textSecondary, fontSize: 14 }}>
-                    {DIAL_CODES[item.countryCode] || ""}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            )}
-            ItemSeparatorComponent={() => <View style={modalStyles.contactSeparator} />}
-          />
-        </Animated.View>
-      </View>
-    </Modal>
-  );
+          </Animated.View>
+        </View>
+      </Modal>
+    );
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background }}>
-      <ServiceHeader title="Mobile Top-up" onBack={goBack} />
+      <ServiceHeader title={t('mobileTopup')} onBack={goBack} />
 
       {/* Progress Modal */}
       <ProgressModal
@@ -988,14 +1002,14 @@ export default function TopupFlowScreen({ navigation }) {
           setShowProgressModal(false);
           setLoading(false);
         }}
-        title="Processing Payment"
-        message="Please wait while we process your transaction..."
+        title="processingPayment"
+        message="processingPaymentMessage"
         duration={3000}
         progressColor={Colors.primary}
         icon="sync-outline"
         iconColor={Colors.primary}
         onComplete={handleProgressComplete}
-        cancelText="Cancel"
+        cancelText="cancel"
       />
 
       {/* Success Modal */}
@@ -1010,15 +1024,15 @@ export default function TopupFlowScreen({ navigation }) {
           // Add share functionality here
           console.log("Share receipt");
         }}
-        title="Topup Successful!"
-        subtitle="Your mobile topup has been processed successfully."
+        title="topupSuccessful"
+        subtitle="topupSuccessfulMessage"
         details={[
-          { type: 'amount', label: 'Amount', value: `${transactionResult?.amountAfn} AFN` },
-          { type: 'transaction', label: 'Transaction ID', value: transactionResult?.txId },
-          { type: 'time', label: 'Date', value: new Date(transactionResult?.date).toLocaleString() },
+          { type: 'amount', label: 'amount', value: `${transactionResult?.amountAfn} AFN` },
+          { type: 'transaction', label: 'transactionId', value: transactionResult?.txId },
+          { type: 'time', label: 'date', value: new Date(transactionResult?.date).toLocaleString() },
         ]}
-        primaryButtonText="Done"
-        shareButtonText="Share Receipt"
+        primaryButtonText="done"
+        shareButtonText="shareReceipt"
       />
 
       {/* Failed Modal */}
@@ -1029,11 +1043,11 @@ export default function TopupFlowScreen({ navigation }) {
           resetFlow();
         }}
         onRetry={handleRetryPayment}
-        title="Payment Failed"
-        subtitle="We couldn't process your payment. Please try again."
+        title="paymentFailed"
+        subtitle="paymentFailedMessage"
         errorDetails={errorDetails}
-        primaryButtonText="Try Again"
-        secondaryButtonText="Cancel"
+        primaryButtonText="tryAgain"
+        secondaryButtonText="cancel"
       />
 
       {/* Pending Modal */}
@@ -1043,8 +1057,8 @@ export default function TopupFlowScreen({ navigation }) {
           setShowPendingModal(false);
           resetFlow();
         }}
-        title="Payment Processing"
-        message="Your payment is being processed. This may take a few moments."
+        title="paymentProcessing"
+        message="paymentProcessingMessage"
         estimatedTime="2-5 minutes"
       />
 
@@ -1129,8 +1143,8 @@ export default function TopupFlowScreen({ navigation }) {
                 <PrimaryButton
                   label={
                     step === lastStep
-                      ? `Pay $${usd} USD`
-                      : "Continue"
+                      ? `${t('pay')} $${usd} USD`
+                      : t('continue')
                   }
                   onPress={step === lastStep ? recharge : goNext}
                   style={{ marginTop: 24, opacity: canNext ? 1 : 0.5 }}
@@ -1138,7 +1152,7 @@ export default function TopupFlowScreen({ navigation }) {
                 />
                 {step > 0 && (
                   <PrimaryButton
-                    label="Back"
+                    label={t('back')}
                     onPress={goBack}
                     style={{ marginTop: 12, marginBottom: 110, backgroundColor: "#6B7280" }}
                   />
@@ -1155,7 +1169,6 @@ export default function TopupFlowScreen({ navigation }) {
   );
 }
 
-// Modal Styles
 const modalStyles = {
   modalOverlay: {
     flex: 1,
@@ -1266,7 +1279,7 @@ const modalStyles = {
   },
 };
 
-// Enhanced Styles
+// Enhanced Styles (keep the same as before)
 const progressStyles = {
   modalOverlay: {
     flex: 1,

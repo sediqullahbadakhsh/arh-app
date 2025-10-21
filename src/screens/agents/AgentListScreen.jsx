@@ -7,93 +7,190 @@ import {
   TouchableOpacity,
   TextInput,
   FlatList,
+  RefreshControl,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../theme/colors";
-import { DUMMY_AGENTS } from "../../constants/agents";
 import ServiceHeader from "../../components/ServiceHeader";
 import { useUser } from "../../context/userContext";
-import { getChildUsers } from "../../services/merchantApi";
+import { getChildUsers, deleteDownlineAgent } from "../../services/merchantApi";
 
-const FILTERS = ["All", "Active", "Inactive"];
+const FILTERS = ["All", "Active", "Inactive", "Suspended"];
 
 export default function AgentListScreen({ navigation }) {
-  const {user} = useUser()
+  const { user } = useUser();
+  console.log(user, 'this is user of agent')
   const [filter, setFilter] = useState("All");
-  const [q, setQ] = useState("");
-  const [childUser, setChildUsers] = useState([])
-  const [refetchAgents, setRefetchAgents] = useState(false)
-  const [filters, setFilters] = useState({search: "", status: ""})
+  const [searchQuery, setSearchQuery] = useState("");
+  const [childUsers, setChildUsers] = useState([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const refreshAgentList = ()=>{
-    setRefetchAgents(!refetchAgents)
-  }
+  const refreshAgentList = async () => {
+    try {
+      setRefreshing(true);
+      await loadAgents();
+    } catch (error) {
+      console.error("Refresh error:", error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
-  const handleFilterChange = (key, value) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
-  }
+  const loadAgents = async () => {
+    try {
+      setLoading(true);
+      const filterParams = {};
 
-  useEffect(()=>{
-const getDownlineAgents = async()=>{
-  const filterParams = {}
+      if (filter !== "All") {
+        filterParams.status = filter.toLowerCase();
+      }
 
-  if (filters.status && filters.status !== "All") {
-    filterParams.status = filters.status.toLowerCase();
-  }
+      if (searchQuery) {
+        filterParams.search = searchQuery;
+      }
 
-  if (filters.search){
-    filterParams.search = filters.search
-  }
-  const res = await getChildUsers(user?.id,filterParams)
-  setChildUsers(res?.data)
-  console.log("💖💖💖",res?.data[0]?.user )
-}
+      const res = await getChildUsers(user?.id, filterParams);
+      setChildUsers(res?.data || []);
+    } catch (error) {
+      console.error("Load agents error:", error);
+      Alert.alert("Error", "Failed to load agents");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-getDownlineAgents()
-  },[refetchAgents, filters.search, filters.status])
+  useEffect(() => {
+    loadAgents();
+  }, [filter, searchQuery]);
 
-  const data = useMemo(() => {
-    const base =
-      filter === "All"
-        ? DUMMY_AGENTS
-        : DUMMY_AGENTS.filter((a) => a.status === filter.toLowerCase());
-    if (!q.trim()) return base;
-    const s = q.trim().toLowerCase();
-    return base.filter(
-      (a) =>
-        `${a.firstName} ${a.lastName}`.toLowerCase().includes(s) ||
-        a.phone.toLowerCase().includes(s) ||
-        a.code.toLowerCase().includes(s)
+  const handleDeleteAgent = (agent) => {
+    Alert.alert(
+      "Delete Agent",
+      `Are you sure you want to delete ${agent.user?.username}?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => confirmDelete(agent.user.id),
+        },
+      ]
     );
-  }, [filter, q]);
+  };
+
+  const confirmDelete = async (agentId) => {
+    try {
+      await deleteDownlineAgent(agentId);
+      Alert.alert("Success", "Agent deleted successfully");
+      refreshAgentList();
+    } catch (error) {
+      console.error("Delete error:", error);
+      Alert.alert("Error", "Failed to delete agent");
+    }
+  };
+
+  const handleAssignSlab = (agent) => {
+    navigation.navigate("AssignSlab", { agent, refreshAgentList });
+  };
+
+  const filteredData = useMemo(() => {
+    return childUsers.filter(agent => {
+      const matchesSearch = searchQuery ? 
+        agent.user?.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        agent.user?.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        agent.user?.mobileNumber?.includes(searchQuery)
+        : true;
+      
+      const matchesFilter = filter === "All" || 
+        agent.user?.status?.toLowerCase() === filter.toLowerCase();
+      
+      return matchesSearch && matchesFilter;
+    });
+  }, [childUsers, searchQuery, filter]);
 
   const renderItem = ({ item }) => {
-    const name = `${item.firstName} ${item.lastName}`;
     return (
       <View style={styles.card}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.name}>{item?.user?.username}</Text>
-          <Text style={styles.meta}>{item?.address}</Text>
-          <View
-            style={{ flexDirection: "row", alignItems: "center", marginTop: 6 }}
-          >
-            <StatusPill status={item?.user?.status} />
-            <Text style={styles.code}>{item?.user?.email}</Text>
+        <View style={styles.cardHeader}>
+          <View style={styles.agentInfo}>
+            <Text style={styles.name}>{item?.user?.username}</Text>
+            <Text style={styles.email}>{item?.user?.email}</Text>
+            <Text style={styles.phone}>{item?.user?.mobileNumber}</Text>
+          </View>
+          <StatusPill status={item?.user?.status} />
+        </View>
+
+        <View style={styles.cardBody}>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Commission:</Text>
+            <Text style={styles.detailValue}>
+              {item?.commissionRateDetails?.percentage 
+                ? `${item.commissionRateDetails.percentage}%` 
+                : "Not set"}
+            </Text>
+          </View>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Current Slab:</Text>
+            <Text style={styles.detailValue}>
+              {item?.commissionRateDetails?.slabTypeDetails?.title || "Not assigned"}
+            </Text>
+          </View>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Address:</Text>
+            <Text style={styles.detailValue} numberOfLines={1}>
+              {item?.address || "Not set"}
+            </Text>
+          </View>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Created:</Text>
+            <Text style={styles.detailValue}>
+              {item?.createdAt ? new Date(item.createdAt).toLocaleDateString() : "-"}
+            </Text>
           </View>
         </View>
-        <TouchableOpacity
-          style={styles.viewBtn}
-          onPress={() => navigation.navigate("AgentView", { agent: item, refreshAgentList })}
-        >
-          <Text style={styles.viewBtnText}>View Agent</Text>
-        </TouchableOpacity>
+
+        <View style={styles.cardActions}>
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.viewBtn]}
+            onPress={() => navigation.navigate("AgentView", { agent: item, refreshAgentList })}
+          >
+            <Ionicons name="eye-outline" size={16} color={Colors.primary} />
+            <Text style={[styles.actionText, styles.viewText]}>View</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.editBtn]}
+            onPress={() => navigation.navigate("AgentEdit", { agent: item, refreshAgentList })}
+          >
+            <Ionicons name="create-outline" size={16} color="#16A34A" />
+            <Text style={[styles.actionText, styles.editText]}>Edit</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.slabBtn]}
+            onPress={() => handleAssignSlab(item)}
+          >
+            <Ionicons name="add-circle-outline" size={16} color="#8B5CF6" />
+            <Text style={[styles.actionText, styles.slabText]}>Slab</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.deleteBtn]}
+            onPress={() => handleDeleteAgent(item)}
+          >
+            <Ionicons name="trash-outline" size={16} color="#DC2626" />
+            <Text style={[styles.actionText, styles.deleteText]}>Delete</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
-      <ServiceHeader title="Agent" />
+      <ServiceHeader title="Manage Agents" />
 
       <View style={styles.container}>
         {/* Filter pills */}
@@ -103,10 +200,7 @@ getDownlineAgents()
             return (
               <TouchableOpacity
                 key={f}
-                onPress={() => {
-                  handleFilterChange("status", f === "All" ? "" : f)
-                  setFilter(f)
-                }}
+                onPress={() => setFilter(f)}
                 style={[styles.pill, active && styles.pillActive]}
               >
                 <Text
@@ -125,57 +219,99 @@ getDownlineAgents()
             <Ionicons name="search" size={16} color="#9E9E9E" />
             <TextInput
               style={styles.searchInput}
-              value={q}
-              onChangeText={(val)=>{
-                handleFilterChange("search", val)
-                setQ(val)
-              }}
-              placeholder="Search Contacts"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search by name, email or phone..."
               placeholderTextColor="#9E9E9E"
               autoCapitalize="none"
             />
+            {searchQuery ? (
+              <TouchableOpacity onPress={() => setSearchQuery("")}>
+                <Ionicons name="close-circle" size={16} color="#9E9E9E" />
+              </TouchableOpacity>
+            ) : null}
           </View>
           <TouchableOpacity
             style={styles.addBtn}
             onPress={() => navigation.navigate("AgentCreate", { refreshAgentList })}
           >
+            <Ionicons name="add" size={20} color="#fff" />
             <Text style={styles.addBtnText}>Add Agent</Text>
           </TouchableOpacity>
         </View>
 
-        <FlatList
-          data={childUser}
-          keyExtractor={(it) => it.id}
-          renderItem={renderItem}
-          ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 24 }}
-        />
+        {/* Results count */}
+        <View style={styles.resultsInfo}>
+          <Text style={styles.resultsText}>
+            {filteredData.length} agent{filteredData.length !== 1 ? 's' : ''} found
+            {searchQuery ? ` for "${searchQuery}"` : ''}
+            {filter !== 'All' ? ` (${filter})` : ''}
+          </Text>
+        </View>
+
+        {/* Agents List */}
+        {loading && !refreshing ? (
+          <View style={styles.loadingContainer}>
+            <Text>Loading agents...</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={filteredData}
+            keyExtractor={(item) => item.id}
+            renderItem={renderItem}
+            ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 24 }}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={refreshAgentList}
+                colors={[Colors.primary]}
+              />
+            }
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Ionicons name="people-outline" size={48} color="#9E9E9E" />
+                <Text style={styles.emptyText}>
+                  {searchQuery 
+                    ? `No agents found for "${searchQuery}"`
+                    : "No agents found"}
+                </Text>
+                <Text style={styles.emptySubtext}>
+                  {searchQuery 
+                    ? "Try adjusting your search terms"
+                    : "Get started by creating your first agent"}
+                </Text>
+              </View>
+            }
+          />
+        )}
       </View>
     </SafeAreaView>
   );
 }
 
 function StatusPill({ status }) {
-  const good = status === "active";
+  const statusConfig = {
+    active: { color: "#16A34A", label: "Active" },
+    inactive: { color: "#6B7280", label: "Inactive" },
+    suspended: { color: "#DC2626", label: "Suspended" },
+  };
+
+  const config = statusConfig[status] || statusConfig.inactive;
+
   return (
     <View
       style={[
         styles.statusPill,
         {
-          borderColor: good ? "#16A34A" : "#D14343",
-          backgroundColor: "transparent",
+          borderColor: config.color,
+          backgroundColor: `${config.color}15`,
         },
       ]}
     >
-      <Text
-        style={{
-          color: good ? "#16A34A" : "#D14343",
-          fontSize: 11,
-          fontWeight: "700",
-        }}
-      >
-        {good ? "Active" : "Inactive"}
+      <Text style={[styles.statusText, { color: config.color }]}>
+        {config.label}
       </Text>
     </View>
   );
@@ -195,7 +331,6 @@ const styles = StyleSheet.create({
   pillActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   pillText: { color: Colors.textSecondary, fontWeight: "600" },
   pillTextActive: { color: "#fff" },
-
   searchRow: { flexDirection: "row", gap: 10, marginBottom: 12 },
   searchBox: {
     flex: 1,
@@ -216,36 +351,125 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     alignItems: "center",
     justifyContent: "center",
+    flexDirection: "row",
+    gap: 6,
   },
   addBtnText: { color: "#fff", fontWeight: "700" },
-
+  resultsInfo: {
+    marginBottom: 12,
+  },
+  resultsText: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
   card: {
     borderWidth: 1,
     borderColor: "#EEE",
     backgroundColor: "#fff",
     borderRadius: 12,
-    padding: 12,
-    flexDirection: "row",
-    alignItems: "center",
+    padding: 16,
+    gap: 12,
   },
-  name: { fontSize: 15, color: Colors.textPrimary, fontWeight: "700" },
-  meta: { fontSize: 12, color: Colors.textSecondary, marginTop: 4 },
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  agentInfo: {
+    flex: 1,
+  },
+  name: { fontSize: 16, color: Colors.textPrimary, fontWeight: "700" },
+  email: { fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
+  phone: { fontSize: 12, color: Colors.textSecondary, marginTop: 1 },
   statusPill: {
     paddingHorizontal: 10,
-    height: 22,
-    borderRadius: 11,
+    height: 24,
+    borderRadius: 12,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 8,
   },
-  code: { fontSize: 12, color: Colors.textSecondary },
-  viewBtn: {
-    borderWidth: 1,
-    borderColor: Colors.primary,
-    borderRadius: 8,
+  statusText: { fontSize: 10, fontWeight: "700" },
+  cardBody: {
+    gap: 6,
+  },
+  detailRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  detailLabel: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontWeight: "500",
+  },
+  detailValue: {
+    fontSize: 12,
+    color: Colors.textPrimary,
+    fontWeight: "600",
+    flex: 1,
+    textAlign: "right",
+    marginLeft: 8,
+  },
+  cardActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  actionBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
     paddingVertical: 8,
-    paddingHorizontal: 10,
+    borderRadius: 6,
+    borderWidth: 1,
   },
-  viewBtnText: { color: Colors.primary, fontWeight: "700", fontSize: 12 },
+  viewBtn: {
+    borderColor: Colors.primary,
+    backgroundColor: `${Colors.primary}15`,
+  },
+  editBtn: {
+    borderColor: "#16A34A",
+    backgroundColor: "#16A34A15",
+  },
+  slabBtn: {
+    borderColor: "#8B5CF6",
+    backgroundColor: "#8B5CF615",
+  },
+  deleteBtn: {
+    borderColor: "#DC2626",
+    backgroundColor: "#DC262615",
+  },
+  actionText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  viewText: { color: Colors.primary },
+  editText: { color: "#16A34A" },
+  slabText: { color: "#8B5CF6" },
+  deleteText: { color: "#DC2626" },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  emptyContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 48,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: Colors.textSecondary,
+    marginTop: 12,
+    textAlign: "center",
+  },
+  emptySubtext: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 4,
+    textAlign: "center",
+  },
 });

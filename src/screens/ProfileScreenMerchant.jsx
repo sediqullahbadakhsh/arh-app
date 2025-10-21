@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, use } from "react";
 import {
   SafeAreaView,
   View,
@@ -16,6 +16,7 @@ import { Colors } from "../theme/colors";
 import * as ImagePicker from "expo-image-picker";
 import { useAuth } from "../auth/AuthProvider";
 import { getCurrentMerchantProfile, updateMerchantProfile } from "../services/merchantProfileService";
+import { useTranslation } from "react-i18next";
 
 export default function ProfileScreenMerchant({ navigation }) {
   const { user, logout } = useAuth();
@@ -23,17 +24,21 @@ export default function ProfileScreenMerchant({ navigation }) {
   const [merchantData, setMerchantData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
-
+  const {t} = useTranslation();
   const fetchMerchantProfile = async () => {
     try {
       setFetching(true);
       const response = await getCurrentMerchantProfile();
-      
+      console.log(response, "this is merchant profile")
       if (response) {
         setMerchantData(response);
         
         if (response.user?.profile_picture) {
           setAvatar(response.user.profile_picture);
+             const fullImageUrl = response.user.profile_picture.startsWith('http') 
+            ? response.user.profile_picture
+            : `http://3.67.144.22/uploads/profile_pictures/${response.user.profile_picture}`;
+          setAvatar(fullImageUrl);
         }
       }
     } catch (error) {
@@ -108,7 +113,7 @@ export default function ProfileScreenMerchant({ navigation }) {
   const goProfileDetails = () =>
     navigation.navigate("profileDetailsMerchant", { title: "Profile Details merchant" });
   const goManageLanguage = () =>
-    navigation.navigate("languageScreen", { title: "Manage Language" });
+    navigation.navigate("languageScreen", { title: t('manageLanguage') });
   const goSecurity = () =>
     navigation.navigate("securityScreen", { title: "Security" });
   const goMerchant = () =>
@@ -220,14 +225,8 @@ export default function ProfileScreenMerchant({ navigation }) {
             />
           </View>
 
-          {/* Display merchant information */}
-          <View style={styles.merchantInfo}>
-            <Text style={styles.merchantEmail}>{merchantData?.user?.email}</Text>
-            <Text style={styles.merchantMobile}>{merchantData?.user?.mobileNumber}</Text>
-            <Text style={styles.merchantAddress}>
-              {merchantData?.agentDetail?.address || "Address not provided"}
-            </Text>
-          </View>
+
+         
         </View>
         
         <View style={styles.decoration1}></View>
@@ -249,7 +248,18 @@ export default function ProfileScreenMerchant({ navigation }) {
                 subtitle="View Your Profile and update"
                 onPress={goProfileDetails}
               />
-
+                 <ProfileRow
+                              icon={
+                                <Ionicons
+                                  name="globe-outline"
+                                  size={22}
+                                  color={Colors.primary}
+                                />
+                              }
+                              title={t('language')}
+                              subtitle={t('services.title')}
+                              onPress={goManageLanguage}
+                            />
               <ProfileRow
                 icon={
                   <Ionicons
@@ -355,7 +365,7 @@ const styles = StyleSheet.create({
     marginTop: 100,
   },
   header: {
-    height: 250,
+    height: 190,
     paddingHorizontal: 24,
     paddingTop: Platform.OS === "android" ? 24 : 0,
     justifyContent: "flex-end",
