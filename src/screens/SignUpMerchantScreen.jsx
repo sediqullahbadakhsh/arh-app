@@ -1,101 +1,146 @@
 // src/screens/SignUpMerchantScreen.jsx
-import React, { useEffect, useMemo, useState, useRef } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
-  SafeAreaView,
   View,
   Text,
+  StyleSheet,
   TouchableOpacity,
   TextInput,
   Modal,
   FlatList,
   Image,
+  SafeAreaView,
   ScrollView,
+  Alert,
+  ActivityIndicator,
   Animated,
   Easing,
   Dimensions,
-  KeyboardAvoidingView,
-  Platform,
-  Alert
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import { Colors } from "../theme/colors";
 import AuthHeader from "../components/AuthHeader";
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+import InputField from "../components/InputField";
 import PrimaryButton from "../components/PrimaryButton";
 import { COUNTRIES } from "../constants/countries";
 import { codeToFlag } from "../utils/flag";
-import { getCountries, getDistricts, getProvinces, merchantSignup } from "../services/merchantApi";
+import { 
+  getCountries, 
+  getDistricts, 
+  getProvinces, 
+  merchantSignup 
+} from "../services/merchantApi";
+import { useAuth } from "../auth/AuthProvider";
+import { useTranslation } from "react-i18next";
+import { useModal } from "../hooks/useModal";
+import ValidationModal from "../components/ValidationModal";
+import SuccessModal from "../components/modals/SuccessModal";
+import ErrorModal from "../components/modals/ErrorModal";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const { height: screenHeight } = Dimensions.get('window');
 const LANGS = ["english", "dari", "pashto"];
+const GAP = 1;
+const { height: screenHeight } = Dimensions.get('window');
 
 export default function SignUpMerchantScreen({ navigation }) {
+  const { user } = useAuth();
   const [step, setStep] = useState(0);
-  const insets = useSafeAreaInsets();
-
-  // Animation values for bottom sheets
-  const [modalSlideAnim] = useState(new Animated.Value(screenHeight));
-  const [searchQuery, setSearchQuery] = useState('');
-
-  // Step 1
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const { modal, showModal, hideModal } = useModal();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [mobileNumber, setMobileNumber] = useState("");
   const [alternativeContact, setAlternativeContact] = useState("");
-
-  // Step 2
-  const defaultAf = useMemo(() => COUNTRIES.find((c) => c.code === "AF") || COUNTRIES[0], []);
-  const [countries, setCountries] = useState([])
-  const [provinces, setProvinces] = useState([])
-  const [districts, setDistricts] = useState([])
-  const [country, setCountry] = useState(defaultAf);
-  const [province, setProvince] = useState("");
-  const [district, setDistrict] = useState("");
+  const {t} = useTranslation();
+  const [countries, setCountries] = useState([]);
+  const [provinces, setProvinces] = useState([]);
+  const [districts, setDistricts] = useState([]);
+  const [country, setCountry] = useState(null);
+  const [province, setProvince] = useState(null);
+  const [district, setDistrict] = useState(null);
   const [address, setAddress] = useState("");
-  const [messageLanguage, setMessageLanguage] = useState("")
-  const [picker, setPicker] = useState({ open: false, type: null });
+  const [messageLanguage, setMessageLanguage] = useState("");
 
-  // Step 3 (KYC)
+
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+
   const [photoUri, setPhotoUri] = useState(null);
   const [idFile, setIdFile] = useState(null);
 
-  // Input focus states
-  const [focusedInput, setFocusedInput] = useState(null);
 
-  const next = () => setStep((s) => Math.min(2, s + 1));
-  const back = () => setStep((s) => Math.max(0, s - 1));
+  const [picker, setPicker] = useState({ open: false, type: null });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [modalSlideAnim] = useState(new Animated.Value(screenHeight));
+  const insets = useSafeAreaInsets();
 
-  useEffect(() => {
-    const getAllCountries = async() => {
-      const res = await getCountries()
-      setCountries(res?.data)
-    }
-    getAllCountries()
-  }, [])
+
+  const [showImagePicker, setShowImagePicker] = useState(false);
+  const [imagePickerSlideAnim] = useState(new Animated.Value(screenHeight));
 
   useEffect(() => {
-    if(country?.id){
-      const getAllProvinces = async() => {
-        const res = await getProvinces(country?.id)
-        setProvinces(res?.data)
+    if (user) {
+      setEmail(user.email || "");
+      setMobileNumber(user.phoneNumber || "");
+      if (user.fullName) {
+        const names = user.fullName.split(' ');
+        setFirstName(names[0] || "");
+        setLastName(names.slice(1).join(' ') || "");
       }
-      getAllProvinces()
     }
-  }, [country?.id])
+  }, [user]);
 
   useEffect(() => {
-    if(province?.id){
-      const getAllDistricts = async() => {
-        const res = await getDistricts(province?.id)
-        setDistricts(res?.data)
+    const getAllCountries = async () => {
+      try {
+        const res = await getCountries();
+        setCountries(res?.data || []);
+      } catch (error) {
+        console.error("Error fetching countries:", error);
+        showModal("Error", "Failed to load countries");
       }
-      getAllDistricts()
-    }
-  }, [province?.id])
+    };
+    getAllCountries();
+  }, []);
 
+  useEffect(() => {
+    if (country?.id) {
+      const getAllProvinces = async () => {
+        try {
+          const res = await getProvinces(country?.id);
+          setProvinces(res?.data || []);
+          setProvince(null);
+          setDistrict(null); 
+        } catch (error) {
+          console.error("Error fetching provinces:", error);
+        }
+      };
+      getAllProvinces();
+    }
+  }, [country?.id]);
+
+  useEffect(() => {
+    if (province?.id) {
+      const getAllDistricts = async () => {
+        try {
+          const res = await getDistricts(province?.id);
+          setDistricts(res?.data || []);
+          setDistrict(null); 
+        } catch (error) {
+          console.error("Error fetching districts:", error);
+        }
+      };
+      getAllDistricts();
+    }
+  }, [province?.id]);
+
+  // Bottom sheet animations
   useEffect(() => {
     if (picker.open) {
       Animated.timing(modalSlideAnim, {
@@ -114,6 +159,25 @@ export default function SignUpMerchantScreen({ navigation }) {
     }
   }, [picker.open]);
 
+  // Image picker modal animations
+  useEffect(() => {
+    if (showImagePicker) {
+      Animated.timing(imagePickerSlideAnim, {
+        toValue: 0,
+        duration: 350,
+        easing: Easing.out(Easing.back(1)),
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(imagePickerSlideAnim, {
+        toValue: screenHeight,
+        duration: 250,
+        easing: Easing.in(Easing.ease),
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [showImagePicker]);
+
   const filteredData = useMemo(() => {
     if (!searchQuery) {
       switch (picker.type) {
@@ -129,16 +193,16 @@ export default function SignUpMerchantScreen({ navigation }) {
     switch (picker.type) {
       case 'country':
         return countries.filter(item => 
-          item.countryName.toLowerCase().includes(query) ||
-          item.countryCode.toLowerCase().includes(query)
+          item.countryName?.toLowerCase().includes(query) ||
+          item.countryCode?.toLowerCase().includes(query)
         );
       case 'province':
         return provinces.filter(item => 
-          item.provinceName.toLowerCase().includes(query)
+          item.provinceName?.toLowerCase().includes(query)
         );
       case 'district':
         return districts.filter(item => 
-          item.districtName.toLowerCase().includes(query)
+          item.districtName?.toLowerCase().includes(query)
         );
       case 'lang':
         return LANGS.filter(item => 
@@ -149,51 +213,162 @@ export default function SignUpMerchantScreen({ navigation }) {
     }
   }, [searchQuery, picker.type, countries, provinces, districts]);
 
-  const submit = async () => {
-    try {
-      const payload = {
-        username: `${firstName} ${lastName}`,
-        email,
-        mobileNumber: mobileNumber,
-        user_type: "agent",
-        status: "active",
-        profile_picture: null,
-        country: country?.id,
-        province: province?.id,
-        district: district?.id,
-        address,
-        alternativeContact,
-        messageLanguage,
-        accountType: "merchant",
-        registrationType: "direct",
-        parentAgentId: null,
-      };
-      await merchantSignup(payload);
-      navigation.replace("SignupResult", {
-        type: "merchant",
-        title: "Application Submitted",
-        message: "Your application has been submitted. We'll email you updates.",
-        cta: "Go Back",
-      });
-    } catch (e) {
-      Alert.alert("Error", e.message);
+  const next = () => {
+    if (validateStep(step)) {
+      setStep((s) => Math.min(2, s + 1));
     }
   };
 
+  const back = () => setStep((s) => Math.max(0, s - 1));
+
+  const validateStep = (currentStep) => {
+    switch (currentStep) {
+      case 0:
+        if (!firstName.trim() || !lastName.trim() || !email.trim() || !mobileNumber.trim()) {
+          showModal("Validation Error", "Please fill all required fields");
+          return false;
+        }
+        if (!/\S+@\S+\.\S+/.test(email)) {
+          showModal("Validation Error", "Please enter a valid email address");
+          return false;
+        }
+        return true;
+      case 1:
+        if (!country || !province || !district || !address.trim()) {
+          showModal("Validation Error", "Please fill all required address fields");
+          return false;
+        }
+        return true;
+      case 2:
+        if (!photoUri) {
+          showModal("Validation Error", "Please take a profile photo");
+          return false;
+        }
+        return true;
+      default:
+        return true;
+    }
+  };
+
+const submitApplication = async () => {
+  if (!validateStep(2)) return;
+
+  setSubmitting(true);
+  try {
+    const payload = {
+      username: `${firstName} ${lastName}`,
+      email: email,
+      mobileNumber: mobileNumber,
+      user_type: "agent",
+      status: "active",
+      profile_picture: null, 
+      country: country?.id,
+      province: province?.id,
+      district: district?.id,
+      address: address,
+      alternativeContact: alternativeContact,
+      messageLanguage: messageLanguage,
+      accountType: "merchant",
+      registrationType: "direct",
+      parentAgentId: null,
+    };
+
+    const response = await merchantSignup(payload);
+    
+    // Fix: Check for success based on the actual API response structure
+    if (response.status === "success" || response.success) {
+      setShowSuccessModal(true);
+    } else {
+      // Handle API error response
+      const errorMsg = response.message || response.error || "Failed to submit application";
+      setErrorMessage(errorMsg);
+      setShowErrorModal(true);
+    }
+  } catch (error) {
+    console.error("Application error:", error);
+    // Extract error message from different possible error formats
+    let errorMsg = "Failed to submit application. Please try again.";
+    
+    if (error.response) {
+      // Server responded with error status
+      errorMsg = error.response.data?.error || error.response.data?.message || errorMsg;
+    } else if (error.request) {
+      // Request was made but no response received
+      errorMsg = "Network error. Please check your connection and try again.";
+    } else if (error.message) {
+      // Error object has a message
+      errorMsg = error.message;
+    } else if (typeof error === 'string') {
+      // Error is a string
+      errorMsg = error;
+    } else if (error.error) {
+      // Error has error property
+      errorMsg = error.error;
+    }
+    
+    setErrorMessage(errorMsg);
+    setShowErrorModal(true);
+  } finally {
+    setSubmitting(false);
+  }
+};
+
   const takePhoto = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== "granted") {
-      alert("Camera permission is required.");
-      return;
+    setShowImagePicker(false);
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== "granted") {
+        setErrorMessage("Camera permission is required.");
+        setShowErrorModal(true);
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setPhotoUri(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error taking photo:', error);
+      setErrorMessage("Failed to open camera. Please try again.");
+      setShowErrorModal(true);
     }
-    const res = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      quality: 0.7,
-    });
-    if (!res.canceled) {
-      const uri = res.assets?.[0]?.uri;
-      if (uri) setPhotoUri(uri);
+  };
+
+  const pickFromGallery = async () => {
+    setShowImagePicker(false);
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        setErrorMessage("Photo library permission is required.");
+        setShowErrorModal(true);
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setPhotoUri(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      setErrorMessage("Failed to open image gallery. Please try again.");
+      setShowErrorModal(true);
     }
+  };
+
+  const removePhoto = () => {
+    setShowImagePicker(false);
+    setPhotoUri(null);
   };
 
   const pickIdFile = async () => {
@@ -206,9 +381,19 @@ export default function SignUpMerchantScreen({ navigation }) {
     const file = res.assets ? res.assets[0] : res;
     setIdFile({
       uri: file.uri,
-      name: file.name || "document",
+      name: file.name || "id_document",
       mimeType: file.mimeType,
     });
+  };
+
+  const handleSuccessClose = () => {
+    setShowSuccessModal(false);
+
+  };
+
+  const handleErrorClose = () => {
+    setShowErrorModal(false);
+    setErrorMessage("");
   };
 
   const PickerModal = () => (
@@ -321,537 +506,344 @@ export default function SignUpMerchantScreen({ navigation }) {
     </Modal>
   );
 
+  const ImagePickerModal = () => (
+    <Modal
+      visible={showImagePicker}
+      transparent={true}
+      animationType="none"
+      statusBarTranslucent={true}
+      onRequestClose={() => setShowImagePicker(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <TouchableOpacity 
+          style={styles.modalBackdrop}
+          activeOpacity={1}
+          onPress={() => setShowImagePicker(false)}
+        />
+        <Animated.View 
+          style={[
+            styles.imagePickerContainer,
+            { transform: [{ translateY: imagePickerSlideAnim }] }
+          ]}
+        >
+          <View style={styles.pickerHeader}>
+            <Text style={styles.pickerTitle}>Choose Profile Photo</Text>
+            <TouchableOpacity 
+              onPress={() => setShowImagePicker(false)}
+              style={styles.closeButton}
+            >
+              <Ionicons name="close" size={24} color="#666" />
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.pickerOptions}>
+            <TouchableOpacity 
+              style={styles.optionButton}
+              onPress={takePhoto}
+            >
+              <View style={[styles.optionIcon, { backgroundColor: '#007AFF' }]}>
+                <Ionicons name="camera" size={24} color="#fff" />
+              </View>
+              <Text style={styles.optionText}>Take Photo</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.optionButton}
+              onPress={pickFromGallery}
+            >
+              <View style={[styles.optionIcon, { backgroundColor: '#34C759' }]}>
+                <Ionicons name="images" size={24} color="#fff" />
+              </View>
+              <Text style={styles.optionText}>Choose from Gallery</Text>
+            </TouchableOpacity>
+            
+            {photoUri && (
+              <TouchableOpacity 
+                style={styles.optionButton}
+                onPress={removePhoto}
+              >
+                <View style={[styles.optionIcon, { backgroundColor: '#FF3B30' }]}>
+                  <Ionicons name="trash" size={24} color="#fff" />
+                </View>
+                <Text style={styles.optionText}>Remove Photo</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
       <AuthHeader
         title="Register as Merchant"
         onBack={() => (step === 0 ? navigation.goBack() : back())}
       />
-
-      {/* Premium Stepper */}
-      <View style={styles.stepperContainer}>
-        {[0, 1, 2].map((index) => (
-          <View key={index} style={styles.stepContainer}>
-            <View style={[
-              styles.stepCircle,
-              step >= index && styles.stepCircleActive
-            ]}>
-              {step > index ? (
-                <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-              ) : (
-                <Text style={[
-                  styles.stepNumber,
-                  step >= index && styles.stepNumberActive
-                ]}>
-                  {index + 1}
-                </Text>
-              )}
-            </View>
-            <Text style={[
-              styles.stepLabel,
-              step >= index && styles.stepLabelActive
-            ]}>
-              {index === 0 ? 'Personal' : index === 1 ? 'Additional' : 'KYC'}
-            </Text>
-            {index < 2 && (
-              <View style={[
-                styles.stepLine,
-                step > index && styles.stepLineActive
-              ]} />
-            )}
-          </View>
-        ))}
-      </View>
-
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+   <KeyboardAwareScrollView
+  contentContainerStyle={{ flexGrow: 1 }}
+  enableOnAndroid
+  extraScrollHeight={20}
+  keyboardShouldPersistTaps="handled"
+>
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <ScrollView
-          contentContainerStyle={styles.container}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          {step === 0 && (
-            <>
-              <Text style={styles.sectionTitle}>Personal Information</Text>
+        <ValidationModal
+          visible={modal.visible}
+          title={modal.title}
+          message={modal.message}
+          onClose={hideModal}
+        />
 
-              <InputField
-                label="First Name *"
-                value={firstName}
-                onChangeText={setFirstName}
-                placeholder="Enter First Name"
-                isFocused={focusedInput === 'firstName'}
-                onFocus={() => setFocusedInput('firstName')}
-                onBlur={() => setFocusedInput(null)}
-              />
+        {step === 0 && (
+          <>
+            <Text style={styles.sectionTitle}>{t('personalInformation')}</Text>
 
-              <InputField
-                label="Last Name *"
-                value={lastName}
-                onChangeText={setLastName}
-                placeholder="Enter Last Name"
-                isFocused={focusedInput === 'lastName'}
-                onFocus={() => setFocusedInput('lastName')}
-                onBlur={() => setFocusedInput(null)}
-              />
+            <LabeledInput
+              label={t("firstName")}
+              value={firstName}
+              onChangeText={setFirstName}
+              placeholder={t("enterFirstName")}
+              required
+            />
+            <LabeledInput
+              label={t("lastName")}
+              value={lastName}
+              onChangeText={setLastName}
+              placeholder={t("enterLastName")}
+              required
+            />
+            <LabeledInput
+              label={t("email")}
+              value={email}
+              onChangeText={setEmail}
+              placeholder={t("enterYourEmailAddress")}
+              keyboardType="email-address"
+              required
+            />
+            <LabeledInput
+              label={t("mobileNumber")}
+              value={mobileNumber}
+              onChangeText={setMobileNumber}
+              placeholder={t("enterMobileNumber")}
+              keyboardType="phone-pad"
+              required
+            />
+            <LabeledInput
+              label={t("alternativeContact")}
+              value={alternativeContact}
+              onChangeText={setAlternativeContact}
+              placeholder={t("enterAlternativeContact")}
+              keyboardType="phone-pad"
+            />
 
-              <InputField
-                label="Email *"
-                value={email}
-                onChangeText={setEmail}
-                placeholder="Enter Your Email Address"
-                keyboardType="email-address"
-                isFocused={focusedInput === 'email'}
-                onFocus={() => setFocusedInput('email')}
-                onBlur={() => setFocusedInput(null)}
-              />
+            <PrimaryButton
+              label={t("continue")}
+              onPress={next}
+              style={styles.fullButton}
+            />
+          </>
+        )}
 
-              <InputField
-                label="Mobile Number *"
-                value={mobileNumber}
-                onChangeText={setMobileNumber}
-                placeholder="Enter Mobile Number"
-                keyboardType="phone-pad"
-                isFocused={focusedInput === 'mobileNumber'}
-                onFocus={() => setFocusedInput('mobileNumber')}
-                onBlur={() => setFocusedInput(null)}
-              />
-            
-              <InputField
-                label="Alternative Contact"
-                value={alternativeContact}
-                onChangeText={setAlternativeContact}
-                placeholder="Enter Alternative Contact"
-                keyboardType="phone-pad"
-                isFocused={focusedInput === 'alternativeContact'}
-                onFocus={() => setFocusedInput('alternativeContact')}
-                onBlur={() => setFocusedInput(null)}
-              />
+        {step === 1 && (
+          <>
+            <Text style={styles.sectionTitle}>{t('addressInformation')}</Text>
 
+            <DropField
+              label={t("country")}
+              value={country?.countryName || "Select Country"}
+              onPress={() => setPicker({ open: true, type: "country" })}
+              leftIcon={
+                country ? <Text style={{ fontSize: 18 }}>{codeToFlag(country.countryCode)}</Text> : null
+              }
+              required
+            />
+            <DropField
+              label={t("province")}
+              value={province?.provinceName || "Select Province"}
+              onPress={() => setPicker({ open: true, type: "province" })}
+              required
+            />
+            <DropField
+              label={t("district")}
+              value={district?.districtName || "Select District"}
+              onPress={() => setPicker({ open: true, type: "district" })}
+              required
+            />
+            <LabeledInput
+              label={t("fulladdress")}
+              value={address}
+              onChangeText={setAddress}
+              placeholder={t("enterFulladdress")}
+              required
+            />
+            <DropField
+              label={t("preferredCommunicationLanguage")}
+              value={messageLanguage || "Select Language"}
+              onPress={() => setPicker({ open: true, type: "lang" })}
+            />
+
+            <View style={styles.rowButtons}>
+              <DarkButton
+                label={t("back")}
+                onPress={back}
+                style={styles.halfButton}
+              />
               <PrimaryButton
-                label="Continue"
+                label={t("continue")}
                 onPress={next}
-                style={styles.continueButton}
+                style={styles.halfButton}
               />
-            </>
-          )}
+            </View>
+          </>
+        )}
 
-          {step === 1 && (
-            <>
-              <Text style={styles.sectionTitle}>Additional Information</Text>
+        {step === 2 && (
+          <>
+            <Text style={styles.sectionTitle}>{t('kycInformation')}</Text>
+            <Text style={styles.subtitle}>{t('pleaseUploadRequiredDocsForVerification')}</Text>
 
-              <DropField
-                label="Country *"
-                value={country?.countryName || "Select Country"}
-                onPress={() => setPicker({ open: true, type: "country" })}
-                leftIcon={
-                  <Text style={{ fontSize: 20 }}>
-                    {codeToFlag(country?.countryCode)}
-                  </Text>
-                }
+            <View style={styles.uploadSection}>
+              <Text style={styles.uploadLabel}>{t('profilePhoto')} *</Text>
+              <TouchableOpacity 
+                style={styles.photoBox}
+                onPress={() => setShowImagePicker(true)}
+              >
+                {photoUri ? (
+                  <Image
+                    source={{ uri: photoUri }}
+                    style={{ width: "100%", height: "100%" }}
+                  />
+                ) : (
+                  <View style={styles.photoPlaceholder}>
+                    <Ionicons name="camera-outline" size={40} color="#9E9E9E" />
+                    <Text style={styles.photoPlaceholderText}>Tap to add photo</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+              <Text style={styles.photoHint}>
+                {photoUri ? "Tap the photo to change" : "Tap to take or select a profile photo"}
+              </Text>
+            </View>
+
+      
+            <View style={styles.rowButtons}>
+              <DarkButton
+                label={t("back")}
+                onPress={back}
+                style={styles.halfButton}
               />
-
-              <DropField
-                label="Province *"
-                value={province?.provinceName || "Select Province"}
-                onPress={() => setPicker({ open: true, type: "province" })}
-              />
-
-              <DropField
-                label="District *"
-                value={district?.districtName || "Select District"}
-                onPress={() => setPicker({ open: true, type: "district" })}
-              />
-
-              <InputField
-                label="Full Address *"
-                value={address}
-                onChangeText={setAddress}
-                placeholder="Enter Full Address"
-                isFocused={focusedInput === 'address'}
-                onFocus={() => setFocusedInput('address')}
-                onBlur={() => setFocusedInput(null)}
-              />
-
-              <DropField
-                label="Message Language *"
-                value={messageLanguage ? messageLanguage.charAt(0).toUpperCase() + messageLanguage.slice(1) : "Select Language"}
-                onPress={() => setPicker({ open: true, type: "lang" })}
-              />
-
-              <View style={styles.buttonRow}>
-                <SecondaryButton
-                  label="Back"
-                  onPress={back}
-                  style={styles.halfButton}
-                />
-                <PrimaryButton
-                  label="Continue"
-                  onPress={next}
-                  style={styles.halfButton}
-                />
-              </View>
-            </>
-          )}
-
-          {step === 2 && (
-            <>
-              <Text style={styles.sectionTitle}>KYC Information</Text>
-
-              <View style={styles.kycSection}>
-                <Text style={styles.kycLabel}>Profile Photo</Text>
-                <View style={styles.photoContainer}>
-                  {photoUri ? (
-                    <Image
-                      source={{ uri: photoUri }}
-                      style={styles.photoImage}
-                    />
-                  ) : (
-                    <View style={styles.photoPlaceholder}>
-                      <Ionicons name="camera-outline" size={32} color="#9CA3AF" />
-                      <Text style={styles.photoPlaceholderText}>No photo taken</Text>
-                    </View>
-                  )}
-                </View>
-                <TouchableOpacity
-                  style={styles.photoButton}
-                  onPress={takePhoto}
-                >
-                  <Ionicons name="camera" size={20} color="#FFFFFF" />
-                  <Text style={styles.photoButtonText}>Take Photo</Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.kycSection}>
-                <Text style={styles.kycLabel}>ID Document</Text>
-                <TouchableOpacity
-                  style={styles.uploadContainer}
-                  onPress={pickIdFile}
-                >
-                  <Ionicons name="cloud-upload-outline" size={32} color={Colors.primary} />
-                  <Text style={styles.uploadText}>
-                    {idFile ? idFile.name : "Upload ID Document"}
-                  </Text>
-                  <Text style={styles.uploadSubtext}>
-                    Supports: JPG, PNG, PDF (Max 5MB)
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.buttonRow}>
-                <SecondaryButton
-                  label="Back"
-                  onPress={back}
-                  style={styles.halfButton}
-                />
-                <PrimaryButton
-                  label="Submit Application"
-                  onPress={submit}
-                  style={styles.halfButton}
-                />
-              </View>
-            </>
-          )}
-        </ScrollView>
-      </KeyboardAvoidingView>
-
+              <TouchableOpacity
+                style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
+                onPress={submitApplication}
+                disabled={submitting}
+              >
+                {submitting ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="send-outline" size={18} color="#fff" />
+                    <Text style={styles.submitButtonText}>{t('submitApplication')}</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+      </ScrollView>
+</KeyboardAwareScrollView>
       <PickerModal />
+      <ImagePickerModal />
+
+
+      <SuccessModal
+        visible={showSuccessModal}
+        onClose={handleSuccessClose}
+        title="Application Submitted Successfully!"
+        message="Your merchant application has been submitted. We'll review your application and contact you soon."
+        buttonText="Continue"
+        autoHideDuration={0}
+      />
+
+
+      <ErrorModal
+        visible={showErrorModal}
+        onClose={handleErrorClose}
+        title="Application Failed"
+        message={errorMessage}
+        buttonText="Try Again"
+        showRetryButton={true}
+      />
     </SafeAreaView>
   );
 }
 
-// Component Definitions
-function InputField({ label, value, onChangeText, placeholder, keyboardType, isFocused, onFocus, onBlur }) {
+function LabeledInput({ label, value, onChangeText, placeholder, keyboardType, required }) {
   return (
-    <View style={styles.inputContainer}>
-      <Text style={styles.inputLabel}>{label}</Text>
-      <View style={[
-        styles.inputWrapper,
-        isFocused && styles.inputWrapperFocused
-      ]}>
-        <TextInput
-          value={value}
-          onChangeText={onChangeText}
-          placeholder={placeholder}
-          placeholderTextColor="#9CA3AF"
-          style={styles.textInput}
-          keyboardType={keyboardType}
-          onFocus={onFocus}
-          onBlur={onBlur}
-        />
-      </View>
+    <View style={{ marginBottom: 13 }}>
+      <Text style={styles.label}>
+        {required && <Text style={{ color: "#F44336" }}>* </Text>}
+        {label}
+      </Text>
+      <InputField 
+        placeholder={placeholder}
+        value={value}
+        onChangeText={onChangeText}
+        keyboardType={keyboardType}
+      />
     </View>
   );
 }
 
-function DropField({ label, value, onPress, leftIcon }) {
+function DropField({ label, value, onPress, leftIcon, required }) {
   return (
-    <View style={styles.inputContainer}>
-      <Text style={styles.inputLabel}>{label}</Text>
+    <View style={{ marginBottom: 13 }}>
+      <Text style={styles.label}>
+        {required && <Text style={{ color: "#F44336" }}>* </Text>}
+        {label}
+      </Text>
       <TouchableOpacity
-        style={styles.dropdownWrapper}
+        style={styles.dropField}
         onPress={onPress}
-        activeOpacity={0.8}
+        activeOpacity={0.85}
       >
-        <View style={styles.dropdownContent}>
-          {leftIcon && <View style={styles.dropdownIcon}>{leftIcon}</View>}
-          <Text style={[
-            styles.dropdownText,
-            !value.includes('Select') && { color: Colors.textPrimary }
-          ]}>
+        <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+          {leftIcon}
+          <Text style={{ color: value.includes("Select") ? "#9E9E9E" : Colors.textPrimary, fontSize: 14 }}>
             {value}
           </Text>
         </View>
-        <Ionicons name="chevron-down" size={20} color="#6B7280" />
+        <Ionicons name="chevron-down" size={18} color="#7A7A7A" />
       </TouchableOpacity>
     </View>
   );
 }
 
-function SecondaryButton({ label, onPress, style }) {
+function DarkButton({ label, onPress, style, disabled }) {
   return (
     <TouchableOpacity
-      style={[styles.secondaryButton, style]}
       onPress={onPress}
       activeOpacity={0.9}
+      disabled={disabled}
+      style={[styles.darkBtn, disabled && { opacity: 0.5 }, style]}
     >
-      <Text style={styles.secondaryButtonText}>{label}</Text>
+      <Text style={styles.darkBtnText}>{label}</Text>
     </TouchableOpacity>
   );
 }
 
-const styles = {
+const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 40,
-  },
-  
-  // Stepper Styles
-  stepperContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 20,
+    paddingTop: 14,
+    paddingBottom: 150,
+    gap: GAP,
     backgroundColor: Colors.white,
   },
-  stepContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  stepCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
-  },
-  stepCircleActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  stepNumber: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6B7280',
-  },
-  stepNumberActive: {
-    color: '#FFFFFF',
-  },
-  stepLabel: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#9CA3AF',
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  stepLabelActive: {
-    color: Colors.primary,
-  },
-  stepLine: {
-    flex: 1,
-    height: 2,
-    backgroundColor: '#E5E7EB',
-    marginHorizontal: 8,
-  },
-  stepLineActive: {
-    backgroundColor: Colors.primary,
-  },
 
-  // Section Styles
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-    marginBottom: 24,
-    textAlign: 'center',
-  },
-
-  // Input Styles
-  inputContainer: {
-    marginBottom: 20,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.textPrimary,
-    marginBottom: 8,
-  },
-  inputWrapper: {
-    height: 56,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    justifyContent: 'center',
-  },
-  inputWrapperFocused: {
-    borderColor: Colors.primary,
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 3,
-  },
-  textInput: {
-    fontSize: 16,
-    color: Colors.textPrimary,
-    padding: 0,
-  },
-
-  // Dropdown Styles
-  dropdownWrapper: {
-    height: 56,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  dropdownContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  dropdownIcon: {
-    marginRight: 12,
-  },
-  dropdownText: {
-    fontSize: 16,
-    color: '#9CA3AF',
-  },
-
-  // Button Styles
-  continueButton: {
-    marginTop: 8,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 24,
-  },
-  halfButton: {
-    width: '48%',
-  },
-  secondaryButton: {
-    height: 56,
-    borderRadius: 12,
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  secondaryButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.textPrimary,
-  },
-
-  // KYC Styles
-  kycSection: {
-    marginBottom: 32,
-  },
-  kycLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.textPrimary,
-    marginBottom: 12,
-  },
-  photoContainer: {
-    height: 200,
-    borderRadius: 12,
-    backgroundColor: '#F9FAFB',
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
-    borderStyle: 'dashed',
-    overflow: 'hidden',
-    marginBottom: 12,
-  },
-  photoImage: {
-    width: '100%',
-    height: '100%',
-  },
-  photoPlaceholder: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  photoPlaceholderText: {
-    fontSize: 14,
-    color: '#9CA3AF',
-    marginTop: 8,
-  },
-  photoButton: {
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: Colors.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  photoButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    marginLeft: 8,
-  },
-  uploadContainer: {
-    height: 120,
-    borderRadius: 12,
-    backgroundColor: '#F9FAFB',
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
-    borderStyle: 'dashed',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  uploadText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.textPrimary,
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  uploadSubtext: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginTop: 4,
-    textAlign: 'center',
-  },
-
-  // Modal Styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'transparent',
@@ -926,4 +918,187 @@ const styles = {
     color: '#999',
     marginTop: 12,
   },
-};
+
+
+  imagePickerContainer: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
+    padding: 16,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  pickerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 20,
+  },
+  pickerTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: Colors.textPrimary,
+  },
+  pickerOptions: {
+    gap: 16,
+  },
+  optionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  optionIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  optionText: {
+    fontSize: 16,
+    color: Colors.textPrimary,
+    fontWeight: '500',
+  },
+
+  sectionTitle: {
+    fontSize: 16,
+    color: Colors.textPrimary,
+    marginBottom: 6,
+    fontWeight: "600",
+  },
+  subtitle: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    marginBottom: 16,
+  },
+  label: { 
+    fontSize: 13, 
+    color: Colors.textPrimary, 
+    marginBottom: 4,
+    fontWeight: "500",
+  },
+
+  dropField: {
+    height: 46,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    paddingHorizontal: 12,
+    backgroundColor: "#fff",
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+
+  uploadSection: {
+    marginBottom: 20,
+    alignItems: 'center'
+  },
+  uploadLabel: {
+    fontSize: 14,
+    color: Colors.textPrimary,
+    marginBottom: 8,
+    fontWeight: "500",
+  },
+  photoBox: {
+    height: 140,
+    width: 140,
+    borderRadius: 8,
+    backgroundColor: "#F5F5F5",
+    overflow: "hidden",
+    marginBottom: 8,
+  },
+  photoPlaceholder: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#E0E0E0",
+  },
+  photoPlaceholderText: {
+    fontSize: 14,
+    color: "#9E9E9E",
+    marginTop: 8,
+  },
+  photoHint: {
+    fontSize: 12,
+    color: "#666",
+    textAlign: "center",
+  },
+  uploadButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.primary,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    alignSelf: "flex-start",
+  },
+  uploadButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+    marginLeft: 8,
+  },
+  uploadBox: {
+    height: 100,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#D7D7D7",
+    borderStyle: "dashed",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F9F9F9",
+    padding: 16,
+  },
+  uploadBoxText: {
+    color: "#9E9E9E",
+    marginTop: 8,
+    textAlign: "center",
+  },
+  uploadHint: {
+    color: "#BDBDBD",
+    fontSize: 12,
+    marginTop: 4,
+    textAlign: "center",
+  },
+
+
+  fullButton: { marginTop: 12 },
+  rowButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 12,
+  },
+  halfButton: { width: "48%" },
+  darkBtn: {
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "#2B2B2B",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  darkBtnText: { color: "#fff", fontSize: 15, fontWeight: "600" },
+  submitButton: {
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: Colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    width: "48%",
+  },
+  submitButtonDisabled: {
+    opacity: 0.6,
+  },
+  submitButtonText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "600",
+    marginLeft: 8,
+  },
+});

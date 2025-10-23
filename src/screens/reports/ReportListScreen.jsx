@@ -1,14 +1,15 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  SafeAreaView,
   View,
   Text,
   StyleSheet,
   FlatList,
   TouchableOpacity,
   Modal,
+  SafeAreaView,
   Share,
 } from "react-native";
+
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../theme/colors";
 import ServiceHeader from "../../components/ServiceHeader";
@@ -88,7 +89,7 @@ export default function ReportListScreen({ navigation, route }) {
         />
       </View>
 
-      {/* Detail modal with Share */}
+
       <Modal
         transparent
         visible={open}

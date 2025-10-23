@@ -16,7 +16,7 @@ export default function ServiceButton({ icon, label, onPress }) {
 
 const styles = StyleSheet.create({
   wrapper: {
-    width: '30%',
+    width: '33%',
     alignItems: 'center',
     // borderWidth: 1,
     flexDirection: 'column',
@@ -26,8 +26,8 @@ const styles = StyleSheet.create({
   iconBox: {
     borderRadius: 12,
     backgroundColor: "#f3f3f3ff",
-    width: scale.hp(10),
-    height: scale.hp(10),
+    width: scale.hp(12),
+    height: scale.hp(12),
     padding: scale.hp(2),
     justifyContent: 'center',
     alignItems: 'center',

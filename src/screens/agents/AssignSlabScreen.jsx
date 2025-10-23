@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import {
-  SafeAreaView,
   View,
   Text,
   StyleSheet,
@@ -8,19 +7,27 @@ import {
   FlatList,
   Alert,
   ScrollView,
+  SafeAreaView,
   ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../theme/colors";
 import ServiceHeader from "../../components/ServiceHeader";
 import { getAllSlabsForMerchant, setComission } from "../../services/merchantApi";
+import CreateSlabModal from "../../components/modals/CreateSlabModal";
+import SlabListModal from "../../components/modals/SlabListModal";
 
-export default function AssignSlabScreen({ navigation, route }) {
+
+export default function AssignCommissionSlabScreen({ navigation, route }) {
   const { agent, refreshAgentList } = route.params || {};
   const [slabs, setSlabs] = useState([]);
   const [selectedSlab, setSelectedSlab] = useState(null);
   const [loading, setLoading] = useState(false);
   const [loadingSlabs, setLoadingSlabs] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [createModalVisible, setCreateModalVisible] = useState(false);
+  const [listModalVisible, setListModalVisible] = useState(false);
 
   useEffect(() => {
     fetchSlabs();
@@ -35,7 +42,6 @@ export default function AssignSlabScreen({ navigation, route }) {
   const fetchSlabs = async () => {
     try {
       setLoadingSlabs(true);
-      // Use the same API call structure as the web version
       const res = await getAllSlabsForMerchant({ 
         slabFor: "agent",
         limit: 100 
@@ -46,7 +52,13 @@ export default function AssignSlabScreen({ navigation, route }) {
       Alert.alert("Error", "Failed to load commission slabs");
     } finally {
       setLoadingSlabs(false);
+      setRefreshing(false);
     }
+  };
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchSlabs();
   };
 
   const handleAssignSlab = async () => {
@@ -57,7 +69,6 @@ export default function AssignSlabScreen({ navigation, route }) {
 
     try {
       setLoading(true);
-      // Use the same mutation structure as web version - only send slabId
       await setComission(agent.user.id, { slabId: selectedSlab.id });
       
       Alert.alert(
@@ -110,22 +121,9 @@ export default function AssignSlabScreen({ navigation, route }) {
             </View>
           </View>
           
-          <Text style={styles.slabDescription}>
-            {item.slabTypeDetails?.description || "No description available"}
-          </Text>
+     
 
-          <View style={styles.slabMeta}>
-            {item.countryDetails && (
-              <Text style={styles.metaText}>
-                Country: {item.countryDetails.countryName}
-              </Text>
-            )}
-            {item.providerDetails && (
-              <Text style={styles.metaText}>
-                Provider: {item.providerDetails.companyName}
-              </Text>
-            )}
-          </View>
+         
 
           {isCurrent && (
             <View style={styles.currentBadge}>
@@ -150,6 +148,15 @@ export default function AssignSlabScreen({ navigation, route }) {
     );
   };
 
+  const handleSlabCreated = () => {
+    setCreateModalVisible(false);
+    fetchSlabs();
+  };
+
+  const handleSlabUpdated = () => {
+    fetchSlabs();
+  };
+
   if (!agent) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
@@ -165,8 +172,36 @@ export default function AssignSlabScreen({ navigation, route }) {
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
       <ServiceHeader title="Assign Commission Slab" onBack={() => navigation.goBack()} />
       
-      <ScrollView style={styles.container}>
-        {/* Agent Info */}
+      <ScrollView 
+        style={styles.container}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[Colors.primary]}
+          />
+        }
+      >
+  
+        <View style={styles.actionButtons}>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.createButton]}
+            onPress={() => setCreateModalVisible(true)}
+          >
+            <Ionicons name="add-circle-outline" size={20} color="#fff" />
+            <Text style={styles.actionButtonText}>Create Slab</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionButton, styles.listButton]}
+            onPress={() => setListModalVisible(true)}
+          >
+            <Ionicons name="list-outline" size={20} color="#fff" />
+            <Text style={styles.actionButtonText}>Slab List</Text>
+          </TouchableOpacity>
+        </View>
+
+   
         <View style={styles.agentInfo}>
           <Text style={styles.agentName}>{agent.user?.username}</Text>
           <Text style={styles.agentEmail}>{agent.user?.email}</Text>
@@ -187,7 +222,6 @@ export default function AssignSlabScreen({ navigation, route }) {
           )}
         </View>
 
-        {/* Selected Slab Info */}
         {selectedSlab && (
           <View style={styles.selectedSlabInfo}>
             <Text style={styles.selectedTitle}>Selected Slab</Text>
@@ -209,9 +243,14 @@ export default function AssignSlabScreen({ navigation, route }) {
           </View>
         )}
 
-        {/* Available Slabs */}
+   
         <View style={styles.slabsSection}>
-          <Text style={styles.sectionTitle}>Available Commission Slabs</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Available Commission Slabs</Text>
+            <Text style={styles.slabCount}>
+              {slabs.length} slab{slabs.length !== 1 ? 's' : ''} available
+            </Text>
+          </View>
           
           {loadingSlabs ? (
             <View style={styles.loadingContainer}>
@@ -230,8 +269,14 @@ export default function AssignSlabScreen({ navigation, route }) {
                   <Ionicons name="document-outline" size={48} color="#9E9E9E" />
                   <Text style={styles.emptyText}>No commission slabs available</Text>
                   <Text style={styles.emptySubtext}>
-                    Contact administrator to create commission slabs
+                    Create your first slab to get started
                   </Text>
+                  <TouchableOpacity
+                    style={styles.createFirstButton}
+                    onPress={() => setCreateModalVisible(true)}
+                  >
+                    <Text style={styles.createFirstButtonText}>Create Slab</Text>
+                  </TouchableOpacity>
                 </View>
               }
             />
@@ -239,7 +284,7 @@ export default function AssignSlabScreen({ navigation, route }) {
         </View>
       </ScrollView>
 
-      {/* Action Button */}
+
       <View style={styles.footer}>
         <TouchableOpacity
           style={[
@@ -262,6 +307,20 @@ export default function AssignSlabScreen({ navigation, route }) {
           )}
         </TouchableOpacity>
       </View>
+
+
+      <CreateSlabModal
+        visible={createModalVisible}
+        onClose={() => setCreateModalVisible(false)}
+        onSuccess={handleSlabCreated}
+      />
+
+      <SlabListModal
+        visible={listModalVisible}
+        onClose={() => setListModalVisible(false)}
+        onUpdate={handleSlabUpdated}
+        slabs={slabs}
+      />
     </SafeAreaView>
   );
 }
@@ -276,6 +335,32 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  marginBottom: 300,
+  actionButtons: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 16,
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  createButton: {
+    backgroundColor: Colors.primary,
+  },
+  listButton: {
+    backgroundColor: "#8B5CF6",
+  },
+  actionButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
   },
   agentInfo: {
     backgroundColor: "#f8f9fa",
@@ -357,13 +442,22 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   slabsSection: {
-    marginBottom: 100,
+    marginBottom: 200,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: "600",
     color: Colors.textPrimary,
-    marginBottom: 12,
+  },
+  slabCount: {
+    fontSize: 12,
+    color: Colors.textSecondary,
   },
   slabItem: {
     flexDirection: "row",
@@ -386,7 +480,7 @@ const styles = StyleSheet.create({
   },
   slabHeader: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    gap: 10,
     alignItems: "flex-start",
     marginBottom: 8,
   },
@@ -394,7 +488,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: Colors.textPrimary,
-    flex: 1,
+
   },
   slabPercentage: {
     backgroundColor: Colors.primary,
@@ -485,6 +579,18 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textAlign: "center",
   },
+  createFirstButton: {
+    marginTop: 16,
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  createFirstButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+  },
   footer: {
     position: "absolute",
     bottom: 0,
@@ -492,6 +598,7 @@ const styles = StyleSheet.create({
     right: 0,
     backgroundColor: "#fff",
     padding: 16,
+    marginBottom: 100,
     borderTopWidth: 1,
     borderTopColor: "#e5e7eb",
   },

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
+import { View, Text,SafeAreaView, StyleSheet } from 'react-native';
 import { Colors } from '../../theme/colors';
 import AuthHeader from '../../components/AuthHeader';
 import InputField from '../../components/InputField';

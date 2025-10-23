@@ -9,11 +9,142 @@ const TopUpStyles = StyleSheet.create({
     fontWeight: "600",
     color: Colors.textPrimary,
   },
+   lottieAnimation: {
+    width: 240,
+    height: 240,
+  },
+
+
+  statusHeader: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  statusIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    marginBottom: 16,
+  },
+  statusTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginTop: 16,
+  },
   smallLabel: {
     fontSize: 13,
     color: Colors.textPrimary,
     marginBottom: 6,
     marginTop: 12,
+  },
+  statusHeader: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  statusIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    marginBottom: 16,
+  },
+  statusTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  detailsCard: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    padding: 20,
+    width: '100%',
+    marginBottom: 20,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E9ECEF',
+  },
+  detailLabel: {
+    fontSize: 14,
+    color: '#6C757D',
+    fontWeight: '500',
+  },
+  detailValue: {
+    fontSize: 14,
+    color: Colors.textPrimary,
+    fontWeight: '600',
+  },
+  amountSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 2,
+    borderTopColor: Colors.primary,
+    alignItems: 'center',
+  },
+  amountLabel: {
+    fontSize: 16,
+    color: '#6C757D',
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  amountValue: {
+    fontSize: 24,
+    color: Colors.primary,
+    fontWeight: '700',
+  },
+  statusMessageContainer: {
+    backgroundColor: '#F8F9FA',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 20,
+    width: '100%',
+  },
+  statusMessage: {
+    fontSize: 14,
+    textAlign: 'center',
+    fontWeight: '500',
+    lineHeight: 20,
+  },
+  progressContainer: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  progressBar: {
+    width: '100%',
+    height: 6,
+    backgroundColor: '#E9ECEF',
+    borderRadius: 3,
+    marginBottom: 8,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 3,
+    transition: 'width 0.3s ease',
+  },
+  progressText: {
+    fontSize: 12,
+    color: '#6C757D',
+    fontWeight: '500',
+  },
+  moreButton: {
+    padding: 12,
+  },
+  moreButtonText: {
+    color: Colors.primary,
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 
   dropField: {
@@ -42,6 +173,7 @@ const TopUpStyles = StyleSheet.create({
   },
   phoneRow: {
     flexDirection: "row",
+    direction: "ltr",
     height: 65,
     borderRadius: 50,
     overflow: "hidden",

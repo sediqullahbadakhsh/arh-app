@@ -1,12 +1,12 @@
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import {
-  SafeAreaView,
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   FlatList,
   TextInput,
+  SafeAreaView,
 } from "react-native";
 import * as Contacts from "expo-contacts";
 import { Colors } from "../theme/colors";

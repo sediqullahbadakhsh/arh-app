@@ -143,7 +143,6 @@ function StepNumber({
 
       <View style={[
         TopUpStyles.phoneRow,
-        isRTL && TopUpStyles.phoneRowRTL,
         {
           borderColor: validationError ? '#EF4444' : (isFocused ? Colors.primary : '#E4E7EC'),
           backgroundColor: '#FFFFFF',

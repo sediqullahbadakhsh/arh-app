@@ -10,6 +10,7 @@ import AboutUsScreen from "../screens/profileScreens/AboutUsScreen";
 import ProfileScreen from "../screens/ProfileScreen";
 import MerchantApplicationScreen from "../screens/profileScreens/MerchantApllicationScreen";
 import ApplicationResultScreen from "../screens/profileScreens/ApplicationResultScreen";
+import PromoCodesScreen from "../screens/profileScreens/PromoCodesScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -29,6 +30,10 @@ export default function ProfileStackNavigator() {
       <Stack.Screen
         name="securityScreen"
         component={SecurityScreen}
+      />
+       <Stack.Screen
+        name="PromoCodes"
+        component={PromoCodesScreen}
       />
      <Stack.Screen 
   name="MerchantApplication" 

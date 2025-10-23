@@ -415,6 +415,374 @@ const HomeStyles = StyleSheet.create({
     height: hp(22.5),
     position: 'relative',
   },
+  modalOverlay: {
+  flex: 1,
+  backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+modalBackdrop: {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+},
+receiptModalContainer: {
+  width: '90%',
+  maxWidth: 400,
+  height: '90%',
+  backgroundColor: '#fff',
+  borderRadius: 24,
+  overflow: 'hidden',
+  shadowColor: '#000',
+  shadowOffset: {
+    width: 0,
+    height: 10,
+  },
+  shadowOpacity: 0.3,
+  shadowRadius: 20,
+  elevation: 10,
+},
+receiptHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  padding: 24,
+  backgroundColor: Colors.primary,
+  borderTopLeftRadius: 24,
+  borderTopRightRadius: 24,
+},
+receiptHeaderIcon: {
+  width: 56,
+  height: 56,
+  borderRadius: 28,
+  backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginRight: 16,
+},
+receiptHeaderText: {
+  flex: 1,
+},
+receiptTitle: {
+  fontSize: 20,
+  fontWeight: 'bold',
+  color: '#fff',
+  marginBottom: 4,
+},
+receiptSubtitle: {
+  fontSize: 14,
+  color: 'rgba(255, 255, 255, 0.9)',
+},
+closeButton: {
+  width: 40,
+  height: 40,
+  borderRadius: 20,
+  backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+receiptContent: {
+  flex: 1,
+  padding: 24,
+},
+statusSection: {
+  alignItems: 'center',
+  marginBottom: 24,
+},
+statusBadgeLarge: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingHorizontal: 16,
+  paddingVertical: 8,
+  borderRadius: 20,
+},
+statusDot: {
+  width: 8,
+  height: 8,
+  borderRadius: 4,
+  marginRight: 8,
+},
+statusTextLarge: {
+  fontSize: 14,
+  fontWeight: '600',
+},
+amountSection: {
+  alignItems: 'center',
+  marginBottom: 24,
+  backgroundColor: '#F3F4F6',
+  borderRadius: 12,
+  paddingTop: 12,
+  paddingBottom: 12,
+  borderBottomWidth: 1,
+  borderBottomColor: '#F3F4F6',
+},
+topSection: {
+  alignItems: 'center',
+  paddingTop: 12,
+},
+
+modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+
+  
+  // Header Styles
+  receiptHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: Colors.primary,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+  },
+  headerLeft: {
+    flex: 1,
+  },
+  headerCenter: {
+    flex: 2,
+    alignItems: 'center',
+  },
+  headerRight: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+  },
+  closeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerActionButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  receiptTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+    textAlign: 'center',
+  },
+
+  receiptContent: {
+    flex: 1,
+    padding: 20,
+  },
+  
+
+  statusSection: {
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  statusIconContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 100,
+    justifyContent: 'center',
+    alignItems: 'center',
+
+  },
+  statusTextLarge: {
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+
+  topSection: {
+    alignItems: 'center',
+
+  },
+
+
+  amountSection: {
+    alignItems: 'center',
+    marginBottom: 24,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    padding: 16,
+  },
+  amountLabel: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  amountValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: Colors.textPrimary,
+  },
+
+
+  detailItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  detailLabel: {
+    fontSize: 14,
+    color: '#6B7280',
+    flex: 1,
+  },
+  detailValue: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: Colors.textPrimary,
+    flex: 1,
+    textAlign: 'right',
+  },
+
+  additionalInfo: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  infoText: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginLeft: 8,
+    flex: 1,
+    lineHeight: 16,
+  },
+
+  receiptActions: {
+    padding: 20,
+    paddingTop: 0,
+  },
+  primaryButton: {
+    backgroundColor: Colors.primary,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+amountValueTop: {
+  fontSize: 24,
+  textAlign: 'center',
+  fontWeight: 'bold',
+  marginBottom: 24,
+  color: Colors.textPrimary,
+},
+amountLabel: {
+  fontSize: 16,
+  color: '#6B7280',
+},
+amountValue: {
+  fontSize: 32,
+  fontWeight: 'bold',
+  color: Colors.textPrimary,
+},
+detailsGrid: {
+  marginBottom: 24,
+},
+detailItem: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  paddingVertical: 12,
+  borderBottomWidth: 1,
+  borderBottomColor: '#F3F4F6',
+},
+detailLabel: {
+  fontSize: 14,
+  color: '#6B7280',
+  flex: 1,
+},
+detailValue: {
+  fontSize: 14,
+  fontWeight: '500',
+  color: Colors.textPrimary,
+  flex: 1,
+  textAlign: 'right',
+},
+additionalInfo: {
+  backgroundColor: '#F9FAFB',
+  borderRadius: 12,
+  padding: 16,
+  marginBottom: 24,
+},
+infoRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginBottom: 8,
+},
+infoText: {
+  fontSize: 12,
+  color: '#6B7280',
+  marginLeft: 8,
+  flex: 1,
+},
+receiptActions: {
+  flexDirection: 'row',
+  padding: 24,
+  paddingTop: 12,
+  gap: 12,
+},
+primaryButton: {
+  flex: 2,
+  backgroundColor: Colors.primary,
+  paddingVertical: 10,
+  paddingHorizontal: 24,
+  borderRadius: 12,
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+primaryButtonText: {
+  color: '#fff',
+  fontSize: 16,
+  fontWeight: '600',
+},
+secondaryButton: {
+  flex: 1,
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingVertical: 16,
+  paddingHorizontal: 16,
+  borderRadius: 12,
+  borderWidth: 1,
+  borderColor: Colors.primary,
+  gap: 8,
+},
+secondaryButtonText: {
+  color: Colors.primary,
+  fontSize: 14,
+  fontWeight: '600',
+},
   svgContainer: {
     width: '100%',
     height: '100%',
@@ -546,10 +914,10 @@ const HomeStyles = StyleSheet.create({
   servicesGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-
-    marginHorizontal: wp(5.5),
-    padding: wp(2.7),
-    justifyContent: "space-between",
+    marginHorizontal: 20,
+    marginTop: 30,
+    justifyContent: "space-between", 
+    marginBottom: 10,
  
   },
 

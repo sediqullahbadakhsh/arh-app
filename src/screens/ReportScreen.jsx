@@ -1,6 +1,6 @@
-// src/screens/ReportScreen.jsx
+
 import React from "react";
-import { SafeAreaView, View, Text, StyleSheet } from "react-native";
+import {  View, Text, StyleSheet } from "react-native";
 import { Colors } from "../theme/colors";
 export default function ReportScreen() {
   return (

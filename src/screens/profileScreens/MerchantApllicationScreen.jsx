@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  SafeAreaView,
   View,
   Text,
   StyleSheet,
@@ -9,6 +8,7 @@ import {
   Modal,
   FlatList,
   Image,
+  SafeAreaView,
   ScrollView,
   Alert,
   ActivityIndicator,

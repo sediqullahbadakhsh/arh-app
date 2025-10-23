@@ -1,11 +1,11 @@
 import React from "react";
 import {
-  SafeAreaView,
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  SafeAreaView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../theme/colors";
@@ -20,22 +20,22 @@ const REPORT_TYPES = {
     color: "#CD0C02",
     gradient: ["#FFE5E5", "#FFF5F5"],
   },
-  TRANSACTION: {
-    key: "TRANSACTION",
-    title: "Transaction Report",
-    description: "Detailed transaction analysis and summaries",
-    icon: "swap-horizontal-outline",
-    color: "#3B82F6",
-    gradient: ["#E0F2FE", "#F0F9FF"],
-  },
-  AGENT: {
-    key: "AGENT",
-    title: "Agent Report",
-    description: "Agent performance and commission reports",
-    icon: "people-outline",
-    color: "#10B981",
-    gradient: ["#D1FAE5", "#ECFDF5"],
-  },
+  // TRANSACTION: {
+  //   key: "TRANSACTION",
+  //   title: "Transaction Report",
+  //   description: "Detailed transaction analysis and summaries",
+  //   icon: "swap-horizontal-outline",
+  //   color: "#3B82F6",
+  //   gradient: ["#E0F2FE", "#F0F9FF"],
+  // },
+  // AGENT: {
+  //   key: "AGENT",
+  //   title: "Agent Report",
+  //   description: "Agent performance and commission reports",
+  //   icon: "people-outline",
+  //   color: "#10B981",
+  //   gradient: ["#D1FAE5", "#ECFDF5"],
+  // },
 };
 
 export default function ReportsHome({ navigation }) {
@@ -79,8 +79,8 @@ export default function ReportsHome({ navigation }) {
           ))}
         </View>
 
-        {/* Quick Stats Section */}
-        <View style={styles.statsSection}>
+
+        {/* <View style={styles.statsSection}>
           <Text style={styles.sectionTitle}>Quick Overview</Text>
           <View style={styles.statsGrid}>
             <View style={styles.statCard}>
@@ -99,7 +99,7 @@ export default function ReportsHome({ navigation }) {
               <Text style={styles.statLabel}>Current Balance</Text>
             </View>
           </View>
-        </View>
+        </View> */}
       </ScrollView>
     </SafeAreaView>
   );

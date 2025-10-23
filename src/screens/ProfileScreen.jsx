@@ -19,6 +19,7 @@ import { getCustomerProfile, updateCustomerProfile } from "../services/authApi";
 import { useTranslation } from "react-i18next";
 import { isRTL } from "../utils/rtl";
 import ValidationModal from "../components/ValidationModal";
+import { useModal } from "../hooks/useModal";
 
 export default function ProfileScreen({ navigation }) {
   const { user, logout } = useAuth();
@@ -289,7 +290,14 @@ export default function ProfileScreen({ navigation }) {
                 subtitle={t('services.title')}
                 onPress={goMerchant}
               />
-
+              {/* <ProfileRow
+  icon={
+    <Ionicons name="pricetag-outline" size={22} color={Colors.primary} />
+  }
+  title={t('promoCodes')}
+  subtitle={t('services.title')}
+  onPress={() => navigation.navigate('PromoCodes')}
+/> */}
               <ProfileRow
                 icon={
                   <Ionicons name="refresh-circle-outline" size={22} color={Colors.primary} />
@@ -477,6 +485,7 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: "row",
+    direction: 'ltr',
     gap: 10,
     paddingVertical: 12,
     paddingHorizontal: 16,

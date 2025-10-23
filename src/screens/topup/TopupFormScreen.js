@@ -1,5 +1,6 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { SafeAreaView, View, StyleSheet, Text } from 'react-native';
+import React, { useEffect,  useState, useRef, useCallback } from 'react';
+import { View, StyleSheet, SafeAreaView, Text } from 'react-native';
+
 import { Colors } from '../../theme/colors';
 import ServiceHeader from '../../components/ServiceHeader';
 import InputField from '../../components/InputField';
@@ -12,7 +13,7 @@ import { USD_TO_AFN } from '../../constants/rates';
 export default function TopupFormScreen({ navigation, route }) {
     const { product, selectedMobile } = route.params || {};
 
-    // Keep initial amount only once
+ 
     const initialAmount = useRef(product?.usd ? String(product.usd) : '');
     const [mobile, setMobile] = useState('');
     const [amount, setAmount] = useState(initialAmount.current);

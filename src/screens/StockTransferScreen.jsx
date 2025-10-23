@@ -22,100 +22,25 @@ import PrimaryButton from "../components/PrimaryButton";
 import { getAgentDownlineAgents, transferStockToDownlineAgent } from "../services/merchantApi";
 import { useUser } from "../context/userContext";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import SuccessModal from "../components/modals/SuccessModal";
+import ErrorModal from "../components/modals/ErrorModal";
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 const STEPS = { FORM: 0, CONFIRM: 1, DONE: 2 };
 
-// Progress Bar Component
-function ProgressBar({ duration = 2000, onComplete }) {
-  const progress = useRef(new Animated.Value(0)).current;
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-
-  React.useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.02,
-          duration: 800,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 800,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-
-    Animated.timing(progress, {
-      toValue: 100,
-      duration,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: false,
-    }).start(() => {
-      if (onComplete) onComplete();
-    });
-  }, []);
-
-  const widthInterpolated = progress.interpolate({
-    inputRange: [0, 100],
-    outputRange: ['0%', '100%'],
-  });
-
-  return (
-    <View style={styles.progressContainer}>
-      <Animated.View 
-        style={[
-          styles.progressBackground,
-          {
-            transform: [{ scale: pulseAnim }]
-          }
-        ]}
-      >
-        <View style={styles.progressTrack}>
-          <Animated.View 
-            style={[
-              styles.progressFill,
-              { 
-                width: widthInterpolated,
-                backgroundColor: Colors.primary,
-              }
-            ]}
-          >
-            <View style={styles.progressShine} />
-          </Animated.View>
-        </View>
-        <View style={styles.progressDots}>
-          {[0, 25, 50, 75, 100].map((dot) => (
-            <View 
-              key={dot} 
-              style={[
-                styles.progressDot,
-                { 
-                  left: `${dot}%`,
-                  backgroundColor: dot === 0 ? Colors.primary : '#E5E7EB'
-                }
-              ]} 
-            />
-          ))}
-        </View>
-      </Animated.View>
-    </View>
-  );
-}
-
 export default function StockTransferScreen({ navigation }) {
   const [step, setStep] = useState(STEPS.FORM);
-  const [pickerOpen, setPickerOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [showProgress, setShowProgress] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
+  
+
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+
   const { user, setUser } = useUser();
   const insets = useSafeAreaInsets();
 
-  // Animation values
   const modalSlideAnim = useRef(new Animated.Value(screenHeight)).current;
   const modalScaleAnim = useRef(new Animated.Value(0.8)).current;
   const modalOpacityAnim = useRef(new Animated.Value(0)).current;
@@ -123,13 +48,18 @@ export default function StockTransferScreen({ navigation }) {
   const successIconRotate = useRef(new Animated.Value(0)).current;
   const contentStaggerAnim = useRef(new Animated.Value(0)).current;
 
-  // form state
+
+  const [agentPickerAnim] = useState(new Animated.Value(screenHeight));
+
+
   const [agent, setAgent] = useState(null);
   const [agents, setAgents] = useState([]);
   const [amountText, setAmountText] = useState("");
-  const [rateText, setRateText] = useState("");
   const [isAmountFocused, setIsAmountFocused] = useState(false);
-  const [isRateFocused, setIsRateFocused] = useState(false);
+  
+
+  const [agentPickerOpen, setAgentPickerOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     const getAgentChildUsers = async() => {
@@ -139,80 +69,67 @@ export default function StockTransferScreen({ navigation }) {
     getAgentChildUsers();
   }, []);
 
-  // parsed & computed
+  useEffect(() => {
+    if (agentPickerOpen) {
+      Animated.timing(agentPickerAnim, {
+        toValue: 0,
+        duration: 350,
+        easing: Easing.out(Easing.back(1)),
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(agentPickerAnim, {
+        toValue: screenHeight,
+        duration: 250,
+        easing: Easing.in(Easing.ease),
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [agentPickerOpen]);
+
+  // Modal handlers
+  const showCustomSuccessModal = (message) => {
+    setSuccessMessage(message);
+    setShowSuccessModal(true);
+  };
+
+  const showCustomErrorModal = (message) => {
+    setErrorMessage(message);
+    setShowErrorModal(true);
+  };
+
+  const handleSuccessClose = () => {
+    setShowSuccessModal(false);
+    setSuccessMessage("");
+    navigation.popToTop();
+  };
+
+  const handleErrorClose = () => {
+    setShowErrorModal(false);
+    setErrorMessage("");
+  };
+
+  // Use agent's commission rate directly
+  const agentCommissionRate = useMemo(() => {
+    return agent?.commissionRateDetails?.percentage || agent?.commission_rate || 0;
+  }, [agent]);
+
+  // parsed & computed - use agentCommissionRate instead of manual input
   const amount = useMemo(
     () => Math.max(0, parseNumber(amountText)),
     [amountText]
   );
-  const rate = useMemo(() => clamp(parseNumber(rateText), 0, 100), [rateText]);
+  const rate = useMemo(() => agentCommissionRate, [agentCommissionRate]);
   const commission = useMemo(() => (amount * rate) / 100, [amount, rate]);
   const total = useMemo(() => amount + commission, [amount, commission]);
 
-  const canContinue = !!agent && amount > 0;
+  const canContinue = !!agent && amount > 0 && agentCommissionRate > 0;
   const txId = useMemo(
     () => "#" + Math.random().toString(36).slice(2, 10).toUpperCase(),
     [step === STEPS.DONE]
   );
 
   const goBack = () => (step > 0 ? setStep(step - 1) : navigation.goBack());
-
-  const animateSuccessModalIn = () => {
-    modalSlideAnim.setValue(screenHeight);
-    modalScaleAnim.setValue(0.8);
-    modalOpacityAnim.setValue(0);
-    successIconScale.setValue(0);
-    successIconRotate.setValue(0);
-    contentStaggerAnim.setValue(0);
-
-    Animated.parallel([
-      Animated.timing(modalSlideAnim, {
-        toValue: 0,
-        duration: 400,
-        easing: Easing.out(Easing.back(1.5)),
-        useNativeDriver: true,
-      }),
-      Animated.timing(modalScaleAnim, {
-        toValue: 1,
-        duration: 400,
-        easing: Easing.out(Easing.back(1.2)),
-        useNativeDriver: true,
-      }),
-      Animated.timing(modalOpacityAnim, {
-        toValue: 1,
-        duration: 300,
-        easing: Easing.out(Easing.ease),
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      Animated.parallel([
-        Animated.spring(successIconScale, {
-          toValue: 1,
-          tension: 100,
-          friction: 8,
-          useNativeDriver: true,
-        }),
-        Animated.timing(successIconRotate, {
-          toValue: 1,
-          duration: 600,
-          easing: Easing.out(Easing.back(2)),
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        Animated.timing(contentStaggerAnim, {
-          toValue: 1,
-          duration: 400,
-          easing: Easing.out(Easing.ease),
-          useNativeDriver: true,
-        }).start();
-      });
-    });
-  };
-
-  const handleProgressComplete = () => {
-    setShowProgress(false);
-    setShowSuccess(true);
-    setTimeout(animateSuccessModalIn, 100);
-  };
 
   const transferStock = async () => {
     try {
@@ -224,34 +141,20 @@ export default function StockTransferScreen({ navigation }) {
       };
 
       const res = await transferStockToDownlineAgent(payload);
-      setShowProgress(true);
+      
+      // Show success modal instead of progress
+      showCustomSuccessModal(`Stock transfer of ${fmtAFN(amount)} to ${agent?.user?.username} was successful!`);
+      setStep(STEPS.FORM); // Reset form
+      setAgent(null);
+      setAmountText("");
       
     } catch (error) {
       console.log("Transfer stock error: ", error);
       const message = error.response?.data?.error || error.message || "Failed to Transfer Stock";
-      Alert.alert("Transfer Failed", message);
+      showCustomErrorModal(message);
+    } finally {
       setLoading(false);
     }
-  };
-
-  const handleSuccessClose = () => {
-    Animated.parallel([
-      Animated.timing(modalSlideAnim, {
-        toValue: screenHeight,
-        duration: 300,
-        easing: Easing.in(Easing.ease),
-        useNativeDriver: true,
-      }),
-      Animated.timing(modalOpacityAnim, {
-        toValue: 0,
-        duration: 300,
-        easing: Easing.in(Easing.ease),
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setShowSuccess(false);
-      navigation.popToTop();
-    });
   };
 
   const modalTransform = {
@@ -261,56 +164,38 @@ export default function StockTransferScreen({ navigation }) {
     ]
   };
 
-  const successIconTransform = {
+  const agentPickerTransform = {
     transform: [
-      { 
-        scale: successIconScale.interpolate({
-          inputRange: [0, 1],
-          outputRange: [0, 1]
-        }) 
-      },
-      {
-        rotate: successIconRotate.interpolate({
-          inputRange: [0, 1],
-          outputRange: ['-180deg', '0deg']
-        })
-      }
+      { translateY: agentPickerAnim }
     ]
   };
 
-  const contentOpacity = contentStaggerAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1]
-  });
-
-  const contentTransform = {
-    transform: [
-      {
-        translateY: contentStaggerAnim.interpolate({
-          inputRange: [0, 1],
-          outputRange: [20, 0]
-        })
-      }
-    ]
-  };
+  const filteredAgents = searchQuery
+    ? agents.filter(item =>
+        item.user?.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.user?.mobileNumber?.includes(searchQuery) ||
+        item.user?.email?.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : agents;
 
   const AgentPickerModal = () => (
     <Modal
-      visible={pickerOpen}
+      visible={agentPickerOpen}
       transparent={true}
       animationType="none"
       statusBarTranslucent={true}
-      onRequestClose={() => setPickerOpen(false)}
+      onRequestClose={() => setAgentPickerOpen(false)}
     >
       <View style={styles.modalOverlay}>
         <TouchableOpacity 
           style={styles.modalBackdrop}
           activeOpacity={1}
-          onPress={() => setPickerOpen(false)}
+          onPress={() => setAgentPickerOpen(false)}
         />
         <Animated.View 
           style={[
             styles.modalCard,
+            agentPickerTransform,
             { 
               height: '70%',
               marginBottom: -insets.bottom
@@ -320,7 +205,7 @@ export default function StockTransferScreen({ navigation }) {
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Select Agent</Text>
             <TouchableOpacity 
-              onPress={() => setPickerOpen(false)}
+              onPress={() => setAgentPickerOpen(false)}
               style={styles.closeButton}
             >
               <Ionicons name="close" size={24} color="#666" />
@@ -331,22 +216,30 @@ export default function StockTransferScreen({ navigation }) {
             <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
             <TextInput
               placeholder="Search agents..."
+              value={searchQuery}
+              onChangeText={setSearchQuery}
               style={styles.searchInput}
               placeholderTextColor="#999"
             />
+            {searchQuery ? (
+              <TouchableOpacity onPress={() => setSearchQuery("")}>
+                <Ionicons name="close-circle" size={20} color="#999" />
+              </TouchableOpacity>
+            ) : null}
           </View>
 
           <FlatList
-            data={agents}
-            keyExtractor={(it) => it.id}
+            data={filteredAgents}
+            keyExtractor={(item) => item.id.toString()}
             renderItem={({ item }) => (
               <TouchableOpacity
                 style={styles.agentItem}
                 onPress={() => {
                   setAgent(item);
-                  setRateText(item?.commission_rate || "0");
-                  setPickerOpen(false);
+                  setAgentPickerOpen(false);
+                  setSearchQuery("");
                 }}
+                activeOpacity={0.7}
               >
                 <View style={styles.agentAvatar}>
                   <Ionicons name="person-circle-outline" size={24} color={Colors.primary} />
@@ -354,11 +247,9 @@ export default function StockTransferScreen({ navigation }) {
                 <View style={styles.agentInfo}>
                   <Text style={styles.agentName}>{item.user?.username}</Text>
                   <Text style={styles.agentPhone}>{item.user?.mobileNumber}</Text>
-                  {item.commission_rate && (
-                    <Text style={styles.agentCommission}>
-                      Commission: {item.commission_rate}%
-                    </Text>
-                  )}
+                  <Text style={styles.agentCommission}>
+                    Commission: {item.commissionRateDetails?.percentage || item.commission_rate || 0}%
+                  </Text>
                 </View>
                 {item.id === agent?.id && (
                   <Ionicons name="checkmark-circle" size={24} color={Colors.primary} />
@@ -366,6 +257,19 @@ export default function StockTransferScreen({ navigation }) {
               </TouchableOpacity>
             )}
             ItemSeparatorComponent={() => <View style={styles.agentSeparator} />}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.modalContent}
+            ListEmptyComponent={
+              <View style={styles.emptyState}>
+                <Ionicons name="people-outline" size={48} color="#9E9E9E" />
+                <Text style={styles.emptyText}>
+                  {searchQuery ? "No agents found" : "No agents available"}
+                </Text>
+                <Text style={styles.emptySubtext}>
+                  {searchQuery ? "Try adjusting your search" : "No downline agents found"}
+                </Text>
+              </View>
+            }
           />
         </Animated.View>
       </View>
@@ -373,7 +277,7 @@ export default function StockTransferScreen({ navigation }) {
   );
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white, paddingBottom: 100 }}>
       <ServiceHeader title="Stock Transfer" onBack={goBack} />
 
       {step === STEPS.DONE ? (
@@ -414,7 +318,7 @@ export default function StockTransferScreen({ navigation }) {
           >
             {step === STEPS.FORM && (
               <>
-    
+                {/* Agent Selection */}
                 <View style={{ marginBottom: 20 }}>
                   <View style={styles.editHeader}>
                     <Text style={styles.label}>Select Agent</Text>
@@ -423,17 +327,17 @@ export default function StockTransferScreen({ navigation }) {
                     style={[
                       styles.dropdown,
                       {
-                        borderColor: pickerOpen ? Colors.primary : '#E4E7EC',
+                        borderColor: agentPickerOpen ? Colors.primary : '#E4E7EC',
                         backgroundColor: '#FFFFFF',
                         shadowColor: Colors.primary,
                         shadowOffset: { width: 0, height: 4 },
-                        shadowOpacity: pickerOpen ? 0.15 : 0,
-                        shadowRadius: pickerOpen ? 10 : 0,
-                        elevation: pickerOpen ? 3 : 0,
+                        shadowOpacity: agentPickerOpen ? 0.15 : 0,
+                        shadowRadius: agentPickerOpen ? 10 : 0,
+                        elevation: agentPickerOpen ? 3 : 0,
                       }
                     ]}
                     activeOpacity={0.85}
-                    onPress={() => setPickerOpen(true)}
+                    onPress={() => setAgentPickerOpen(true)}
                   >
                     <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
                       {agent ? (
@@ -444,6 +348,9 @@ export default function StockTransferScreen({ navigation }) {
                           <View style={{ flex: 1 }}>
                             <Text style={styles.dropdownText}>{agent.user?.username}</Text>
                             <Text style={styles.dropdownSubtext}>{agent.user?.mobileNumber}</Text>
+                            <Text style={styles.dropdownCommission}>
+                              Commission: {agentCommissionRate}%
+                            </Text>
                           </View>
                         </>
                       ) : (
@@ -493,31 +400,29 @@ export default function StockTransferScreen({ navigation }) {
                   </View>
                 </View>
 
-         
+                {/* Commission Rate - Display Only */}
                 <View style={{ marginBottom: 20 }}>
                   <Text style={styles.label}>Commission Rate</Text>
-                  <View style={[
-                    styles.inputContainer,
-                    {
-                      borderColor: isRateFocused ? Colors.primary : '#2e2e2eff',
-                      backgroundColor: '#F8F9FA',
-                    }
-                  ]}>
+                  <View style={[styles.inputContainer, styles.inputDisabled]}>
                     <Text style={styles.currencyTag}>%</Text>
-                    <TextInput
-                      value={String(rateText)}
-                      keyboardType="numeric"
-                      placeholder="0"
-                      placeholderTextColor="#9E9E9E"
-                      style={[styles.input, { color: Colors.textSecondary }]}
-                      onFocus={() => setIsRateFocused(true)}
-                      onBlur={() => setIsRateFocused(false)}
-                      editable={false}
-                    />
+                    <Text style={[styles.input, { color: Colors.textPrimary, paddingVertical: 15 }]}>
+                      {agentCommissionRate}%
+                    </Text>
                   </View>
                 </View>
 
-    
+                {/* Commission Amount - Display Only */}
+                <View style={{ marginBottom: 20 }}>
+                  <Text style={styles.label}>Commission Amount</Text>
+                  <View style={[styles.inputContainer, styles.inputDisabled]}>
+                    <Text style={styles.currencyTag}>AFN</Text>
+                    <Text style={[styles.input, { color: Colors.textPrimary, paddingVertical: 15 }]}>
+                      {fmtAFN(commission)}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Total Amount - Display Only */}
                 <View style={{ marginBottom: 20 }}>
                   <Text style={styles.label}>Total Amount</Text>
                   <View style={[styles.inputContainer, styles.inputDisabled]}>
@@ -527,9 +432,6 @@ export default function StockTransferScreen({ navigation }) {
                     </Text>
                   </View>
                 </View>
-
-          
-       
 
                 <PrimaryButton
                   label="Continue"
@@ -551,7 +453,7 @@ export default function StockTransferScreen({ navigation }) {
                   <DetailRow label="Agent" value={`${agent?.user?.username}`} />
                   <DetailRow label="Phone" value={agent?.user?.mobileNumber} />
                   <DetailRow label="Transfer Amount" value={fmtAFN(amount)} />
-                  <DetailRow label="Commission Rate" value={`${stripTrailingZeros(agent?.commission_rate || 0)}%`} />
+                  <DetailRow label="Commission Rate" value={`${agentCommissionRate}%`} />
                   <DetailRow label="Commission Amount" value={fmtAFN(commission)} />
                   <View style={styles.totalRow}>
                     <Text style={styles.totalLabel}>Total Amount</Text>
@@ -576,131 +478,30 @@ export default function StockTransferScreen({ navigation }) {
         </KeyboardAvoidingView>
       )}
 
+      {/* Success Modal */}
+      <SuccessModal
+        visible={showSuccessModal}
+        onClose={handleSuccessClose}
+        title="Transfer Successful!"
+        message={successMessage}
+        buttonText="Continue"
+        autoHideDuration={3000}
+      />
 
-      {/* Fixed Progress Modal */}
-      <Modal
-        visible={showProgress}
-        transparent={true}
-        animationType="fade"
-        statusBarTranslucent={true}
-      >
-        <View style={styles.progressModalOverlay}>
-          <View style={styles.progressModal}>
-            <View style={styles.progressContent}>
-              <View style={styles.processingIconContainer}>
-                <Ionicons name="swap-horizontal-outline" size={48} color={Colors.primary} />
-                <View style={styles.processingPulse} />
-              </View>
-              <Text style={styles.progressTitle}>Processing Transfer</Text>
-              <Text style={styles.progressText}>
-                Transferring {amountText} AFN to {agent?.user?.username}...
-              </Text>
-              
-              <ProgressBar 
-                duration={2500} 
-                onComplete={handleProgressComplete}
-              />
-              
-              <TouchableOpacity 
-                style={styles.cancelButton}
-                onPress={() => setShowProgress(false)}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Fixed Success Modal */}
-      <Modal
-        visible={showSuccess}
-        transparent={true}
-        animationType="fade"
-        statusBarTranslucent={true}
-      >
-        <View style={styles.successModalOverlay}>
-          <Animated.View 
-            style={[
-              styles.successModal,
-              modalTransform,
-              { opacity: modalOpacityAnim }
-            ]}
-          >
-            <Animated.View style={styles.successContent}>
-              {/* Success Icon with Animation */}
-              <Animated.View 
-                style={[
-                  styles.successIconContainer,
-                  successIconTransform
-                ]}
-              >
-                <View style={styles.successIconBackground} />
-                <Ionicons name="checkmark" size={42} color="#FFFFFF" />
-                <View style={styles.successIconRipple} />
-                <View style={[styles.successIconRipple, styles.successIconRipple2]} />
-              </Animated.View>
-
-              {/* Success Content with Stagger Animation */}
-              <Animated.View 
-                style={[
-                  styles.successTextContent,
-                  { 
-                    opacity: contentOpacity,
-                    ...contentTransform 
-                  }
-                ]}
-              >
-                <Text style={styles.successTitle}>Transfer Successful!</Text>
-                <Text style={styles.successSubtitle}>
-                  Stock has been transferred to {agent?.user?.username}
-                </Text>
-
-                <View style={styles.successDetails}>
-                  <View style={styles.detailRow}>
-                    <View style={styles.detailIcon}>
-                      <Ionicons name="person-outline" size={18} color={Colors.primary} />
-                    </View>
-                    <Text style={styles.detailLabel}>Agent:</Text>
-                    <Text style={styles.detailValue}>{agent?.user?.username}</Text>
-                  </View>
-                  
-                  <View style={styles.detailRow}>
-                    <View style={styles.detailIcon}>
-                      <Ionicons name="cash-outline" size={18} color={Colors.primary} />
-                    </View>
-                    <Text style={styles.detailLabel}>Amount:</Text>
-                    <Text style={styles.detailValue}>{fmtAFN(amount)}</Text>
-                  </View>
-                  
-                  <View style={styles.detailRow}>
-                    <View style={styles.detailIcon}>
-                      <Ionicons name="time-outline" size={18} color={Colors.primary} />
-                    </View>
-                    <Text style={styles.detailLabel}>Completed:</Text>
-                    <Text style={styles.detailValue}>
-                      {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                    </Text>
-                  </View>
-                </View>
-
-                <PrimaryButton
-                  label="Continue"
-                  onPress={handleSuccessClose}
-                  style={styles.successButton}
-                />
-              </Animated.View>
-            </Animated.View>
-          </Animated.View>
-        </View>
-      </Modal>
+      {/* Error Modal */}
+      <ErrorModal
+        visible={showErrorModal}
+        onClose={handleErrorClose}
+        title="Transfer Failed"
+        message={errorMessage}
+        buttonText="Try Again"
+        showRetryButton={true}
+      />
 
       <AgentPickerModal />
     </SafeAreaView>
   );
 }
-
-/* ---------- Helper Components ---------- */
 
 function DetailRow({ label, value, bold }) {
   return (
@@ -710,8 +511,6 @@ function DetailRow({ label, value, bold }) {
     </View>
   );
 }
-
-/* ---------- Utility Functions ---------- */
 
 function parseNumber(s = "") {
   const cleaned = String(s).replace(/[^\d.]/g, "");
@@ -742,76 +541,68 @@ function stripTrailingZeros(n) {
   return s.endsWith(".0") ? s.slice(0, -2) : s;
 }
 
-/* ---------- Styles ---------- */
-
 const styles = {
-  // Modal Overlay Styles - FIXED
-  progressModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  successModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
-
-  progressContainer: {
-    marginVertical: 20,
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
   },
-  progressBackground: {
-    padding: 4,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  progressTrack: {
-    height: 12,
-    backgroundColor: '#F1F5F9',
-    borderRadius: 8,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 8,
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  progressShine: {
+  modalCard: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '50%',
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderRadius: 8,
-  },
-  progressDots: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
     bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
+    padding: 16,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: Colors.textPrimary,
+  },
+  closeButton: {
+    padding: 4,
+  },
+  searchContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 2,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    marginBottom: 16,
+    height: 44,
   },
-  progressDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+  searchIcon: {
+    marginRight: 8,
   },
-
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: Colors.textPrimary,
+  },
+  modalContent: {
+    paddingBottom: 20,
+  },
 
   sectionTitle: {
     fontSize: 20,
@@ -833,9 +624,8 @@ const styles = {
     marginBottom: 8,
   },
 
-
   dropdown: {
-    height: 65,
+    height: 75,
     borderRadius: 16,
     borderWidth: 1,
     backgroundColor: '#FFFFFF',
@@ -854,7 +644,12 @@ const styles = {
     color: Colors.textSecondary,
     marginTop: 2,
   },
-
+  dropdownCommission: {
+    fontSize: 12,
+    color: Colors.primary,
+    marginTop: 2,
+    fontWeight: '500',
+  },
 
   inputContainer: {
     flexDirection: 'row',
@@ -881,44 +676,6 @@ const styles = {
   },
   clearBtn: {
     padding: 6,
-  },
-
-
-  quickAmountsContainer: {
-    marginTop: 20,
-  },
-  quickAmountsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.textPrimary,
-    marginBottom: 12,
-  },
-  quickAmountsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  quickAmountButton: {
-    minWidth: 70,
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: '#F5F5F5',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  quickAmountButtonSelected: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  quickAmountText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.textPrimary,
-  },
-  quickAmountTextSelected: {
-    color: Colors.white,
   },
 
   // Confirm Card
@@ -1019,63 +776,13 @@ const styles = {
     fontWeight: '800',
   },
 
-  // Modal Styles
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "flex-end",
-  },
-  modalCard: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 25,
-    borderTopRightRadius: 25,
-    padding: 16,
-    elevation: 5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-  },
-  modalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: Colors.textPrimary,
-  },
-  closeButton: {
-    padding: 4,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    marginBottom: 16,
-    height: 44,
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    color: Colors.textPrimary,
-  },
-
   // Agent List Styles
   agentItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 8,
   },
   agentAvatar: {
     width: 40,
@@ -1119,151 +826,22 @@ const styles = {
     backgroundColor: '#F0F0F0',
   },
 
-  // Progress Modal Styles - FIXED
-  progressModal: {
-    backgroundColor: 'white',
-    borderRadius: 24,
-    padding: 32,
-    width: Math.min(screenWidth * 0.9, 400),
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 24,
-    elevation: 12,
-  },
-  progressContent: {
-    alignItems: 'center',
-    width: '100%',
-  },
-  processingIconContainer: {
-    position: 'relative',
-    marginBottom: 16,
-  },
-  processingPulse: {
-    position: 'absolute',
-    top: -10,
-    left: -10,
-    right: -10,
-    bottom: -10,
-    borderRadius: 34,
-    borderWidth: 2,
-    borderColor: Colors.primary,
-    opacity: 0.3,
-    transform: [{ scale: 1.2 }],
-  },
-  progressTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-    marginTop: 8,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  progressText: {
-    fontSize: 16,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: 32,
-    lineHeight: 22,
-  },
-  cancelButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 32,
-    borderRadius: 12,
-    backgroundColor: '#F8FAFC',
-    marginTop: 8,
-  },
-  cancelButtonText: {
-    color: Colors.textSecondary,
-    fontSize: 16,
-    fontWeight: '600',
-  },
 
-  // Success Modal Styles - FIXED
-  successModal: {
-    backgroundColor: 'white',
-    borderRadius: 28,
-    padding: 0,
-    width: Math.min(screenWidth * 0.9, 400),
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.3,
-    shadowRadius: 40,
-    elevation: 20,
-    overflow: 'hidden',
-  },
-  successContent: {
+  emptyState: {
     alignItems: 'center',
-    width: '100%',
-  },
-  successIconContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
     justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 40,
-    marginBottom: 24,
-    position: 'relative',
+    paddingVertical: 40,
   },
-  successIconBackground: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: Colors.primary,
-    borderRadius: 50,
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  successIconRipple: {
-    position: 'absolute',
-    top: -10,
-    left: -10,
-    right: -10,
-    bottom: -10,
-    borderRadius: 60,
-    borderWidth: 2,
-    borderColor: Colors.primary,
-    opacity: 0.2,
-  },
-  successIconRipple2: {
-    top: -20,
-    left: -20,
-    right: -20,
-    bottom: -20,
-    opacity: 0.1,
-  },
-  successTextContent: {
-    alignItems: 'center',
-    paddingHorizontal: 32,
-    paddingBottom: 32,
-    width: '100%',
-  },
-  successTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: Colors.textPrimary,
-    marginBottom: 8,
-    textAlign: 'center',
-    letterSpacing: -0.5,
-  },
-  successSubtitle: {
+  emptyText: {
     fontSize: 16,
     color: Colors.textSecondary,
+    marginTop: 12,
     textAlign: 'center',
-    marginBottom: 32,
-    lineHeight: 24,
   },
-  successButton: {
-    width: '100%',
-    marginTop: 8,
-    borderRadius: 16,
-    height: 56,
+  emptySubtext: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    marginTop: 4,
+    textAlign: 'center',
   },
 };

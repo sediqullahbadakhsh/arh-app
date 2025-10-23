@@ -1,6 +1,5 @@
 import React, { useMemo, useState, useRef, useEffect } from "react";
 import { 
-  SafeAreaView, 
   View, 
   Text, 
   TouchableOpacity, 
@@ -11,6 +10,7 @@ import {
   Modal,
   Animated,
   Easing,
+  SafeAreaView,
   Dimensions
 } from "react-native";
 import { Colors } from "../theme/colors";
@@ -495,7 +495,7 @@ export default function TransferToPrimaryScreen({ navigation, route }) {
           />
 
   
-          <View style={styles.infoCard}>
+          {/* <View style={styles.infoCard}>
             <View style={styles.infoHeader}>
               <Ionicons name="information-circle-outline" size={20} color={Colors.primary} />
               <Text style={styles.infoTitle}>About This Transfer</Text>
@@ -505,7 +505,7 @@ export default function TransferToPrimaryScreen({ navigation, route }) {
               • Transfers are processed instantly{"\n"}
               • No transfer fees applied
             </Text>
-          </View>
+          </View> */}
         </ScrollView>
       </KeyboardAvoidingView>
 

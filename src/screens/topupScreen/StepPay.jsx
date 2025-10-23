@@ -1,8 +1,8 @@
-import { CardField, useStripe } from "@stripe/stripe-react-native";
-import { Text, TouchableOpacity, ScrollView, StyleSheet, TextInput, Image } from "react-native";
+import React, { useState, useEffect } from "react";
+import { Text, TouchableOpacity, ScrollView, StyleSheet, Image, Alert } from "react-native";
 import { View } from "react-native";
+import { CardField, useStripe } from "@stripe/stripe-react-native";
 import TopUpStyles from "./TopupStyle";
-import { useState } from "react";
 import { Colors } from "../../theme/colors";
 import { useTranslation } from "react-i18next";
 
@@ -12,13 +12,11 @@ function StepPay({
   onCardDetailsChange,
 }) {
   const { t } = useTranslation();
-  const [isFocused, setIsFocused] = useState(false);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
-  const [cardDetails, setCardDetails] = useState({
-    number: '',
-    expiry: '',
-    cvc: ''
-  });
+  const { createPaymentMethod } = useStripe();
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('card');
+  const [cardDetails, setCardDetails] = useState(null);
+  const [isCreatingPaymentMethod, setIsCreatingPaymentMethod] = useState(false);
+  const [paymentMethodId, setPaymentMethodId] = useState(null);
 
   const paymentMethods = [
     { 
@@ -41,225 +39,236 @@ function StepPay({
     },
   ];
 
+  // Create Stripe PaymentMethod when card details are complete
+  useEffect(() => {
+    const createStripePaymentMethod = async () => {
+      if (!cardDetails?.complete || isCreatingPaymentMethod) return;
+
+      setIsCreatingPaymentMethod(true);
+      
+      try {
+        console.log('Creating PaymentMethod with Stripe CardField...');
+
+        const { paymentMethod, error } = await createPaymentMethod({
+          paymentMethodType: 'Card',
+        });
+
+        if (error) {
+          console.error('Error creating PaymentMethod:', error);
+          Alert.alert(t('paymentError'), error.message);
+          onCardDetailsChange(false, null);
+          setPaymentMethodId(null);
+        } else if (paymentMethod) {
+          console.log('PaymentMethod created successfully:', paymentMethod.id);
+          setPaymentMethodId(paymentMethod.id);
+          onCardDetailsChange(true, paymentMethod.id);
+        }
+      } catch (error) {
+        console.error('Exception creating PaymentMethod:', error);
+        Alert.alert(t('error'), t('paymentMethodCreationFailed'));
+        onCardDetailsChange(false, null);
+        setPaymentMethodId(null);
+      } finally {
+        setIsCreatingPaymentMethod(false);
+      }
+    };
+
+    if (selectedPaymentMethod === 'card' && cardDetails?.complete) {
+      // Add a small delay to avoid rapid API calls
+      const timer = setTimeout(() => {
+        createStripePaymentMethod();
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    } else {
+      setPaymentMethodId(null);
+      onCardDetailsChange(false, null);
+    }
+  }, [cardDetails, selectedPaymentMethod]);
+
   const handlePaymentMethodSelect = (methodId) => {
     setSelectedPaymentMethod(methodId);
+    setPaymentMethodId(null);
+    setCardDetails(null);
     
-
     if (methodId !== 'card') {
-      setCardDetails({ number: '', expiry: '', cvc: '' });
-      onCardDetailsChange(false);
+      onCardDetailsChange(false, null);
     }
   };
 
-  const handleCardFieldChange = (field, value) => {
-    const newDetails = {
-      ...cardDetails,
-      [field]: value.replace(/\s/g, '') 
-    };
+  const handleCardFieldChange = (cardDetails) => {
+    setCardDetails(cardDetails);
     
-    setCardDetails(newDetails);
-    
-
-    const isComplete = 
-      newDetails.number.length >= 16 && 
-      newDetails.expiry.length >= 5 && 
-      newDetails.cvc.length >= 3;
-    
-    onCardDetailsChange(isComplete);
-  };
-
-  const formatCardNumber = (value) => {
-    const cleaned = value.replace(/\D/g, '');
-    const match = cleaned.match(/(\d{1,4})(\d{1,4})?(\d{1,4})?(\d{1,4})?/);
-    if (match) {
-      return [match[1], match[2], match[3], match[4]].filter(Boolean).join(' ');
+    // If card becomes incomplete, reset payment method
+    if (!cardDetails.complete && paymentMethodId) {
+      setPaymentMethodId(null);
+      onCardDetailsChange(false, null);
     }
-    return value;
   };
 
-  const formatExpiry = (value) => {
-    const cleaned = value.replace(/\D/g, '');
-    if (cleaned.length >= 3) {
-      return cleaned.slice(0, 2) + '/' + cleaned.slice(2, 4);
-    }
-    return value;
-  };
-
-  const getSelectedMethod = () => {
-    return paymentMethods.find(method => method.id === selectedPaymentMethod);
+  const clearCardDetails = () => {
+    setCardDetails(null);
+    setPaymentMethodId(null);
+    onCardDetailsChange(false, null);
   };
 
   return (
     <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
       <View style={{ marginTop: 12 }}>
         <Text style={TopUpStyles.sectionTitle}>
-          {selectedPaymentMethod ? t('cardDetails') : t('paymentMethod')}
+          {t('paymentMethod')}
         </Text>
 
-        {!selectedPaymentMethod ? (
-          <View style={styles.paymentMethodContainer}>
-            {paymentMethods.map((method) => (
-              <TouchableOpacity
-                key={method.id}
-                style={styles.paymentMethodButton}
-                onPress={() => handlePaymentMethodSelect(method.id)}
-              >
-                <View style={styles.paymentMethodContent}>
-                  <Image 
-                    source={method.icon} 
-                    style={styles.paymentIcon}
-                    resizeMode="contain"
-                  />
-                  <Text style={styles.paymentMethodText}>
-                    {method.label}
+        {/* Payment Method Selection */}
+        <View style={styles.paymentMethodContainer}>
+          {paymentMethods.map((method) => (
+            <TouchableOpacity
+              key={method.id}
+              style={[
+                styles.paymentMethodButton,
+                selectedPaymentMethod === method.id && styles.paymentMethodButtonSelected
+              ]}
+              onPress={() => handlePaymentMethodSelect(method.id)}
+              disabled={isCreatingPaymentMethod}
+            >
+              <View style={styles.paymentMethodContent}>
+                <Image 
+                  source={method.icon} 
+                  style={[
+                    styles.paymentIcon,
+                    selectedPaymentMethod === method.id && styles.paymentIconSelected
+                  ]}
+                  resizeMode="contain"
+                />
+                <Text style={[
+                  styles.paymentMethodText,
+                  selectedPaymentMethod === method.id && styles.paymentMethodTextSelected
+                ]}>
+                  {method.label}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Card Details Form */}
+        {selectedPaymentMethod === 'card' && (
+          <View style={styles.cardDetailsContainer}>
+            <View style={styles.fieldContainer}>
+              <View style={styles.fieldHeader}>
+                <Text style={styles.fieldLabel}>{t('cardDetails')}</Text>
+                {cardDetails && (
+                  <TouchableOpacity onPress={clearCardDetails} style={styles.clearButton}>
+                    <Text style={styles.clearButtonText}>{t('clear')}</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              
+              <CardField
+                postalCodeEnabled={false}
+                placeholders={{
+                  number: '1234 1234 1234 1234',
+                  expiration: 'MM/YY',
+                  cvc: 'CVC',
+                }}
+                cardStyle={{
+                  backgroundColor: '#FFFFFF',
+                  textColor: '#000000',
+                  borderWidth: 1,
+                  borderColor: cardDetails?.complete ? '#10B981' : '#E0E0E0',
+                  borderRadius: 8,
+                  fontSize: 16,
+                }}
+                style={{
+                  width: '100%',
+                  height: 50,
+                  marginVertical: 8,
+                }}
+                onCardChange={handleCardFieldChange}
+              />
+
+              {cardDetails?.error && (
+                <Text style={styles.errorText}>
+                  {cardDetails.error.message || t('cardError')}
+                </Text>
+              )}
+
+              {cardDetails?.complete && !paymentMethodId && (
+                <View style={styles.processingContainer}>
+                  <Text style={styles.processingText}>
+                    {t('validatingCard')}
                   </Text>
                 </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        ) : (
- 
-          <View>
-    
-            {selectedPaymentMethod === 'card' && (
-              <View style={styles.cardDetailsContainer}>
-                <View style={styles.fieldContainer}>
-                  <Text style={styles.fieldLabel}>{t('cardNumber')}</Text>
-                  <View style={[
-                    styles.inputContainer,
-                    isFocused && cardDetails.number === '' && styles.inputContainerFocused
-                  ]}>
-                    <View style={styles.inputWithIcon}>
-                      <Image 
-                        source={require('../../../assets/images/credit-card.png')} 
-                        style={styles.inputIcon} 
-                        resizeMode="contain"
-                      />
-                      <TextInput
-                        style={styles.textInput}
-                        placeholder="1234 5678 9012 3456"
-                        placeholderTextColor="#B8B8B8"
-                        keyboardType="numeric"
-                        maxLength={19}
-                        value={formatCardNumber(cardDetails.number)}
-                        onChangeText={(value) => handleCardFieldChange('number', value)}
-                        onFocus={() => setIsFocused(true)}
-                        onBlur={() => setIsFocused(false)}
-                      />
-                    </View>
-                  </View>
-                </View>
+              )}
+            </View>
 
-                <View style={styles.row}>
-                  <View style={[styles.fieldContainer, { flex: 1, marginRight: 8 }]}>
-                    <Text style={styles.fieldLabel}>{t('expiryDate')}</Text>
-                    <View style={[
-                      styles.inputContainer,
-                      isFocused && cardDetails.expiry === '' && styles.inputContainerFocused
-                    ]}>
-                      <View style={styles.inputWithIcon}>
-                        <Image 
-                          source={require('../../../assets/images/calendar.png')} 
-                          style={styles.inputIcon} 
-                          resizeMode="contain"
-                        />
-                        <TextInput
-                          style={styles.textInput}
-                          placeholder="MM/YY"
-                          placeholderTextColor="#B8B8B8"
-                          keyboardType="numeric"
-                          maxLength={5}
-                          value={formatExpiry(cardDetails.expiry)}
-                          onChangeText={(value) => handleCardFieldChange('expiry', value)}
-                          onFocus={() => setIsFocused(true)}
-                          onBlur={() => setIsFocused(false)}
-                        />
-                      </View>
-                    </View>
-                  </View>
-
-                  <View style={[styles.fieldContainer, { flex: 1, marginLeft: 8 }]}>
-                    <Text style={styles.fieldLabel}>{t('cvc')}</Text>
-                    <View style={[
-                      styles.inputContainer,
-                      isFocused && cardDetails.cvc === '' && styles.inputContainerFocused
-                    ]}>
-                      <View style={styles.inputWithIcon}>
-                        <Image 
-                          source={require('../../../assets/images/lock.png')} 
-                          style={styles.inputIcon} 
-                          resizeMode="contain"
-                        />
-                        <TextInput
-                          style={styles.textInput}
-                          placeholder="123"
-                          placeholderTextColor="#B8B8B8"
-                          keyboardType="numeric"
-                          maxLength={4}
-                          value={cardDetails.cvc}
-                          onChangeText={(value) => handleCardFieldChange('cvc', value)}
-                          onFocus={() => setIsFocused(true)}
-                          onBlur={() => setIsFocused(false)}
-                          secureTextEntry
-                        />
-                      </View>
-                    </View>
-                  </View>
-                </View>
-
-                <Text style={[TopUpStyles.smallLabel, { marginTop: 16 }]}>
-                  {t('securePaymentNotice')}
+            {isCreatingPaymentMethod && (
+              <View style={styles.processingContainer}>
+                <Text style={styles.processingText}>
+                  {t('creatingPaymentMethod')}
                 </Text>
               </View>
             )}
 
-            {/* PayPal Payment Method */}
-            {selectedPaymentMethod === 'paypal' && (
-              <View style={styles.altPaymentContainer}>
-                <Image 
-                  source={require('../../../assets/images/paypal.png')} 
-                  style={styles.paymentLogo} 
-                  resizeMode="contain"
-                />
-                <Text style={styles.altPaymentText}>
-                  {t('paypalRedirect')}
+            {paymentMethodId && (
+              <View style={styles.successContainer}>
+                <Text style={styles.successMessage}>
+                  {t('paymentMethodReady')}
                 </Text>
-                <TouchableOpacity style={[styles.paymentButton, { backgroundColor: '#0070BA' }]}>
-                  <Image 
-                    source={require('../../../assets/images/paypal.png')} 
-                    style={styles.buttonIcon} 
-                    resizeMode="contain"
-                  />
-                  <Text style={styles.paymentButtonText}>{t('continueWithPaypal')}</Text>
-                </TouchableOpacity>
               </View>
             )}
 
-            {/* Google Pay Payment Method */}
-            {selectedPaymentMethod === 'googlepay' && (
-              <View style={styles.altPaymentContainer}>
-                <Image 
-                  source={require('../../../assets/images/google-pay.png')} 
-                  style={styles.paymentLogo} 
-                  resizeMode="contain"
-                />
-                <Text style={styles.altPaymentText}>
-                  {t('googlePayRedirect')}
-                </Text>
-                <TouchableOpacity style={[styles.paymentButton, { backgroundColor: '#4285F4' }]}>
-                  <Image 
-                    source={require('../../../assets/images/google-pay.png')} 
-                    style={styles.buttonIcon} 
-                    resizeMode="contain"
-                  />
-                  <Text style={styles.paymentButtonText}>{t('payWithGooglePay')}</Text>
-                </TouchableOpacity>
-              </View>
-            )}
+            <Text style={[TopUpStyles.smallLabel, { marginTop: 16 }]}>
+              {t('securePaymentNotice')}
+            </Text>
           </View>
         )}
 
-        {/* Order Summary - Always visible */}
+        {/* PayPal Payment Method */}
+        {selectedPaymentMethod === 'paypal' && (
+          <View style={styles.altPaymentContainer}>
+            <Image 
+              source={require('../../../assets/images/paypal.png')} 
+              style={styles.paymentLogo} 
+              resizeMode="contain"
+            />
+            <Text style={styles.altPaymentText}>
+              {t('paypalRedirect')}
+            </Text>
+            <TouchableOpacity style={[styles.paymentButton, { backgroundColor: '#0070BA' }]}>
+              <Image 
+                source={require('../../../assets/images/paypal.png')} 
+                style={styles.buttonIcon} 
+                resizeMode="contain"
+              />
+              <Text style={styles.paymentButtonText}>{t('continueWithPaypal')}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Google Pay Payment Method */}
+        {selectedPaymentMethod === 'googlepay' && (
+          <View style={styles.altPaymentContainer}>
+            <Image 
+              source={require('../../../assets/images/google-pay.png')} 
+              style={styles.paymentLogo} 
+              resizeMode="contain"
+            />
+            <Text style={styles.altPaymentText}>
+              {t('googlePayRedirect')}
+            </Text>
+            <TouchableOpacity style={[styles.paymentButton, { backgroundColor: '#4285F4' }]}>
+              <Image 
+                source={require('../../../assets/images/google-pay.png')} 
+                style={styles.buttonIcon} 
+                resizeMode="contain"
+              />
+              <Text style={styles.paymentButtonText}>{t('payWithGooglePay')}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Order Summary */}
         <View style={TopUpStyles.summaryCard}>
           <View style={TopUpStyles.summaryRow}>
             <Text style={TopUpStyles.summaryKey}>{t('mobileNumber')}</Text>
@@ -332,6 +341,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
+  paymentMethodButtonSelected: {
+    borderColor: Colors.primary,
+    backgroundColor: 'rgba(59, 130, 246, 0.05)',
+  },
   paymentMethodContent: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -343,11 +356,17 @@ const styles = StyleSheet.create({
     marginRight: 8,
     tintColor: Colors.textSecondary,
   },
+  paymentIconSelected: {
+    tintColor: Colors.primary,
+  },
   paymentMethodText: {
     fontSize: 14,
     fontWeight: '600',
     color: Colors.textSecondary,
     textAlign: 'center',
+  },
+  paymentMethodTextSelected: {
+    color: Colors.primary,
   },
   cardDetailsContainer: {
     marginTop: 8,
@@ -355,44 +374,58 @@ const styles = StyleSheet.create({
   fieldContainer: {
     marginBottom: 16,
   },
+  fieldHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
   fieldLabel: {
     fontSize: 14,
     fontWeight: '600',
     color: Colors.textPrimary,
+  },
+  clearButton: {
+    padding: 4,
+  },
+  clearButtonText: {
+    color: Colors.primary,
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  errorText: {
+    color: '#EF4444',
+    fontSize: 12,
+    marginTop: 8,
+    marginLeft: 4,
+  },
+  processingContainer: {
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 8,
     marginBottom: 8,
   },
-  inputContainer: {
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
+  processingText: {
+    color: Colors.primary,
+    fontSize: 14,
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  successContainer: {
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    padding: 12,
     borderRadius: 8,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    height: 50,
-    justifyContent: 'center',
+    marginTop: 8,
+    marginBottom: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#10B981',
   },
-  inputContainerFocused: {
-    borderColor: Colors.primary,
-  },
-  inputWithIcon: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  inputIcon: {
-    width: 20,
-    height: 20,
-    marginRight: 10,
-    tintColor: '#B8B8B8',
-  },
-  textInput: {
-    fontSize: 16,
-    color: Colors.textPrimary,
-    padding: 0,
-    margin: 0,
-    flex: 1,
-  },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  successMessage: {
+    color: '#065F46',
+    fontSize: 14,
+    textAlign: 'center',
+    fontWeight: '500',
   },
   altPaymentContainer: {
     alignItems: 'center',

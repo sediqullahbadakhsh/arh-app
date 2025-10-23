@@ -15,7 +15,6 @@ export default function SignUpScreen({ navigation }) {
     const [pass2, setPass2] = useState('');
 
     const handleSignUp = () => {
-        // Instead of replace Tabs:
         navigation.navigate('CountrySelect', {
             name,
             email,

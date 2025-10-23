@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { SafeAreaView, View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity } from 'react-native';
 import { Colors } from '../../theme/colors';
 import ServiceHeader from '../../components/ServiceHeader';
 import { BUNDLE_CATEGORIES, DATA_BUNDLES } from '../../constants/dataBundles';

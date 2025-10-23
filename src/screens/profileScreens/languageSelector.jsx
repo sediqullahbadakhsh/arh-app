@@ -77,7 +77,7 @@ export default function LanguageSelector({ selectedLang, onChange, langs, loadin
 
   return (
     <View style={{ marginBottom: 10 }}>
-      <Text style={styles.label}>Select Language</Text>
+      <Text style={styles.label}>{t("selectLanguage1")}</Text>
       <TouchableOpacity
         style={[styles.dropField, loading && styles.disabled]}
         onPress={() => !loading && setIsOpen(true)}

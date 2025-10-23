@@ -1,20 +1,33 @@
 import React, { useState } from "react";
 import {
-  SafeAreaView,
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
+  SafeAreaView,
   ScrollView,
-  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../theme/colors";
 import ServiceHeader from "../../components/ServiceHeader";
+import DeleteConfirmationModal from "../../components/modals/DeleteConfirmationModal";
+import SuccessModal from "../../components/modals/SuccessModalShort";
+import ErrorModal from "../../components/modals/ErrorModal";
+
+const deleteDownlineAgent = async (agentId) => {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      Math.random() > 0.1 ? resolve() : reject(new Error("Network error"));
+    }, 1500);
+  });
+};
 
 export default function AgentViewScreen({ navigation, route }) {
   const { agent, refreshAgentList } = route.params || {};
   const [loading, setLoading] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
 
   if (!agent) {
     return (
@@ -28,33 +41,36 @@ export default function AgentViewScreen({ navigation, route }) {
   }
 
   const handleDeleteAgent = () => {
-    Alert.alert(
-      "Delete Agent",
-      `Are you sure you want to delete ${agent.user?.username}? This action cannot be undone.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => confirmDelete(agent.user.id),
-        },
-      ]
-    );
+    setShowDeleteModal(true);
   };
 
-  const confirmDelete = async (agentId) => {
+  const confirmDelete = async () => {
     try {
       setLoading(true);
-      await deleteDownlineAgent(agentId);
-      Alert.alert("Success", "Agent deleted successfully");
-      refreshAgentList?.();
-      navigation.goBack();
+      await deleteDownlineAgent(agent.user.id);
+      setShowDeleteModal(false);
+      setShowSuccessModal(true);
     } catch (error) {
       console.error("Delete error:", error);
-      Alert.alert("Error", "Failed to delete agent");
+      setShowDeleteModal(false);
+      setShowErrorModal(true);
     } finally {
       setLoading(false);
     }
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteModal(false);
+  };
+
+  const handleSuccessClose = () => {
+    setShowSuccessModal(false);
+    refreshAgentList?.();
+    navigation.goBack();
+  };
+
+  const handleErrorClose = () => {
+    setShowErrorModal(false);
   };
 
   const getStatusColor = (status) => {
@@ -76,11 +92,10 @@ export default function AgentViewScreen({ navigation, route }) {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white, paddingBottom: 65, }}>
       <ServiceHeader title="Agent Details" onBack={() => navigation.goBack()} />
       
       <ScrollView style={styles.container}>
-
         <View style={styles.btnBox}>
           <TouchableOpacity
             style={[styles.actionBtn, styles.editBtn]}
@@ -162,7 +177,7 @@ export default function AgentViewScreen({ navigation, route }) {
           <InfoRow label="Message Language" value={agent.messageLanguage} />
         </View>
 
-        {/* System Information */}
+ 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>System Information</Text>
           
@@ -174,41 +189,41 @@ export default function AgentViewScreen({ navigation, route }) {
             label="Last Updated" 
             value={agent.updatedAt ? new Date(agent.updatedAt).toLocaleDateString() : "-"} 
           />
-          <InfoRow label="User Type" value={agent.user_type} />
-        </View>
-
-        {/* Additional Actions */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-          
-          <TouchableOpacity
-            style={styles.quickAction}
-            onPress={() => navigation.navigate("AgentProfile", { agentId: agent.user?.id })}
-          >
-            <Ionicons name="person-outline" size={20} color={Colors.primary} />
-            <Text style={styles.quickActionText}>View Full Profile</Text>
-            <Ionicons name="chevron-forward" size={16} color="#6B7280" />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.quickAction}
-            onPress={() => navigation.navigate("AgentTransactions", { agentId: agent.user?.id })}
-          >
-            <Ionicons name="receipt-outline" size={20} color={Colors.primary} />
-            <Text style={styles.quickActionText}>View Transactions</Text>
-            <Ionicons name="chevron-forward" size={16} color="#6B7280" />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.quickAction}
-            onPress={() => navigation.navigate("AgentReports", { agentId: agent.user?.id })}
-          >
-            <Ionicons name="bar-chart-outline" size={20} color={Colors.primary} />
-            <Text style={styles.quickActionText}>View Reports</Text>
-            <Ionicons name="chevron-forward" size={16} color="#6B7280" />
-          </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        visible={showDeleteModal}
+        onCancel={cancelDelete}
+        onConfirm={confirmDelete}
+        title="Delete Agent"
+        message="Are you sure you want to delete this agent? This action cannot be undone and all associated data will be permanently removed."
+        itemName={agent.user?.username}
+        isLoading={loading}
+        confirmText="Delete Agent"
+        cancelText="Cancel"
+      />
+
+      {/* Success Modal */}
+      <SuccessModal
+        visible={showSuccessModal}
+        onClose={handleSuccessClose}
+        title="Agent Deleted Successfully"
+        message="The agent has been permanently removed from the system. All associated data has been deleted."
+        buttonText="Continue"
+        autoHideDuration={0} // Don't auto-hide, let user click
+      />
+
+      {/* Error Modal */}
+      <ErrorModal
+        visible={showErrorModal}
+        onClose={handleErrorClose}
+        title="Failed to Delete Agent"
+        message="There was an error while deleting the agent. Please check your connection and try again."
+        buttonText="Try Again"
+        showRetryButton={true}
+      />
 
       {loading && (
         <View style={styles.loadingOverlay}>
@@ -313,19 +328,6 @@ const styles = StyleSheet.create({
     fontWeight: "400",
     flex: 1,
     textAlign: "right",
-  },
-  quickAction: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f8f9fa",
-  },
-  quickActionText: {
-    flex: 1,
-    fontSize: 14,
-    color: Colors.textPrimary,
-    marginLeft: 12,
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,

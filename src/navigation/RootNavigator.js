@@ -14,6 +14,8 @@ import PasswordLoginScreen from "../screens/PasswordLoginScreen";
 import { useAuth } from "../auth/AuthProvider";
 import { useUser } from "../context/userContext";
 import { Text } from "react-native";
+import AllTransactionsScreen from "../screens/AllTransactionsScreen";
+import MerchantAnalyticsScreen from "../screens/MerchantAnalyticsScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -28,7 +30,7 @@ export default function RootNavigator() {
   return (
     <Stack.Navigator
       screenOptions={{ headerShown: false }}
-      initialRouteName={authed ? "Tabs" : "Welcome"}
+      initialRouteName={authed ? "Tabs" : "Onboarding"}
 
       
     >
@@ -38,10 +40,19 @@ export default function RootNavigator() {
         </>
       ) : (
         <>
-          <Stack.Screen name="Welcome" component={CountrySelectScreen} />
+          {/* <Stack.Screen name="Welcome" component={CountrySelectScreen} /> */}
           {/* <Stack.Screen name="Welcome" component={WelcomeScreen} /> */}
           <Stack.Screen name="Onboarding" component={OnboardingScreen} />
           <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen 
+  name="AllTransactions" 
+  component={AllTransactionsScreen} 
+  options={{ headerShown: false }}
+/>
+    <Stack.Screen 
+  name="MerchantAnalytics" 
+  component={MerchantAnalyticsScreen} 
+/>
           <Stack.Screen name="LoginPassword" component={PasswordLoginScreen} />
           <Stack.Screen name="SignUpChooser" component={SignUpChooser} />
           <Stack.Screen

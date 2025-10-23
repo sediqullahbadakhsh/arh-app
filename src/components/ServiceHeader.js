@@ -54,6 +54,7 @@ const styles = StyleSheet.create({
     },
     headerRow: {
         flexDirection: 'row',
+        direction: 'ltr',
         alignItems: 'center',
         justifyContent: 'space-between',
         width: '100%',

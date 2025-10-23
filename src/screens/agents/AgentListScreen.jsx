@@ -1,22 +1,24 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  SafeAreaView,
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   TextInput,
   FlatList,
+  SafeAreaView,
   RefreshControl,
-  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../theme/colors";
 import ServiceHeader from "../../components/ServiceHeader";
 import { useUser } from "../../context/userContext";
 import { getChildUsers, deleteDownlineAgent } from "../../services/merchantApi";
+import DeleteConfirmationModal from "../../components/modals/DeleteConfirmationModal";
+import SuccessModal from "../../components/modals/SuccessModal";
+import ErrorModal from "../../components/modals/ErrorModal";
 
-const FILTERS = ["All", "Active", "Inactive", "Suspended"];
+const FILTERS = ["All", "Active", "Inactive"];
 
 export default function AgentListScreen({ navigation }) {
   const { user } = useUser();
@@ -26,6 +28,13 @@ export default function AgentListScreen({ navigation }) {
   const [childUsers, setChildUsers] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
+  
+  // Modal states
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [agentToDelete, setAgentToDelete] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const refreshAgentList = async () => {
     try {
@@ -55,7 +64,7 @@ export default function AgentListScreen({ navigation }) {
       setChildUsers(res?.data || []);
     } catch (error) {
       console.error("Load agents error:", error);
-      Alert.alert("Error", "Failed to load agents");
+      // We'll use error modal instead of Alert
     } finally {
       setLoading(false);
     }
@@ -66,29 +75,40 @@ export default function AgentListScreen({ navigation }) {
   }, [filter, searchQuery]);
 
   const handleDeleteAgent = (agent) => {
-    Alert.alert(
-      "Delete Agent",
-      `Are you sure you want to delete ${agent.user?.username}?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => confirmDelete(agent.user.id),
-        },
-      ]
-    );
+    setAgentToDelete(agent);
+    setShowDeleteModal(true);
   };
 
-  const confirmDelete = async (agentId) => {
+  const confirmDelete = async () => {
+    if (!agentToDelete) return;
+    
     try {
-      await deleteDownlineAgent(agentId);
-      Alert.alert("Success", "Agent deleted successfully");
+      setDeleteLoading(true);
+      await deleteDownlineAgent(agentToDelete.user.id);
+      setShowDeleteModal(false);
+      setShowSuccessModal(true);
       refreshAgentList();
     } catch (error) {
       console.error("Delete error:", error);
-      Alert.alert("Error", "Failed to delete agent");
+      setShowDeleteModal(false);
+      setShowErrorModal(true);
+    } finally {
+      setDeleteLoading(false);
+      setAgentToDelete(null);
     }
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteModal(false);
+    setAgentToDelete(null);
+  };
+
+  const handleSuccessClose = () => {
+    setShowSuccessModal(false);
+  };
+
+  const handleErrorClose = () => {
+    setShowErrorModal(false);
   };
 
   const handleAssignSlab = (agent) => {
@@ -179,6 +199,7 @@ export default function AgentListScreen({ navigation }) {
           <TouchableOpacity
             style={[styles.actionBtn, styles.deleteBtn]}
             onPress={() => handleDeleteAgent(item)}
+            disabled={deleteLoading}
           >
             <Ionicons name="trash-outline" size={16} color="#DC2626" />
             <Text style={[styles.actionText, styles.deleteText]}>Delete</Text>
@@ -189,23 +210,33 @@ export default function AgentListScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white, paddingBottom: 100, }}>
       <ServiceHeader title="Manage Agents" />
 
       <View style={styles.container}>
-        {/* Filter pills */}
         <View style={styles.pillsRow}>
           {FILTERS.map((f) => {
             const active = f === filter;
+            let btnStyle, textStyle;
+            
+            if (f === "All") {
+              btnStyle = active ? styles.allBtnActive : styles.allBtn;
+              textStyle = active ? styles.allTextActive : styles.allText;
+            } else if (f === "Active") {
+              btnStyle = active ? styles.activeBtnActive : styles.activeBtn;
+              textStyle = active ? styles.activeTextActive : styles.activeText;
+            } else {
+              btnStyle = active ? styles.inactiveBtnActive : styles.inactiveBtn;
+              textStyle = active ? styles.inactiveTextActive : styles.inactiveText;
+            }
+
             return (
               <TouchableOpacity
                 key={f}
                 onPress={() => setFilter(f)}
-                style={[styles.pill, active && styles.pillActive]}
+                style={[styles.filterPill, btnStyle]}
               >
-                <Text
-                  style={[styles.pillText, active && styles.pillTextActive]}
-                >
+                <Text style={[styles.filterPillText, textStyle]}>
                   {f}
                 </Text>
               </TouchableOpacity>
@@ -213,7 +244,6 @@ export default function AgentListScreen({ navigation }) {
           })}
         </View>
 
-        {/* Search + Add Agent */}
         <View style={styles.searchRow}>
           <View style={styles.searchBox}>
             <Ionicons name="search" size={16} color="#9E9E9E" />
@@ -240,7 +270,6 @@ export default function AgentListScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* Results count */}
         <View style={styles.resultsInfo}>
           <Text style={styles.resultsText}>
             {filteredData.length} agent{filteredData.length !== 1 ? 's' : ''} found
@@ -249,7 +278,6 @@ export default function AgentListScreen({ navigation }) {
           </Text>
         </View>
 
-        {/* Agents List */}
         {loading && !refreshing ? (
           <View style={styles.loadingContainer}>
             <Text>Loading agents...</Text>
@@ -287,6 +315,46 @@ export default function AgentListScreen({ navigation }) {
           />
         )}
       </View>
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        visible={showDeleteModal}
+        onCancel={cancelDelete}
+        onConfirm={confirmDelete}
+        title="Delete Agent"
+        message="Are you sure you want to delete this agent? This action cannot be undone and all associated data will be permanently removed."
+        itemName={agentToDelete?.user?.username}
+        isLoading={deleteLoading}
+        confirmText="Delete Agent"
+        cancelText="Cancel"
+      />
+
+      {/* Success Modal */}
+      <SuccessModal
+        visible={showSuccessModal}
+        onClose={handleSuccessClose}
+        title="Agent Deleted Successfully"
+        message="The agent has been permanently removed from the system. All associated data has been deleted."
+        buttonText="Continue"
+        autoHideDuration={0}
+      />
+
+      {/* Error Modal */}
+      <ErrorModal
+        visible={showErrorModal}
+        onClose={handleErrorClose}
+        title="Failed to Delete Agent"
+        message="There was an error while deleting the agent. Please check your connection and try again."
+        buttonText="Try Again"
+        showRetryButton={true}
+      />
+
+      {/* Global Loading Overlay for Delete */}
+      {deleteLoading && (
+        <View style={styles.loadingOverlay}>
+          <Text style={styles.loadingText}>Deleting Agent...</Text>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -295,7 +363,6 @@ function StatusPill({ status }) {
   const statusConfig = {
     active: { color: "#16A34A", label: "Active" },
     inactive: { color: "#6B7280", label: "Inactive" },
-    suspended: { color: "#DC2626", label: "Suspended" },
   };
 
   const config = statusConfig[status] || statusConfig.inactive;
@@ -319,18 +386,71 @@ function StatusPill({ status }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 24, paddingTop: 10 },
-  pillsRow: { flexDirection: "row", gap: 10, marginBottom: 12 },
-  pill: {
-    height: 36,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#E8E8E8",
-    justifyContent: "center",
+  pillsRow: { 
+    flexDirection: "row", 
+    gap: 10, 
+    marginBottom: 12,
+    justifyContent: "space-between"
   },
-  pillActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  pillText: { color: Colors.textSecondary, fontWeight: "600" },
-  pillTextActive: { color: "#fff" },
+  filterPill: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    paddingVertical: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  filterPillText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  // All filter button styles
+  allBtn: {
+    borderColor: Colors.primary,
+    backgroundColor: `${Colors.primary}15`,
+  },
+  allBtnActive: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primary,
+  },
+  allText: {
+    color: Colors.primary,
+  },
+  allTextActive: {
+    color: "#fff",
+  },
+  // Active filter button styles
+  activeBtn: {
+    borderColor: "#16A34A",
+    backgroundColor: "#16A34A15",
+  },
+  activeBtnActive: {
+    borderColor: "#16A34A",
+    backgroundColor: "#16A34A",
+  },
+  activeText: {
+    color: "#16A34A",
+  },
+  activeTextActive: {
+    color: "#fff",
+  },
+  // Inactive filter button styles
+  inactiveBtn: {
+    borderColor: "#6B7280",
+    backgroundColor: "#6B728015",
+  },
+  inactiveBtnActive: {
+    borderColor: "#6B7280",
+    backgroundColor: "#6B7280",
+  },
+  inactiveText: {
+    color: "#6B7280",
+  },
+  inactiveTextActive: {
+    color: "#fff",
+  },
   searchRow: { flexDirection: "row", gap: 10, marginBottom: 12 },
   searchBox: {
     flex: 1,
@@ -471,5 +591,17 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: 4,
     textAlign: "center",
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(255,255,255,0.8)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 999,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: Colors.textPrimary,
+    fontWeight: "600",
   },
 });

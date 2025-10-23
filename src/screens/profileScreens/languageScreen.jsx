@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Alert, SafeAreaView, View, ActivityIndicator, Text, ScrollView } from "react-native";
+import { View, ActivityIndicator, Text, SafeAreaView, ScrollView } from "react-native";
 import ServiceHeader from "../../components/ServiceHeader";
 import { Colors } from "../../theme/colors";
 import LanguageSelector from "./languageSelector";
@@ -8,12 +8,41 @@ import { useUser } from "../../context/userContext";
 import { updateLanguage } from "../../services/merchantApi";
 import RTLTransitionHandler from '../../components/RTLTransitionHandler';
 import { useTranslation } from "react-i18next";
+import SuccessModal from "../../components/modals/SuccessModal";
+import ErrorModal from "../../components/modals/ErrorModal";
 
 export default function LanguageScreen({ navigation }) {
   const { user } = useUser();
   const { selectedLang, LANGS, changeLanguage, isChangingLanguage } = useLanguage();
   const [updatingBackend, setUpdatingBackend] = useState(false);
-  const {t} = useTranslation();
+  const { t } = useTranslation();
+
+  // Modal states
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+
+  // Modal handlers
+  const showCustomSuccessModal = (message) => {
+    setSuccessMessage(message);
+    setShowSuccessModal(true);
+  };
+
+  const showCustomErrorModal = (message) => {
+    setErrorMessage(message);
+    setShowErrorModal(true);
+  };
+
+  const handleSuccessClose = () => {
+    setShowSuccessModal(false);
+    setSuccessMessage("");
+  };
+
+  const handleErrorClose = () => {
+    setShowErrorModal(false);
+    setErrorMessage("");
+  };
 
   const handleLanguageChange = async (lang) => {
     if (isChangingLanguage || updatingBackend) return;
@@ -31,13 +60,23 @@ export default function LanguageScreen({ navigation }) {
         await updateLanguage(user.id, payload);
       }
 
-      Alert.alert("Success", "Language changed successfully!");
+      showCustomSuccessModal(t('languageChangedSuccessfully'));
     } catch (error) {
       console.error('Error changing language:', error);
-      Alert.alert("Error", "Failed to change language. Please try again.");
+      showCustomErrorModal(t('failedToChangeLanguage'));
     } finally {
       setUpdatingBackend(false);
     }
+  };
+
+  const handleLanguageChangeSuccess = () => {
+    // Optional: Additional actions after successful language change
+    console.log('Language change completed successfully');
+  };
+
+  const handleLanguageChangeError = () => {
+    // Optional: Additional actions after failed language change
+    console.log('Language change failed');
   };
 
   return (
@@ -47,12 +86,15 @@ export default function LanguageScreen({ navigation }) {
           title={t('manageLanguage')}
           onBack={() => navigation.goBack()} 
         />
+        
         <ScrollView contentContainerStyle={{ padding: 24 }}>
           <LanguageSelector
             selectedLang={selectedLang}
             onChange={handleLanguageChange}
             langs={LANGS}
             loading={isChangingLanguage || updatingBackend}
+            onLanguageChangeSuccess={handleLanguageChangeSuccess}
+            onLanguageChangeError={handleLanguageChangeError}
           />
           
           {(isChangingLanguage || updatingBackend) && (
@@ -64,6 +106,26 @@ export default function LanguageScreen({ navigation }) {
             </View>
           )}
         </ScrollView>
+
+   
+        <SuccessModal
+          visible={showSuccessModal}
+          onClose={handleSuccessClose}
+          title={t("success")}
+          message={successMessage}
+          buttonText={t("continue")}
+          autoHideDuration={3000}
+        />
+
+
+        <ErrorModal
+          visible={showErrorModal}
+          onClose={handleErrorClose}
+          title={t("error")}
+          message={errorMessage}
+          buttonText={t("tryAgain")}
+          showRetryButton={true}
+        />
       </SafeAreaView>
     </RTLTransitionHandler>
   );
