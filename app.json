@@ -30,7 +30,12 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ],
+      "usesCleartextTraffic": true
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -40,49 +45,45 @@
         "projectId": "9b8473e8-2b17-4675-8f26-eba1bef60ae3"
       }
     },
-  "plugins": [
-  "expo-localization",
-  "expo-font",
-  [
-    "expo-build-properties",
-    {
-      "android": {
-        "compileSdkVersion": 35,
-        "targetSdkVersion": 35,
-        "buildToolsVersion": "34.0.0",
-        "enableProguardInReleaseBuilds": false,
-        "enableShrinkResourcesInReleaseBuilds": false,
-        "enableMinifyInReleaseBuilds": false,
-        "extraGradleProperties": {
-          "newArchEnabled": "true"
-        },
-        "packagingOptions": {
-          "pickFirst": [
-            "**/libc++_shared.so",
-            "**/libfbjni.so"
-          ],
-          "exclude": [
-            "META-INF/DEPENDENCIES",
-            "META-INF/LICENSE",
-            "META-INF/LICENSE.txt",
-            "META-INF/license.txt",
-            "META-INF/NOTICE",
-            "META-INF/NOTICE.txt",
-            "META-INF/notice.txt",
-            "META-INF/ASL2.0"
-          ]
-        },
-        "extraMainManifest": {
-          "application": {
-            "usesCleartextTraffic": true
+    "plugins": [
+      "expo-localization",
+      "expo-font",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35,
+            "buildToolsVersion": "34.0.0",
+            "enableProguardInReleaseBuilds": false,
+            "enableShrinkResourcesInReleaseBuilds": false,
+            "enableMinifyInReleaseBuilds": false,
+            "extraGradleProperties": {
+              "newArchEnabled": "true"
+            },
+            "packagingOptions": {
+              "pickFirst": [
+                "**/libc++_shared.so",
+                "**/libfbjni.so"
+              ],
+              "exclude": [
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE",
+                "META-INF/LICENSE.txt",
+                "META-INF/license.txt",
+                "META-INF/NOTICE",
+                "META-INF/NOTICE.txt",
+                "META-INF/notice.txt",
+                "META-INF/ASL2.0"
+              ]
+            },
+            "networkSecurityConfig": "./network-security-config.xml"
+          },
+          "ios": {
+            "deploymentTarget": "15.1"
           }
         }
-      },
-      "ios": {
-        "deploymentTarget": "15.1"
-      }
-    }
-  ]
-]
+      ]
+    ]
   }
 }
