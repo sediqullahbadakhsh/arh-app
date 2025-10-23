@@ -10,6 +10,12 @@ import {
   RefreshControl,
   Dimensions,
   Image,
+  Modal,
+  Animated,
+  Easing,
+  Share,
+  Alert,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from 'expo-linear-gradient';
@@ -27,8 +33,12 @@ import { getAppContents } from '../../services/appContentApi';
 import TopupIcon from '../../../assets/icons/topup.png';
 import BundleIcon from '../../../assets/icons/Data bundle.png';
 import GamesIcon from '../../../assets/icons/game.png';
+import * as Print from 'expo-print';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import * as MediaLibrary from 'expo-media-library';
 
-const { width: screenWidth } = Dimensions.get('window');
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 const CountdownTimer = ({ expiresAt }) => {
   const { t } = useTranslation();
@@ -103,6 +113,483 @@ const CountdownTimer = ({ expiresAt }) => {
   );
 };
 
+const ReceiptModal = ({ visible, onClose, transaction }) => {
+  const [slideAnim] = useState(new Animated.Value(screenHeight));
+  const [downloading, setDownloading] = useState(false);
+  const { t } = useTranslation();
+
+  useEffect(() => {
+    if (visible) {
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 400,
+        easing: Easing.out(Easing.back(1.2)),
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(slideAnim, {
+        toValue: screenHeight,
+        duration: 300,
+        easing: Easing.in(Easing.ease),
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [visible]);
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'succeeded':
+        return '#10B981';
+      case 'failed':
+        return '#EF4444';
+      case 'pending':
+        return '#F59E0B';
+      default:
+        return '#6B7280';
+    }
+  };
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'succeeded':
+        return 'checkmark-circle';
+      case 'failed':
+        return 'close-circle';
+      case 'pending':
+        return 'time';
+      default:
+        return 'help-circle';
+    }
+  };
+
+  const getStatusText = (status) => {
+    switch (status) {
+      case 'succeeded':
+        return t('status.succeeded');
+      case 'failed':
+        return t('status.failed');
+      case 'pending':
+        return t('status.pending');
+      default:
+        return status;
+    }
+  };
+
+  const getServiceName = (source) => {
+    switch (source) {
+      case 'stripe_card':
+        return t('services.mobileTopup');
+      case 'data_bundle':
+        return t('services.dataBundle');
+      case 'game_coins':
+        return t('services.gameCoins');
+      default:
+        return t('transaction');
+    }
+  };
+
+  const getServiceIcon = (source) => {
+    switch (source) {
+      case 'stripe_card':
+        return 'phone-portrait-outline';
+      case 'data_bundle':
+        return 'wifi-outline';
+      case 'game_coins':
+        return 'game-controller-outline';
+      default:
+        return 'document-text-outline';
+    }
+  };
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric',
+      month: 'long', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const shareReceipt = async () => {
+    try {
+      const receiptText = `
+🎫 Transaction Receipt
+
+Service: ${getServiceName(transaction.source)}
+Amount: ${Number(transaction.amount).toFixed(2)} ${transaction.currency}
+Receiver: ${transaction.receiver}
+Status: ${getStatusText(transaction.status)}
+Date: ${formatDate(transaction.createdAt)}
+Transaction ID: ${transaction.txnNumber}
+
+Thank you for your business!
+      `.trim();
+
+      await Share.share({
+        message: receiptText,
+        title: 'Transaction Receipt',
+      });
+    } catch (error) {
+      console.error('Error sharing receipt:', error);
+      Alert.alert('Error', 'Failed to share receipt');
+    }
+  };
+
+  const generatePDFHtml = () => {
+    const statusColor = getStatusColor(transaction.status);
+    const statusText = getStatusText(transaction.status);
+    const serviceName = getServiceName(transaction.source);
+    
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Transaction Receipt</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+          }
+          .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #C40C02;
+          }
+          .company-name {
+            font-size: 24px;
+            font-weight: bold;
+            color: #C40C02;
+            margin-bottom: 5px;
+          }
+          .receipt-title {
+            font-size: 18px;
+            color: #666;
+          }
+          .status-section {
+            text-align: center;
+            margin: 20px 0;
+            padding: 15px;
+            background-color: ${statusColor}15;
+            border-radius: 10px;
+            border-left: 4px solid ${statusColor};
+          }
+          .status-text {
+            font-size: 16px;
+            font-weight: bold;
+            color: ${statusColor};
+          }
+          .amount-section {
+            text-align: center;
+            margin: 30px 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 10px;
+          }
+          .amount-label {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 10px;
+          }
+          .amount-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #C40C02;
+          }
+          .details-grid {
+            margin: 20px 0;
+          }
+          .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #e9ecef;
+          }
+          .detail-label {
+            font-weight: bold;
+            color: #666;
+          }
+          .detail-value {
+            color: #333;
+            text-align: right;
+          }
+          .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e9ecef;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+          }
+          .thank-you {
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #C40C02;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="company-name">MobileTopup</div>
+          <div class="receipt-title">Transaction Receipt</div>
+        </div>
+
+        <div class="status-section">
+          <div class="status-text">${statusText.toUpperCase()}</div>
+        </div>
+
+        <div class="amount-section">
+          <div class="amount-label">Total Amount</div>
+          <div class="amount-value">${Number(transaction.amount).toFixed(2)} ${transaction.currency}</div>
+        </div>
+
+        <div class="details-grid">
+          <div class="detail-row">
+            <span class="detail-label">Transaction ID:</span>
+            <span class="detail-value">${transaction.txnNumber}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Date & Time:</span>
+            <span class="detail-value">${formatDate(transaction.createdAt)}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Receiver:</span>
+            <span class="detail-value">${transaction.receiver}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Service:</span>
+            <span class="detail-value">${serviceName}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Payment Method:</span>
+            <span class="detail-value">${transaction.source?.replace('_', ' ').toUpperCase()}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Status:</span>
+            <span class="detail-value" style="color: ${statusColor}; font-weight: bold;">${statusText}</span>
+          </div>
+        </div>
+
+        <div class="footer">
+          <div class="thank-you">Thank you for your business!</div>
+          <div>This is an automated receipt. Please keep it for your records.</div>
+          <div>For support, contact: support@mobiletopup.com</div>
+          <div>Generated on: ${new Date().toLocaleString()}</div>
+        </div>
+      </body>
+      </html>
+    `;
+  };
+
+  const downloadPDF = async () => {
+    if (!transaction) return;
+    
+    try {
+      setDownloading(true);
+      
+      // Generate PDF
+      const html = generatePDFHtml();
+      const { uri } = await Print.printToFileAsync({ html });
+      
+      // Generate file name
+      const fileName = `Receipt_${transaction.txnNumber}_${new Date().getTime()}.pdf`;
+      const newPath = `${FileSystem.documentDirectory}${fileName}`;
+      
+      // Move file to permanent location
+      await FileSystem.moveAsync({
+        from: uri,
+        to: newPath,
+      });
+      
+      if (Platform.OS === 'ios') {
+        // For iOS, share the file
+        await Sharing.shareAsync(newPath, {
+          mimeType: 'application/pdf',
+          dialogTitle: 'Save Receipt as PDF',
+        });
+      } else {
+        // For Android, save to downloads
+        const permission = await MediaLibrary.requestPermissionsAsync();
+        
+        if (permission.granted) {
+          const asset = await MediaLibrary.createAssetAsync(newPath);
+          await MediaLibrary.createAlbumAsync('Downloads', asset, false);
+          Alert.alert('Success', 'Receipt saved to Downloads folder');
+        } else {
+          // Fallback to sharing if permission denied
+          await Sharing.shareAsync(newPath, {
+            mimeType: 'application/pdf',
+            dialogTitle: 'Save Receipt as PDF',
+          });
+        }
+      }
+      
+      // Clean up temporary file
+      try {
+        await FileSystem.deleteAsync(newPath);
+      } catch (cleanupError) {
+        console.log('Cleanup error:', cleanupError);
+      }
+      
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      Alert.alert('Error', 'Failed to generate PDF receipt. Please try again.');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  if (!transaction) return null;
+
+  return (
+    <Modal
+      visible={visible}
+      transparent={true}
+      animationType="none"
+      statusBarTranslucent={true}
+      onRequestClose={onClose}
+    >
+      <View style={HomeStyles.modalOverlay}>
+        <TouchableOpacity 
+          style={HomeStyles.modalBackdrop}
+          activeOpacity={1}
+          onPress={onClose}
+        />
+        <Animated.View 
+          style={[
+            HomeStyles.receiptModalContainer,
+            { transform: [{ translateY: slideAnim }] }
+          ]}
+        >
+          <View style={HomeStyles.receiptHeader}>
+            <View style={HomeStyles.headerLeft}>
+              <TouchableOpacity onPress={onClose} style={HomeStyles.closeButton}>
+                <Ionicons name="close" size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={HomeStyles.headerCenter}>
+              <Text style={HomeStyles.receiptTitle}>Receipt</Text>
+            </View>
+            
+            <View style={HomeStyles.headerRight}>
+              <TouchableOpacity 
+                onPress={shareReceipt} 
+                style={HomeStyles.headerActionButton}
+                disabled={downloading}
+              >
+                <Ionicons name="share-outline" size={20} color="#fff" />
+              </TouchableOpacity>
+              <TouchableOpacity 
+                onPress={downloadPDF} 
+                style={HomeStyles.headerActionButton}
+                disabled={downloading}
+              >
+                {downloading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Ionicons name="download-outline" size={20} color="#fff" />
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <ScrollView style={HomeStyles.receiptContent}>
+            <View style={HomeStyles.statusSection}>
+              <View style={[
+                HomeStyles.statusIconContainer,
+                { backgroundColor: `${getStatusColor(transaction.status)}15` }
+              ]}>
+                <Ionicons 
+                  name={getStatusIcon(transaction.status)} 
+                  size={80} 
+                  color={getStatusColor(transaction.status)} 
+                />
+              </View>
+            </View>
+
+            <View style={HomeStyles.topSection}>
+              <Text style={HomeStyles.amountValueTop}>
+                {transaction.status === 'succeeded' ? 'Top-Up Success' : 
+                 transaction.status === 'failed' ? 'Top-Up Failed' : 
+                 'Processing Top-Up'}
+              </Text>
+            </View>
+
+            <View style={HomeStyles.detailsGrid}>
+              <View style={HomeStyles.detailItem}>
+                <Text style={HomeStyles.detailLabel}>Transaction ID</Text>
+                <Text style={HomeStyles.detailValue} numberOfLines={1} ellipsizeMode="middle">
+                  {transaction.txnNumber}
+                </Text>
+              </View>
+              
+              <View style={HomeStyles.detailItem}>
+                <Text style={HomeStyles.detailLabel}>Date & Time</Text>
+                <Text style={HomeStyles.detailValue}>
+                  {formatDate(transaction.createdAt)}
+                </Text>
+              </View>
+              
+              <View style={HomeStyles.detailItem}>
+                <Text style={HomeStyles.detailLabel}>Receiver</Text>
+                <Text style={HomeStyles.detailValue}>
+                  {transaction.receiver}
+                </Text>
+              </View>
+              
+              <View style={HomeStyles.detailItem}>
+                <Text style={HomeStyles.detailLabel}>Service</Text>
+                <Text style={HomeStyles.detailValue}>
+                  {getServiceName(transaction.source)}
+                </Text>
+              </View>
+            </View>
+
+            <View style={HomeStyles.amountSection}>
+              <Text style={HomeStyles.amountLabel}>Total Amount</Text>
+              <Text style={HomeStyles.amountValue}>
+                {Number(transaction.amount).toFixed(2)} {transaction.currency}
+              </Text>
+            </View>
+
+            <View style={HomeStyles.additionalInfo}>
+              <View style={HomeStyles.infoRow}>
+                <Ionicons name="information-circle-outline" size={16} color="#6B7280" />
+                <Text style={HomeStyles.infoText}>
+                  {transaction.status === 'succeeded' 
+                    ? 'Your transaction was completed successfully.' 
+                    : transaction.status === 'failed'
+                    ? 'Your transaction failed. Please try again.'
+                    : 'Your transaction is being processed.'}
+                </Text>
+              </View>
+            </View>
+          </ScrollView>
+
+          <View style={HomeStyles.receiptActions}>
+            <TouchableOpacity 
+              style={HomeStyles.primaryButton}
+              onPress={onClose}
+              disabled={downloading}
+            >
+              <Text style={HomeStyles.primaryButtonText}>
+                {downloading ? 'Generating PDF...' : 'Done'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+};
+
 export default function HomeConsumerScreen({ navigation }) {
   const { user } = useAuth();
   const { t, i18n } = useTranslation();
@@ -111,13 +598,13 @@ export default function HomeConsumerScreen({ navigation }) {
   const [profileImage, setProfileImage] = useState(null);
   const [userName, setUserName] = useState(user?.fullName || user?.username || t('customer'));
   const [currentOfferIndex, setCurrentOfferIndex] = useState(0);
+  const [receiptModalVisible, setReceiptModalVisible] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState(null);
 
   const { data: appContentsData, isLoading: offersLoading, refetch: refetchOffers } = useQuery({
     queryKey: ['app-contents'],
     queryFn: () => getAppContents({ active: true }), 
   });
-
-  console.log(appContentsData, "this is app content data");
 
   const offersData = useMemo(() => {
     if (!appContentsData?.data) return [];
@@ -265,6 +752,11 @@ export default function HomeConsumerScreen({ navigation }) {
   const goToProfile = () => navigation.navigate("ProfileDetails");
   const goToMerchant = () => navigation.navigate("MerchantSignup");
 
+  const handleTransactionPress = (transaction) => {
+    setSelectedTransaction(transaction);
+    setReceiptModalVisible(true);
+  };
+
   const SERVICES_B2C = useMemo(
     () => [
       {
@@ -358,7 +850,7 @@ export default function HomeConsumerScreen({ navigation }) {
     }
 
     if (offersData.length === 0) {
-      return null; // Don't show offers section if no offers available
+      return null;
     }
 
     return (
@@ -411,57 +903,57 @@ export default function HomeConsumerScreen({ navigation }) {
     );
   };
 
-  const TransactionRow = ({ item }) => (
-    <TouchableOpacity
-      style={HomeStyles.txRow}
-      onPress={() => navigation.navigate("Orders")}
-      activeOpacity={0.85}
-    >
-      <View style={HomeStyles.txLeft}>
-        <View style={[
-          HomeStyles.txIconWrap,
-          { backgroundColor: item.status === 'succeeded' ? '#E8F5E9' : 
-                            item.status === 'failed' ? '#FFEBEE' : '#FFF8E1' }
-        ]}>
-          <Ionicons
-            name={getServiceIcon(item.source)} 
-            size={20} 
-            color={item.status === 'succeeded' ? '#4CAF50' : 
-                   item.status === 'failed' ? '#F44336' : '#FFC107'} 
-          />
-        </View>
-        <View style={HomeStyles.txInfo}>
-          <Text style={HomeStyles.txTitle}>
-            {getServiceName(item.source)}
-          </Text>
-          <Text style={HomeStyles.txSub}>{formatDate(item.createdAt)}</Text>
-          <Text style={HomeStyles.txPhone}>{item.receiver}</Text>
-        </View>
+const TransactionRow = ({ item }) => (
+  <TouchableOpacity
+    style={HomeStyles.txRow}
+    onPress={() => handleTransactionPress(item)}
+    activeOpacity={0.85}
+  >
+    <View style={HomeStyles.txLeft}>
+      <View style={[
+        HomeStyles.txIconWrap,
+        { backgroundColor: item.status === 'succeeded' ? '#E8F5E9' : 
+                          item.status === 'failed' ? '#FFEBEE' : '#FFF8E1' }
+      ]}>
+        <Ionicons
+          name={getServiceIcon(item.source)} 
+          size={20} 
+          color={item.status === 'succeeded' ? '#4CAF50' : 
+                 item.status === 'failed' ? '#F44336' : '#FFC107'} 
+        />
       </View>
-      <View style={HomeStyles.txRight}>
+      <View style={HomeStyles.txInfo}>
+        <Text style={HomeStyles.txTitle}>
+          {getServiceName(item.source)}
+        </Text>
+        <Text style={HomeStyles.txSub}>{formatDate(item.createdAt)}</Text>
+        <Text style={HomeStyles.txPhone}>{item.receiver}</Text>
+      </View>
+    </View>
+    <View style={HomeStyles.txRight}>
+      <Text style={[
+        HomeStyles.txAmount,
+        { color: item.status === 'succeeded' ? '#4CAF50' : 
+               item.status === 'failed' ? '#F44336' : '#FFC107' }
+      ]}>
+        {Number(item.amount).toFixed(2)} {item.currency}
+      </Text>
+      <View style={[
+        HomeStyles.statusBadge,
+        { backgroundColor: item.status === 'succeeded' ? '#E8F5E9' : 
+                          item.status === 'failed' ? '#FFEBEE' : '#FFF8E1' }
+      ]}>
         <Text style={[
-          HomeStyles.txAmount,
+          HomeStyles.statusText,
           { color: item.status === 'succeeded' ? '#4CAF50' : 
                  item.status === 'failed' ? '#F44336' : '#FFC107' }
         ]}>
-          {Number(item.amount).toFixed(2)} {item.currency}
+          {getStatusText(item.status)}
         </Text>
-        <View style={[
-          HomeStyles.statusBadge,
-          { backgroundColor: item.status === 'succeeded' ? '#E8F5E9' : 
-                            item.status === 'failed' ? '#FFEBEE' : '#FFF8E1' }
-        ]}>
-          <Text style={[
-            HomeStyles.statusText,
-            { color: item.status === 'succeeded' ? '#4CAF50' : 
-                   item.status === 'failed' ? '#F44336' : '#FFC107' }
-          ]}>
-            {getStatusText(item.status)}
-          </Text>
-        </View>
       </View>
-    </TouchableOpacity>
-  );
+    </View>
+  </TouchableOpacity>
+);
 
   return (
     <SafeAreaView style={HomeStyles.safeArea}>
@@ -566,6 +1058,12 @@ export default function HomeConsumerScreen({ navigation }) {
           </View>
         </View>   
       </ScrollView>
+
+      <ReceiptModal
+        visible={receiptModalVisible}
+        onClose={() => setReceiptModalVisible(false)}
+        transaction={selectedTransaction}
+      />
     </SafeAreaView>
   );
 }

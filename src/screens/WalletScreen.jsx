@@ -25,7 +25,7 @@ const { width } = Dimensions.get("window");
 const CARD_WIDTH = width - 48;
 const CARD_MARGIN = 16;
 
-// Skeleton Loader Component
+
 const SkeletonLoader = ({ style }) => (
   <View style={[styles.skeleton, style]}>
     <View style={styles.skeletonShimmer} />
@@ -328,11 +328,7 @@ export default function WalletScreen({ navigation }) {
         <View style={styles.recentContainer}>
           <View style={styles.recentHeader}>
             <Text style={styles.recentTitle}>Recent Transactions</Text>
-            {!txLoading && (
-              <TouchableOpacity>
-                <Text style={styles.seeAllText}>See All</Text>
-              </TouchableOpacity>
-            )}
+           
           </View>
           
           <FlatList
@@ -490,21 +486,16 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   recentContainer: {
-    marginHorizontal: 24,
     backgroundColor: "#fff",
     borderRadius: 20,
+    marginBottom: 100,
     paddingHorizontal: 20,
     paddingVertical: 20,
-    borderWidth: 1,
-    borderColor: "#F2F2F2",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    borderLeftWidth: 2,
+    borderRightWidth: 2,
+    borderTopWidth: 2,
+    borderColor: "#F3F3F3",
+
     minHeight: 200,
   },
   recentHeader: {

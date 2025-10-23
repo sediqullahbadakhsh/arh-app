@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import {
   SafeAreaView,
   View,
@@ -11,15 +11,18 @@ import {
   ScrollView,
   Alert,
   Image,
+  Animated,
+  Easing,
+  Dimensions,
+  Share
 } from "react-native";
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { Colors } from "../../theme/colors";
 import ServiceHeader from "../../components/ServiceHeader";
 import InputField from "../../components/InputField";
 import PrimaryButton from "../../components/PrimaryButton";
-import { COUNTRIES } from "../../constants/countries";
-import { codeToFlag } from "../../utils/flag";
 import { 
   updateAgentDetails, 
   getCountries, 
@@ -28,11 +31,15 @@ import {
   getAgentById 
 } from "../../services/merchantApi";
 import { useUser } from "../../context/userContext";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import SuccessModal from "../../components/modals/SuccessModal";
+
+const { height: screenHeight } = Dimensions.get('window');
 
 const LANGS = [
-  { label: "English", value: "english" },
-  { label: "Dari", value: "dari" },
-  { label: "Pashto", value: "pashto" },
+  { label: "English", value: "english", code: "en" },
+  { label: "Dari", value: "dari", code: "fa" },
+  { label: "Pashto", value: "pashto", code: "ps" },
 ];
 
 const STATUSES = [
@@ -46,14 +53,17 @@ const ACCOUNT_TYPES = [
   { label: "Merchant", value: "merchant" },
 ];
 
-const GAP = 1;
+const GAP = 16;
 
 export default function AgentEditScreen({ navigation, route }) {
   const { user } = useUser();
+  const insets = useSafeAreaInsets();
   const { agent, refreshAgentList } = route.params || {};
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [isSuccessVisible, setIsSuccessVisible] = useState(false);
+  const [agentData, setAgentData] = useState(null);
 
   // Form state
   const [firstName, setFirstName] = useState("");
@@ -71,10 +81,22 @@ export default function AgentEditScreen({ navigation, route }) {
   const [commissionRate, setCommissionRate] = useState("");
   const [profilePicture, setProfilePicture] = useState(null);
   
+  // Data states
   const [countries, setCountries] = useState([]);
   const [provinces, setProvinces] = useState([]);
   const [districts, setDistricts] = useState([]);
-  const [picker, setPicker] = useState({ open: false, type: null });
+  
+  // Modal states
+  const [modal, setModal] = useState({ 
+    open: false, 
+    type: null,
+    title: "",
+    data: [],
+    searchQuery: ""
+  });
+
+  // Animation
+  const [modalSlideAnim] = useState(new Animated.Value(screenHeight));
 
   useEffect(() => {
     if (agent) {
@@ -94,6 +116,24 @@ export default function AgentEditScreen({ navigation, route }) {
       getAllDistricts(province.id);
     }
   }, [province?.id]);
+
+  useEffect(() => {
+    if (modal.open) {
+      Animated.timing(modalSlideAnim, {
+        toValue: 0,
+        duration: 350,
+        easing: Easing.out(Easing.back(1)),
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(modalSlideAnim, {
+        toValue: screenHeight,
+        duration: 250,
+        easing: Easing.in(Easing.ease),
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [modal.open]);
 
   const loadAgentData = () => {
     if (!agent) return;
@@ -127,7 +167,7 @@ export default function AgentEditScreen({ navigation, route }) {
 
     // Set profile picture if available
     if (agent.user?.profile_picture) {
-      const IMG_BASE_URL = "YOUR_IMAGE_BASE_URL"; // Replace with your actual image base URL
+      const IMG_BASE_URL = "http://3.67.144.22/uploads/profile_pictures/"; // Replace with your actual image base URL
       setProfilePicture(`${IMG_BASE_URL}${agent.user.profile_picture}`);
     }
   };
@@ -175,6 +215,78 @@ export default function AgentEditScreen({ navigation, route }) {
     } catch (error) {
       console.error("Error fetching districts:", error);
     }
+  };
+
+  const openModal = (type, title, data) => {
+    setModal({ 
+      open: true, 
+      type, 
+      title, 
+      data,
+      searchQuery: "" 
+    });
+  };
+
+  const closeModal = () => {
+    setModal({ open: false, type: null, title: "", data: [], searchQuery: "" });
+  };
+
+  const handleSelect = (item) => {
+    switch (modal.type) {
+      case "country":
+        setCountry(item);
+        break;
+      case "province":
+        setProvince(item);
+        break;
+      case "district":
+        setDistrict(item);
+        break;
+      case "lang":
+        setMessageLanguage(item.value);
+        break;
+      case "status":
+        setStatus(item.value);
+        break;
+      case "accountType":
+        setAccountType(item.value);
+        break;
+    }
+    closeModal();
+  };
+
+  const getSelectedValue = (type) => {
+    switch (type) {
+      case "country":
+        return country?.countryName;
+      case "province":
+        return province?.provinceName;
+      case "district":
+        return district?.districtName;
+      case "lang":
+        return LANGS.find(l => l.value === messageLanguage)?.label;
+      case "status":
+        return STATUSES.find(s => s.value === status)?.label;
+      case "accountType":
+        return ACCOUNT_TYPES.find(a => a.value === accountType)?.label;
+      default:
+        return "";
+    }
+  };
+
+  const getModalData = () => {
+    let data = modal.data;
+    if (modal.searchQuery) {
+      const query = modal.searchQuery.toLowerCase();
+      data = data.filter(item => 
+        item.countryName?.toLowerCase().includes(query) ||
+        item.provinceName?.toLowerCase().includes(query) ||
+        item.districtName?.toLowerCase().includes(query) ||
+        item.label?.toLowerCase().includes(query) ||
+        item.value?.toLowerCase().includes(query)
+      );
+    }
+    return data;
   };
 
   const next = () => {
@@ -290,26 +402,27 @@ export default function AgentEditScreen({ navigation, route }) {
         alternativeContact: alternativeContact.trim(),
         messageLanguage: messageLanguage,
         accountType: accountType,
-        commission_rate: commissionRate ? parseFloat(commissionRate) : 0,
-        // Note: Profile picture upload would require FormData and separate handling
-        // For now, we're not including it in the update
       };
 
-      await updateAgentDetails(agent.id, payload);
+      await updateAgentDetails(agent.user_id, payload);
       
-      Alert.alert(
-        "Success", 
-        "Agent updated successfully!",
-        [
-          {
-            text: "OK",
-            onPress: () => {
-              refreshAgentList?.();
-              navigation.goBack();
-            }
-          }
-        ]
-      );
+
+      const updatedAgentData = {
+        agentName: `${firstName} ${lastName}`.trim(),
+        email: email.trim(),
+        mobileNumber: mobileNumber.trim(),
+        accountType: getSelectedValue("accountType"),
+        status: getSelectedValue("status"),
+        location: `${district?.districtName}, ${province?.provinceName}, ${country?.countryName}`,
+        address: address.trim(),
+        language: getSelectedValue("lang"),
+        timestamp: new Date().toISOString(),
+        agentId: agent.user_id || `AG${Date.now()}`,
+      };
+      
+      setAgentData(updatedAgentData);
+      setIsSuccessVisible(true);
+      
     } catch (error) {
       console.error("Update agent error:", error);
       Alert.alert(
@@ -321,293 +434,385 @@ export default function AgentEditScreen({ navigation, route }) {
     }
   };
 
+  const handleSuccessClose = () => {
+    setIsSuccessVisible(false);
+    refreshAgentList?.();
+    navigation.goBack();
+  };
+
+  const handleShareAgent = async () => {
+    try {
+      if (!agentData) {
+        Alert.alert("Error", "No agent data available to share");
+        return;
+      }
+
+      const shareMessage = `👤 Agent Updated Successfully!
+
+🤝 Updated Agent Information:
+• Name: ${agentData.agentName}
+• Email: ${agentData.email}
+• Mobile: ${agentData.mobileNumber}
+• Account Type: ${agentData.accountType}
+• Status: ${agentData.status}
+• Location: ${agentData.location}
+• Language: ${agentData.language}
+• Agent ID: ${agentData.agentId}
+
+📍 Address: ${agentData.address}
+
+📅 Updated: ${new Date(agentData.timestamp).toLocaleDateString()}
+
+Agent profile has been successfully updated! ✅`;
+
+      await Share.share({
+        message: shareMessage,
+        title: 'Agent Updated Successfully'
+      });
+
+    } catch (error) {
+      console.log('Error sharing agent details:', error);
+      Alert.alert("Share Error", "Failed to share agent details. Please try again.");
+    }
+  };
+
+  const getSuccessDetails = () => {
+    if (!agentData) return [];
+    
+    return [
+      {
+        type: "agent",
+        label: "Agent Name",
+        value: agentData.agentName
+      },
+      {
+        type: "email",
+        label: "Email Address",
+        value: agentData.email
+      },
+    
+    ];
+  };
+
+  const renderFlag = (countryCode) => {
+    if (!countryCode) return null;
+    
+
+    const flagEmojis = {
+      'AF': '🇦🇫',
+      'US': '🇺🇸',
+      'GB': '🇬🇧',
+      'CA': '🇨🇦',
+      'AU': '🇦🇺',
+      'IN': '🇮🇳',
+      'PK': '🇵🇰',
+      'CN': '🇨🇳',
+      'JP': '🇯🇵',
+      'KR': '🇰🇷',
+      'DE': '🇩🇪',
+      'FR': '🇫🇷',
+      'IT': '🇮🇹',
+      'ES': '🇪🇸',
+      'BR': '🇧🇷',
+      'RU': '🇷🇺',
+    };
+    
+    return (
+      <Text style={{ fontSize: 18, marginRight: 12 }}>
+        {flagEmojis[countryCode] || '🏳️'}
+      </Text>
+    );
+  };
+
+  const renderModalItem = ({ item }) => (
+    <TouchableOpacity 
+      style={styles.modalRow} 
+      onPress={() => handleSelect(item)}
+      activeOpacity={0.7}
+    >
+      {modal.type === "country" && renderFlag(item.countryCode)}
+      
+      <View style={{ flex: 1 }}>
+        <Text style={styles.modalItemTitle}>
+          {item.countryName || item.provinceName || item.districtName || item.label}
+        </Text>
+        {modal.type === "country" && item.countryCode && (
+          <Text style={styles.modalItemSubtitle}>
+            {item.countryCode}
+          </Text>
+        )}
+        {modal.type === "lang" && item.code && (
+          <Text style={styles.modalItemSubtitle}>
+            {item.code.toUpperCase()}
+          </Text>
+        )}
+      </View>
+      
+      {isItemSelected(item) && (
+        <Ionicons name="checkmark-circle" size={22} color={Colors.primary} />
+      )}
+    </TouchableOpacity>
+  );
+
+  const isItemSelected = (item) => {
+    switch (modal.type) {
+      case "country":
+        return item.id === country?.id;
+      case "province":
+        return item.id === province?.id;
+      case "district":
+        return item.id === district?.id;
+      case "lang":
+        return item.value === messageLanguage;
+      case "status":
+        return item.value === status;
+      case "accountType":
+        return item.value === accountType;
+      default:
+        return false;
+    }
+  };
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
       <ServiceHeader
         title="Edit Agent"
         onBack={() => navigation.goBack()}
       />
-
-      {/* Step indicator */}
-      <View style={styles.stepperWrap}>
-        <StepDot index={0} current={step} label="Personal" />
-        <StepLine active={step >= 1} />
-        <StepDot index={1} current={step} label="Location" />
-        <StepLine active={step >= 2} />
-        <StepDot index={2} current={step} label="Settings" />
-      </View>
-
-      <ScrollView
-        contentContainerStyle={styles.container}
+      
+      <KeyboardAwareScrollView
+        contentContainerStyle={{ flexGrow: 1 }}
+        enableOnAndroid
+        extraScrollHeight={20}
         keyboardShouldPersistTaps="handled"
       >
-        {step === 0 && (
-          <>
-            <Text style={styles.sectionTitle}>Personal Information</Text>
+        <ScrollView
+          contentContainerStyle={styles.container}
+          keyboardShouldPersistTaps="handled"
+        >
+          {step === 0 && (
+            <>
+              <Text style={styles.sectionTitle}>Personal Information</Text>
 
-            {/* Profile Picture */}
-            <View style={styles.profileSection}>
-              <TouchableOpacity onPress={pickImage} style={styles.profileImageContainer}>
-                {profilePicture ? (
-                  <Image source={{ uri: profilePicture }} style={styles.profileImage} />
-                ) : (
-                  <View style={styles.profilePlaceholder}>
-                    <Ionicons name="person" size={32} color="#9E9E9E" />
+              <View style={styles.profileSection}>
+                <TouchableOpacity onPress={pickImage} style={styles.profileImageContainer}>
+                  {profilePicture ? (
+                    <Image source={{ uri: profilePicture }} style={styles.profileImage} />
+                  ) : (
+                    <View style={styles.profilePlaceholder}>
+                      <Ionicons name="person" size={32} color="#9E9E9E" />
+                    </View>
+                  )}
+                  <View style={styles.cameraIcon}>
+                    <Ionicons name="camera" size={16} color="#fff" />
                   </View>
-                )}
-                <View style={styles.cameraIcon}>
-                  <Ionicons name="camera" size={16} color="#fff" />
-                </View>
-              </TouchableOpacity>
-              <Text style={styles.profileHint}>Tap to change photo</Text>
-            </View>
+                </TouchableOpacity>
+                <Text style={styles.profileHint}>Tap to change photo</Text>
+              </View>
 
-            <LabeledInput
-              label="First Name"
-              value={firstName}
-              onChangeText={setFirstName}
-              placeholder="Enter First Name"
-              required
-            />
-            <LabeledInput
-              label="Last Name"
-              value={lastName}
-              onChangeText={setLastName}
-              placeholder="Enter Last Name"
-              required
-            />
-            <LabeledInput
-              label="Email"
-              value={email}
-              onChangeText={setEmail}
-              placeholder="Enter Email Address"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              required
-            />
-            <LabeledInput
-              label="Mobile Number"
-              value={mobileNumber}
-              onChangeText={setMobileNumber}
-              placeholder="Enter Mobile Number"
-              keyboardType="phone-pad"
-              required
-            />
-            <LabeledInput
-              label="Alternative Contact"
-              value={alternativeContact}
-              onChangeText={setAlternativeContact}
-              placeholder="Enter Alternative Contact"
-              keyboardType="phone-pad"
-            />
-
-            <PrimaryButton
-              label="Continue"
-              onPress={next}
-              style={styles.fullButton}
-            />
-          </>
-        )}
-
-        {step === 1 && (
-          <>
-            <Text style={styles.sectionTitle}>Location Information</Text>
-
-            <DropField
-              label="Country"
-              value={country?.countryName || "Select Country"}
-              onPress={() => setPicker({ open: true, type: "country" })}
-              leftIcon={
-                <Text style={{ fontSize: 18 }}>
-                  {codeToFlag(country?.countryCode)}
-                </Text>
-              }
-              required
-            />
-            <DropField
-              label="Province"
-              value={province?.provinceName || "Select Province"}
-              onPress={() => setPicker({ open: true, type: "province" })}
-              required
-            />
-            <DropField
-              label="District"
-              value={district?.districtName || "Select District"}
-              onPress={() => setPicker({ open: true, type: "district" })}
-              required
-            />
-            <LabeledInput
-              label="Full Address"
-              value={address}
-              onChangeText={setAddress}
-              placeholder="Enter Full Address"
-              required
-            />
-            <DropField
-              label="Message Language"
-              value={messageLanguage ? LANGS.find(l => l.value === messageLanguage)?.label : "Select Language"}
-              onPress={() => setPicker({ open: true, type: "lang" })}
-              required
-            />
-
-            <View style={styles.rowButtons}>
-              <DarkButton
-                label="Back"
-                onPress={back}
-                style={styles.halfButton}
+              <LabeledInput
+                label="First Name"
+                value={firstName}
+                onChangeText={setFirstName}
+                placeholder="Enter First Name"
+                required
               />
+              <LabeledInput
+                label="Last Name"
+                value={lastName}
+                onChangeText={setLastName}
+                placeholder="Enter Last Name"
+                required
+              />
+              <LabeledInput
+                label="Email"
+                value={email}
+                onChangeText={setEmail}
+                placeholder="Enter Email Address"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                required
+              />
+              <LabeledInput
+                label="Mobile Number"
+                value={mobileNumber}
+                onChangeText={setMobileNumber}
+                placeholder="Enter Mobile Number"
+                keyboardType="phone-pad"
+                required
+              />
+              <LabeledInput
+                label="Alternative Contact"
+                value={alternativeContact}
+                onChangeText={setAlternativeContact}
+                placeholder="Enter Alternative Contact"
+                keyboardType="phone-pad"
+              />
+
               <PrimaryButton
                 label="Continue"
                 onPress={next}
-                style={styles.halfButton}
+                style={styles.fullButton}
               />
-            </View>
-          </>
-        )}
+            </>
+          )}
 
-        {step === 2 && (
-          <>
-            <Text style={styles.sectionTitle}>Account Settings</Text>
+          {step === 1 && (
+            <>
+              <Text style={styles.sectionTitle}>Location Information</Text>
 
-            <DropField
-              label="Account Type"
-              value={accountType ? ACCOUNT_TYPES.find(a => a.value === accountType)?.label : "Select Account Type"}
-              onPress={() => setPicker({ open: true, type: "accountType" })}
-              required
-            />
-            <DropField
-              label="Status"
-              value={status ? STATUSES.find(s => s.value === status)?.label : "Select Status"}
-              onPress={() => setPicker({ open: true, type: "status" })}
-              required
-            />
-
-            <LabeledInput
-              label="Commission Rate (%)"
-              value={commissionRate}
-              onChangeText={setCommissionRate}
-              placeholder="Enter Commission Rate"
-              keyboardType="decimal-pad"
-            />
-
-            <View style={styles.infoBox}>
-              <Text style={styles.infoTitle}>Update Summary</Text>
-              <InfoRow label="Name" value={`${firstName} ${lastName}`} />
-              <InfoRow label="Email" value={email} />
-              <InfoRow label="Mobile" value={mobileNumber} />
-              <InfoRow label="Country" value={country?.countryName} />
-              <InfoRow label="Province" value={province?.provinceName} />
-              <InfoRow label="District" value={district?.districtName} />
-              <InfoRow label="Address" value={address} />
-              <InfoRow label="Language" value={messageLanguage} />
-              <InfoRow label="Account Type" value={accountType} />
-              <InfoRow label="Status" value={status} />
-              <InfoRow label="Commission Rate" value={commissionRate ? `${commissionRate}%` : "Not set"} />
-            </View>
-
-            <View style={styles.rowButtons}>
-              <DarkButton
-                label="Back"
-                onPress={back}
-                style={styles.halfButton}
-                disabled={updating}
+              <DropField
+                label="Country"
+                value={getSelectedValue("country")}
+                onPress={() => openModal("country", "Select Country", countries)}
+                leftIcon={renderFlag(country?.countryCode)}
+                required
               />
-              <PrimaryButton
-                label={updating ? "Updating..." : "Update Agent"}
-                onPress={submit}
-                style={styles.halfButton}
-                disabled={updating}
+              <DropField
+                label="Province"
+                value={getSelectedValue("province")}
+                onPress={() => openModal("province", "Select Province", provinces)}
+                required
               />
-            </View>
-          </>
-        )}
-      </ScrollView>
+              <DropField
+                label="District"
+                value={getSelectedValue("district")}
+                onPress={() => openModal("district", "Select District", districts)}
+                required
+              />
+              <LabeledInput
+                label="Full Address"
+                value={address}
+                onChangeText={setAddress}
+                placeholder="Enter Full Address"
+                required
+              />
+              <DropField
+                label="Message Language"
+                value={getSelectedValue("lang")}
+                onPress={() => openModal("lang", "Select Language", LANGS)}
+                required
+              />
 
-      {/* Picker modal */}
+              <View style={styles.rowButtons}>
+                <DarkButton
+                  label="Back"
+                  onPress={back}
+                  style={styles.halfButton}
+                />
+                <PrimaryButton
+                  label="Continue"
+                  onPress={next}
+                  style={styles.halfButton}
+                />
+              </View>
+            </>
+          )}
+
+          {step === 2 && (
+            <>
+           
+              <View style={styles.infoBox}>
+                <Text style={styles.infoTitle}>Update Summary</Text>
+                <InfoRow label="Name" value={`${firstName} ${lastName}`} />
+                <InfoRow label="Email" value={email} />
+                <InfoRow label="Mobile" value={mobileNumber} />
+                <InfoRow label="Country" value={country?.countryName} />
+                <InfoRow label="Province" value={province?.provinceName} />
+                <InfoRow label="District" value={district?.districtName} />
+                <InfoRow label="Address" value={address} />
+                <InfoRow label="Language" value={getSelectedValue("lang")} />
+                <InfoRow label="Account Type" value={getSelectedValue("accountType")} />
+                <InfoRow label="Status" value={getSelectedValue("status")} />
+                <InfoRow label="Commission Rate" value={commissionRate ? `${commissionRate}%` : "Not set"} />
+              </View>
+
+              <View style={styles.rowButtons}>
+                <DarkButton
+                  label="Back"
+                  onPress={back}
+                  style={styles.halfButton}
+                  disabled={updating}
+                />
+                <PrimaryButton
+                  label={updating ? "Updating..." : "Update Agent"}
+                  onPress={submit}
+                  style={styles.halfButton}
+                  disabled={updating}
+                />
+              </View>
+            </>
+          )}
+        </ScrollView>
+      </KeyboardAwareScrollView>
+
+  
+      <SuccessModal
+        visible={isSuccessVisible}
+        onClose={handleSuccessClose}
+        title="Agent Updated Successfully!"
+        subtitle="The agent profile has been updated successfully with all the new information."
+        details={getSuccessDetails()}
+        primaryButtonText="Continue"
+        showConfetti={true}
+        showAnimation={true}
+        animationSize={120}
+      />
+
+
       <Modal
-        transparent
-        visible={picker.open}
-        animationType="fade"
-        statusBarTranslucent
-        presentationStyle="overFullScreen"
-        onRequestClose={() => setPicker({ open: false })}
+        visible={modal.open}
+        transparent={true}
+        animationType="none"
+        statusBarTranslucent={true}
+        onRequestClose={closeModal}
       >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity 
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={closeModal}
+          />
+          <Animated.View 
+            style={[
+              styles.modalCard,
+              { 
+                transform: [{ translateY: modalSlideAnim }],
+                height: '80%',
+                marginBottom: -insets.bottom
+              }
+            ]}
+          >
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {picker.type === "country" && "Select Country"}
-                {picker.type === "province" && "Select Province"}
-                {picker.type === "district" && "Select District"}
-                {picker.type === "lang" && "Select Language"}
-                {picker.type === "status" && "Select Status"}
-                {picker.type === "accountType" && "Select Account Type"}
-              </Text>
-              <TouchableOpacity
-                onPress={() => setPicker({ open: false })}
-                style={{ padding: 6 }}
+              <Text style={styles.modalTitle}>{modal.title}</Text>
+              <TouchableOpacity 
+                onPress={closeModal}
+                style={styles.closeButton}
               >
-                <Ionicons name="close" size={20} color="#333" />
+                <Ionicons name="close" size={24} color="#666" />
               </TouchableOpacity>
             </View>
 
+            <View style={styles.searchContainer}>
+              <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
+              <TextInput
+                placeholder={`Search ${modal.title.toLowerCase()}...`}
+                value={modal.searchQuery}
+                onChangeText={(text) => setModal(prev => ({ ...prev, searchQuery: text }))}
+                style={styles.searchInput}
+                placeholderTextColor="#999"
+              />
+            </View>
+
             <FlatList
-              data={
-                picker.type === "country" ? countries :
-                picker.type === "province" ? provinces :
-                picker.type === "district" ? districts :
-                picker.type === "lang" ? LANGS :
-                picker.type === "status" ? STATUSES :
-                picker.type === "accountType" ? ACCOUNT_TYPES : []
-              }
-              keyExtractor={(item) => item.value || item.id || item.countryCode}
-              ItemSeparatorComponent={() => <View style={{ height: GAP }} />}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.modalRow}
-                  onPress={() => {
-                    if (picker.type === "country") {
-                      setCountry(item);
-                    } else if (picker.type === "province") {
-                      setProvince(item);
-                    } else if (picker.type === "district") {
-                      setDistrict(item);
-                    } else if (picker.type === "lang") {
-                      setMessageLanguage(item.value);
-                    } else if (picker.type === "status") {
-                      setStatus(item.value);
-                    } else if (picker.type === "accountType") {
-                      setAccountType(item.value);
-                    }
-                    setPicker({ open: false });
-                  }}
-                  activeOpacity={0.85}
-                >
-                  <Text
-                    style={{
-                      flex: 1,
-                      fontSize: 15,
-                      color: Colors.textPrimary,
-                    }}
-                  >
-                    {item.countryName || item.provinceName || item.districtName || item.label}
-                  </Text>
-                  {((picker.type === "country" && item.id === country?.id) ||
-                   (picker.type === "province" && item.id === province?.id) ||
-                   (picker.type === "district" && item.id === district?.id) ||
-                   (picker.type === "lang" && item.value === messageLanguage) ||
-                   (picker.type === "status" && item.value === status) ||
-                   (picker.type === "accountType" && item.value === accountType)) && (
-                    <Ionicons
-                      name="checkmark-circle"
-                      color={Colors.primary}
-                      size={18}
-                    />
-                  )}
-                </TouchableOpacity>
-              )}
+              data={getModalData()}
+              keyExtractor={(item) => item.id?.toString() || item.value || item.code || Math.random().toString()}
+              renderItem={renderModalItem}
+              ItemSeparatorComponent={() => <View style={styles.modalSeparator} />}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.modalContent}
             />
-          </View>
+          </Animated.View>
         </View>
       </Modal>
     </SafeAreaView>
@@ -628,7 +833,7 @@ function LabeledInput({ label, placeholder, required, ...rest }) {
 
 function DropField({ label, value, onPress, leftIcon, required }) {
   return (
-    <View style={{ marginBottom: 13 }}>
+    <View style={{ marginBottom: GAP }}>
       <Text style={styles.label}>
         {required && <Text style={{ color: "#F44336" }}>* </Text>}
         {label}
@@ -636,18 +841,15 @@ function DropField({ label, value, onPress, leftIcon, required }) {
       <TouchableOpacity
         style={styles.dropField}
         onPress={onPress}
-        activeOpacity={0.85}
+        activeOpacity={0.8}
       >
-        <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
-          {leftIcon ? <View style={{ marginRight: 8 }}>{leftIcon}</View> : null}
-          <Text style={{ 
-            color: value && !value.includes("Select") ? Colors.textPrimary : "#6B7280", 
-            fontSize: 14 
-          }}>
-            {value}
+        <View style={styles.selectedContent}>
+          {leftIcon && <View style={{ marginRight: 12 }}>{leftIcon}</View>}
+          <Text style={[styles.dropFieldText, !value && styles.placeholderText]}>
+            {value || `Select ${label}`}
           </Text>
         </View>
-        <Ionicons name="chevron-down" size={18} color="#7A7A7A" />
+        <Ionicons name="chevron-down" size={20} color="#7A7A7A" />
       </TouchableOpacity>
     </View>
   );
@@ -666,44 +868,6 @@ function DarkButton({ label, onPress, style, disabled }) {
   );
 }
 
-function StepDot({ index, current, label }) {
-  const active = current === index;
-  const done = current > index;
-  return (
-    <View style={styles.stepItem}>
-      <View
-        style={[
-          styles.stepDot,
-          active && {
-            backgroundColor: Colors.primary,
-            borderColor: Colors.primary,
-          },
-          done && { backgroundColor: Colors.primary },
-        ]}
-      >
-        {done ? (
-          <Ionicons name="checkmark" size={12} color="#fff" />
-        ) : (
-          <Text style={[styles.stepNum, active && { color: "#fff" }]}>
-            {index + 1}
-          </Text>
-        )}
-      </View>
-      <Text style={styles.stepLabel} numberOfLines={1}>
-        {label}
-      </Text>
-    </View>
-  );
-}
-
-function StepLine({ active }) {
-  return (
-    <View
-      style={[styles.stepLine, active && { backgroundColor: Colors.primary }]}
-    />
-  );
-}
-
 function InfoRow({ label, value }) {
   return (
     <View style={styles.infoRow}>
@@ -716,126 +880,87 @@ function InfoRow({ label, value }) {
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 24,
-    paddingTop: 14,
+    paddingTop: 20,
     paddingBottom: 140,
-    gap: GAP,
     backgroundColor: Colors.white,
   },
-  modalRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 10,
-    paddingHorizontal: 6,
-    borderRadius: 8,
+  sectionTitle: {
+    fontSize: 18,
+    color: Colors.textPrimary,
+    marginBottom: 20,
+    fontWeight: "700",
+  },
+  label: { 
+    fontSize: 14, 
+    color: Colors.textPrimary, 
+    marginBottom: 8,
+    fontWeight: '600'
+  },
+  dropField: {
+    height: 56,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    paddingHorizontal: 16,
     backgroundColor: "#fff",
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.25)",
-    justifyContent: "center",
-    padding: 24,
-  },
-  modalCard: {
-    width: "100%",
-    backgroundColor: "#fff",
-    borderRadius: 14,
-    padding: 14,
-    maxHeight: "70%",
-    elevation: 6,
-    shadowColor: "#000",
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 8 },
-  },
-  modalHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 8,
   },
-  modalTitle: { fontSize: 16, fontWeight: "700", color: Colors.textPrimary },
-  stepperWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 24,
-    paddingTop: 10,
-    backgroundColor: Colors.white,
+  selectedContent: {
+    flexDirection: "row", 
+    alignItems: "center", 
+    flex: 1
   },
-  stepItem: { alignItems: "center" },
-  stepDot: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: "#E5E7EB",
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
+  dropFieldText: {
+    color: Colors.textPrimary, 
+    fontSize: 16,
+    fontWeight: '500'
   },
-  stepNum: { fontSize: 12, color: Colors.textPrimary, fontWeight: "700" },
-  stepLabel: {
-    fontSize: 10,
-    marginTop: 4,
-    color: Colors.textSecondary,
-    width: 72,
-    textAlign: "center",
+  placeholderText: {
+    color: "#6B7280",
   },
-  stepLine: {
-    height: 2,
-    width: 28,
-    backgroundColor: "#E5E7EB",
-    marginHorizontal: 8,
+  fullButton: { 
+    marginTop: 20 
   },
-  sectionTitle: {
-    fontSize: 14,
-    color: Colors.textPrimary,
-    marginBottom: 6,
-    fontWeight: "600",
-  },
-  label: { fontSize: 13, color: Colors.textPrimary, marginBottom: 4 },
-  dropField: {
-    height: 46,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    paddingHorizontal: 12,
-    backgroundColor: "#fff",
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  fullButton: { marginTop: 12 },
   rowButtons: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 12,
+    marginTop: 20,
   },
-  halfButton: { width: "48%" },
+  halfButton: { 
+    width: "48%" 
+  },
   darkBtn: {
     height: 50,
-    borderRadius: 25,
+    borderRadius: 12,
     backgroundColor: "#2B2B2B",
     alignItems: "center",
     justifyContent: "center",
   },
-  darkBtnText: { color: "#fff", fontSize: 15, fontWeight: "600" },
+  darkBtnText: { 
+    color: "#fff", 
+    fontSize: 16, 
+    fontWeight: "600" 
+  },
   infoBox: {
     backgroundColor: "#f8f9fa",
-    borderRadius: 8,
-    padding: 16,
-    marginVertical: 12,
+    borderRadius: 12,
+    padding: 20,
+    marginVertical: 16,
   },
   infoTitle: {
     fontSize: 16,
     fontWeight: "600",
     color: Colors.textPrimary,
-    marginBottom: 12,
+    marginBottom: 16,
   },
   infoRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 4,
+    paddingVertical: 6,
   },
   infoLabel: {
     fontSize: 14,
@@ -892,5 +1017,89 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.textSecondary,
     fontStyle: "italic",
+  },
+  
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  modalCard: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
+    padding: 16,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+  },
+  modalTitle: { 
+    fontSize: 18, 
+    fontWeight: "700", 
+    color: Colors.textPrimary 
+  },
+  closeButton: {
+    padding: 4,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    marginBottom: 16,
+    height: 44,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: Colors.textPrimary,
+  },
+  modalContent: {
+    paddingBottom: 20,
+  },
+  modalRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+  },
+  modalItemTitle: {
+    fontSize: 16,
+    color: Colors.textPrimary,
+    fontWeight: '500',
+  },
+  modalItemSubtitle: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  modalSeparator: {
+    height: 1,
+    backgroundColor: '#F0F0F0',
   },
 });

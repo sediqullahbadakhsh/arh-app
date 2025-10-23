@@ -15,6 +15,7 @@ import {
   Easing,
   Dimensions,
   FlatList,
+  StyleSheet,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -30,6 +31,8 @@ import {
 } from "../../services/merchantProfileService";
 import ProfileStyles from "./Styles/ProfileStyle";
 import { useTranslation } from "react-i18next";
+import SuccessModal from "../../components/modals/SuccessModal";
+import ErrorModal from "../../components/modals/ErrorModal";
 
 const { height: screenHeight } = Dimensions.get('window');
 
@@ -233,7 +236,12 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
   const [originalData, setOriginalData] = useState({});
   const [errors, setErrors] = useState({});
   const [showImagePicker, setShowImagePicker] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
+  
+  // Modal states
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  
   const [scaleAnim] = useState(new Animated.Value(0));
   const [slideAnim] = useState(new Animated.Value(screenHeight));
   const [isEditing, setIsEditing] = useState(false);
@@ -271,7 +279,6 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
         if (merchantData) {
           const userInfo = merchantData.user || {};
           
-     
           const addressData = {
             alternativeContact: merchantData.alternativeContact || "",
             address: merchantData.address || "",
@@ -301,7 +308,6 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
             setAvatar(fullImageUrl);
           }
 
- 
           if (merchantData.countryDetails) {
             setSelectedCountry(merchantData.countryDetails);
           }
@@ -313,11 +319,11 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
           }
         }
 
-        // Load countries for dropdown
         await loadCountries();
       } catch (error) {
         console.error("Error fetching merchant data:", error);
-        Alert.alert("Error", "Failed to load profile data");
+        setErrorMessage("Failed to load profile data. Please try again.");
+        setShowErrorModal(true);
       } finally {
         setFetching(false);
       }
@@ -326,12 +332,10 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
     fetchMerchantData();
   }, []);
 
-
   const hasChanges = () => {
     return JSON.stringify(formData) !== JSON.stringify(originalData) || 
            avatar !== (user?.profile_picture ? `http://192.168.0.107:8081/uploads/profile_pictures/${user.profile_picture}` : null);
   };
-
 
   useEffect(() => {
     if (countries.length > 0 && formData.country && !selectedCountry) {
@@ -385,32 +389,6 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
     }
   }, [showImagePicker]);
 
-  useEffect(() => {
-    if (showSuccess) {
-      Animated.sequence([
-        Animated.timing(scaleAnim, {
-          toValue: 1.2,
-          duration: 200,
-          easing: Easing.out(Easing.back(1)),
-          useNativeDriver: true,
-        }),
-        Animated.timing(scaleAnim, {
-          toValue: 1,
-          duration: 100,
-          easing: Easing.in(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ]).start();
-
-      const timer = setTimeout(() => {
-        setShowSuccess(false);
-      }, 2000);
-
-      return () => clearTimeout(timer);
-    }
-  }, [showSuccess]);
-
-
   const loadCountries = async () => {
     setLoadingCountries(true);
     try {
@@ -422,11 +400,12 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
       }
     } catch (error) {
       console.error("Error loading countries:", error);
+      setErrorMessage("Failed to load countries. Please try again.");
+      setShowErrorModal(true);
     } finally {
       setLoadingCountries(false);
     }
   };
-
 
   useEffect(() => {
     if (formData.country) {
@@ -459,11 +438,12 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
       }
     } catch (error) {
       console.error("Error loading provinces:", error);
+      setErrorMessage("Failed to load provinces. Please try again.");
+      setShowErrorModal(true);
     } finally {
       setLoadingProvinces(false);
     }
   };
-
 
   useEffect(() => {
     if (formData.province) {
@@ -494,6 +474,8 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
       }
     } catch (error) {
       console.error("Error loading districts:", error);
+      setErrorMessage("Failed to load districts. Please try again.");
+      setShowErrorModal(true);
     } finally {
       setLoadingDistricts(false);
     }
@@ -503,7 +485,8 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
     if (Platform.OS !== 'web') {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Sorry, we need camera roll permissions to make this work!');
+        setErrorMessage("Sorry, we need camera roll permissions to make this work!");
+        setShowErrorModal(true);
       }
     }
   };
@@ -518,7 +501,8 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
       if (status !== 'granted') {
         const { status: newStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (newStatus !== 'granted') {
-          Alert.alert("Permission required", "Please allow access to your photos to change your profile picture.");
+          setErrorMessage("Please allow access to your photos to change your profile picture.");
+          setShowErrorModal(true);
           return;
         }
       }
@@ -540,7 +524,8 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert("Error", "Failed to open image gallery. Please try again.");
+      setErrorMessage("Failed to open image gallery. Please try again.");
+      setShowErrorModal(true);
     }
   };
 
@@ -552,7 +537,8 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       
       if (status !== 'granted') {
-        Alert.alert("Permission required", "Please allow camera access to take a photo.");
+        setErrorMessage("Please allow camera access to take a photo.");
+        setShowErrorModal(true);
         return;
       }
 
@@ -571,7 +557,8 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
       }
     } catch (error) {
       console.error('Error taking photo:', error);
-      Alert.alert("Error", "Failed to open camera. Please try again.");
+      setErrorMessage("Failed to open camera. Please try again.");
+      setShowErrorModal(true);
     }
   };
 
@@ -633,7 +620,6 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
       return;
     }
 
-
     if (!validateForm()) return;
 
     setLoading(true);
@@ -660,19 +646,29 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
           }
         }
         
-
         setOriginalData(formData);
         setIsEditing(false);
-        setShowSuccess(true);
+        setShowSuccessModal(true);
       } else {
-        Alert.alert("Error", response.message || "Failed to update profile");
+        setErrorMessage(response.message || "Failed to update profile");
+        setShowErrorModal(true);
       }
     } catch (error) {
       console.error("Update profile error:", error);
-      Alert.alert("Error", "An error occurred while updating your profile");
+      setErrorMessage("An error occurred while updating your profile");
+      setShowErrorModal(true);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSuccessClose = () => {
+    setShowSuccessModal(false);
+  };
+
+  const handleErrorClose = () => {
+    setShowErrorModal(false);
+    setErrorMessage("");
   };
 
   const handleChange = (field, value) => {
@@ -681,7 +677,6 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
     if (errors[field]) {
       setErrors({ ...errors, [field]: "" });
     }
-
 
     if (field === 'country') {
       setFormData(prev => ({
@@ -700,18 +695,15 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
     }
   };
 
-
   const handleCountrySelect = (country) => {
     setSelectedCountry(country);
     handleChange("country", country.id.toString());
   };
 
-
   const handleProvinceSelect = (province) => {
     setSelectedProvince(province);
     handleChange("province", province.id.toString());
   };
-
 
   const handleDistrictSelect = (district) => {
     setSelectedDistrict(district);
@@ -791,31 +783,6 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
               </TouchableOpacity>
             )}
           </View>
-        </Animated.View>
-      </View>
-    </Modal>
-  );
-
-  const SuccessModal = () => (
-    <Modal
-      visible={showSuccess}
-      transparent={true}
-      animationType="fade"
-      statusBarTranslucent={true}
-      onRequestClose={() => setShowSuccess(false)}
-    >
-      <View style={ProfileStyles.successOverlay}>
-        <Animated.View 
-          style={[
-            ProfileStyles.successContainer,
-            { transform: [{ scale: scaleAnim }] }
-          ]}
-        >
-          <View style={ProfileStyles.successIcon}>
-            <Ionicons name="checkmark-done" size={48} color="#fff" />
-          </View>
-          <Text style={ProfileStyles.successTitle}>{t('success!')}</Text>
-          <Text style={ProfileStyles.successMessage}>{t('profileUpdateSuccess')}</Text>
         </Animated.View>
       </View>
     </Modal>
@@ -1028,7 +995,7 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
             ]}>
               <Ionicons name="location-outline" size={20} color="#666" style={ProfileStyles.inputIcon} />
               <TextInput
-                style={[ProfileStyles.input, { height: 80, textAlignVertical: 'top' }]}
+                style={[ProfileStyles.input, {   }]}
                 placeholder="Enter your complete address"
                 value={formData.address}
                 onChangeText={(text) => handleChange("address", text)}
@@ -1062,8 +1029,49 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
         </ScrollView>
       </View>
 
+      {/* Success Modal */}
+      <SuccessModal
+        visible={showSuccessModal}
+        onClose={handleSuccessClose}
+        title="Profile Updated Successfully!"
+        message="Your profile information has been updated successfully."
+        buttonText="Continue"
+        autoHideDuration={0}
+      />
+
+      {/* Error Modal */}
+      <ErrorModal
+        visible={showErrorModal}
+        onClose={handleErrorClose}
+        title="Operation Failed"
+        message={errorMessage}
+        buttonText="Try Again"
+        showRetryButton={true}
+      />
+
       <ImagePickerModal />
-      <SuccessModal />
+
+   
+      {loading && (
+        <View style={styles.loadingOverlay}>
+          <Text style={styles.loadingText}>Updating Profile...</Text>
+        </View>
+      )}
     </View>
   );
 }
+
+const styles = {
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(255,255,255,0.8)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 999,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: Colors.textPrimary,
+    fontWeight: "600",
+  },
+};

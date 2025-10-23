@@ -1,4 +1,3 @@
-// src/screens/MerchantTopupFlowScreen.jsx
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import {
   SafeAreaView,
@@ -16,14 +15,16 @@ import {
   Easing,
   Dimensions,
   Image,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import LottieView from 'lottie-react-native';
 import { Colors } from "../theme/colors";
 import ServiceHeader from "../components/ServiceHeader";
 import PrimaryButton from "../components/PrimaryButton";
 import { codeToFlag } from "../utils/flag";
 import { DIAL_CODES, guessOperator } from "../constants/dialing";
-import { getCountries, makeRechargeAgent } from "../services/merchantApi";
+import { getCountries, makeRechargeAgent, getOrderStatus } from "../services/merchantApi";
 import { getSetaraganMnoId } from "../utils/getCompanyIdForSetaragan";
 import { getMnoLogo } from "../utils/getMnoLogo";
 import * as Contacts from 'expo-contacts';
@@ -32,16 +33,28 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import formatLocal from "../utils/formatLocal";
 import TopUpStyles from "./topupScreen/TopupStyle";
 import { useAuth } from "../auth/AuthProvider";
+import { useTranslation } from "react-i18next";
+import { isRTL } from "../utils/rtl";
 
 const { height: screenHeight } = Dimensions.get('window');
 const BASE_STEPS = { COUNTRY: 0, NUMBER: 1, PAY: 2 };
+
+// Status types
+const ORDER_STATUS = {
+  QUEUED: 'queued',
+  PROCESSING: 'processing',
+  SUCCEEDED: 'succeeded',
+  FAILED: 'failed',
+  PENDING: 'pending'
+};
 
 export default function MerchantTopupFlowScreen({ navigation }) {
   const { user } = useAuth?.() || { user: null };
   const lastStep = BASE_STEPS.PAY;
   const [countries, setCountries] = useState([]);
   const [step, setStep] = useState(0);
-  const [success, setSuccess] = useState(null);
+  const [orderStatus, setOrderStatus] = useState(null);
+  const [orderDetails, setOrderDetails] = useState(null);
   const [loading, setLoading] = useState(false);
   const [contacts, setContacts] = useState([]);
   const [filteredContacts, setFilteredContacts] = useState([]);
@@ -53,6 +66,8 @@ export default function MerchantTopupFlowScreen({ navigation }) {
   const [localNumber, setLocalNumber] = useState("");
   const [amountAfn, setAmountAfn] = useState("");
   const insets = useSafeAreaInsets();
+  const pollingRef = useRef(null);
+  const lottieRef = useRef(null);
 
   const [contactsSlideAnim] = useState(new Animated.Value(screenHeight));
   const [countriesSlideAnim] = useState(new Animated.Value(screenHeight));
@@ -61,6 +76,22 @@ export default function MerchantTopupFlowScreen({ navigation }) {
   const operator = guessOperator(country?.countryCode, localNumber.replace(/\D/g, ""));
   const operatorId = getSetaraganMnoId(localNumber);
   const operatorLogo = getMnoLogo(operatorId);
+
+  // Clean up polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+      }
+    };
+  }, []);
+
+  // Play Lottie animation when status changes
+  useEffect(() => {
+    if (lottieRef.current && (orderStatus === ORDER_STATUS.SUCCEEDED || orderStatus === ORDER_STATUS.FAILED)) {
+      lottieRef.current.play();
+    }
+  }, [orderStatus]);
 
   useEffect(() => {
     const getAllCountries = async () => {
@@ -72,6 +103,53 @@ export default function MerchantTopupFlowScreen({ navigation }) {
 
     getAllCountries();
   }, []);
+
+  // Polling function to check order status
+  const startPollingOrderStatus = async (orderId) => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+    }
+
+    let pollCount = 0;
+    const maxPolls = 60; // 3 minutes maximum (60 polls * 3 seconds)
+
+    pollingRef.current = setInterval(async () => {
+      try {
+        pollCount++;
+        const statusResponse = await getOrderStatus(orderId);
+        const currentStatus = statusResponse.data?.status;
+        
+        console.log(`Poll ${pollCount}: Order status:`, currentStatus);
+        
+        setOrderStatus(currentStatus);
+        setOrderDetails(prev => ({
+          ...prev,
+          ...statusResponse.data
+        }));
+
+        // Stop polling if we reach a final state or max polls
+        if (currentStatus === ORDER_STATUS.SUCCEEDED || 
+            currentStatus === ORDER_STATUS.FAILED || 
+            pollCount >= maxPolls) {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+          
+          if (pollCount >= maxPolls) {
+            setOrderStatus(ORDER_STATUS.FAILED);
+            console.log("Max polling attempts reached");
+          }
+        }
+      } catch (error) {
+        console.error("Error polling order status:", error);
+        // Continue polling even if there's an error, but stop after max attempts
+        if (pollCount >= maxPolls) {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+          setOrderStatus(ORDER_STATUS.FAILED);
+        }
+      }
+    }, 3000); // Poll every 3 seconds
+  };
 
   useEffect(() => {
     if (contactsModalVisible) {
@@ -203,37 +281,174 @@ export default function MerchantTopupFlowScreen({ navigation }) {
         setLoading(false);
         return;
       }
-      
+
+      // Validate amount
+      const amountValue = parseFloat(amountAfn);
+      if (isNaN(amountValue) || amountValue <= 0) {
+        Alert.alert("Invalid Amount", "Please enter a valid amount greater than 0");
+        setLoading(false);
+        return;
+      }
+
+      // Check minimum amount for Setaragan
+      if (amountValue < 10) {
+        Alert.alert("Minimum Amount", "The minimum topup amount for Setaragan is 50 AFN");
+        setLoading(false);
+        return;
+      }
+
       const payload = {
-        amount: amountAfn,
-        companyId: "",
-        countryId: country?.id,
-        currency: "AFN",
-        operator: operatorId,
-        productId: 2,
+        source: "agent_stock",
         receiver: localNumber,
-        source: "agent_stock"
+        operator: operatorId,
+        customAmount: amountValue,
+        currency: "AFN",
+        countryId: country?.id,
+        companyId: "", 
+        productId: 1, 
       };
 
+      console.log("Sending recharge payload:", payload);
+
       const res = await makeRechargeAgent(payload);
-      setSuccess({
-        mobile: `${dial} ${formatLocal(localNumber)}`,
-        amountAfn: amountAfn,
-        txId: res?.txnNumber,
-        date: new Date().toISOString(),
-      });
-      goNext();
+      
+      if (res.status === "queued") {
+        setOrderStatus(ORDER_STATUS.QUEUED);
+        setOrderDetails({
+          orderId: res.orderId,
+          txnNumber: res.txnNumber,
+          mobile: `${dial} ${formatLocal(localNumber)}`,
+          amountAfn: amountAfn,
+          date: new Date().toISOString(),
+          operator: operator?.name || "Unknown",
+        });
+        
+        // Start polling for status updates
+        await startPollingOrderStatus(res.orderId);
+        goNext();
+      } else {
+        throw new Error(res.error || "Failed to process recharge");
+      }
       
     } catch (error) {
       console.log("Recharge error: ", error);
       const message =
         error.response?.data?.error ||
+        error.response?.data?.details ||
         error.message ||
         "Failed to Recharge";
     
       Alert.alert("Failed To Recharge", message);
     }
     setLoading(false);
+  };
+
+  const getStatusMessage = () => {
+    switch (orderStatus) {
+      case ORDER_STATUS.QUEUED:
+        return "Your topup has been queued and will be processed shortly.";
+      case ORDER_STATUS.PROCESSING:
+      case ORDER_STATUS.PENDING:
+        return "Your topup is being processed. Please wait...";
+      case ORDER_STATUS.SUCCEEDED:
+        return "Topup completed successfully! The amount has been credited to the recipient's account.";
+      case ORDER_STATUS.FAILED:
+        return "Topup failed. The amount has been refunded to your wallet. Please try again.";
+      default:
+        return "Processing your request...";
+    }
+  };
+
+  const getStatusIcon = () => {
+    switch (orderStatus) {
+      case ORDER_STATUS.QUEUED:
+        return (
+          <View style={[TopUpStyles.statusIcon, { backgroundColor: '#FFF3CD', borderColor: '#FFEAA7' }]}>
+            <Ionicons name="time-outline" size={36} color="#FFA500" />
+          </View>
+        );
+      case ORDER_STATUS.PROCESSING:
+      case ORDER_STATUS.PENDING:
+        return (
+          <View style={[TopUpStyles.statusIcon, { backgroundColor: '#D1ECF1', borderColor: '#B8DAE4' }]}>
+            <ActivityIndicator size="large" color={Colors.primary} />
+          </View>
+        );
+      case ORDER_STATUS.SUCCEEDED:
+        return (
+          <LottieView
+            ref={lottieRef}
+            source={require('../../assets/lotties/succcess.json')}
+            autoPlay={true}
+            loop={false}
+            style={TopUpStyles.lottieAnimation}
+          />
+        );
+      case ORDER_STATUS.FAILED:
+        return (
+          <LottieView
+            ref={lottieRef}
+            source={require('../../assets/lotties/error.json')}
+            autoPlay={true}
+            loop={false}
+            style={TopUpStyles.lottieAnimation}
+          />
+        );
+      default:
+        return (
+          <View style={[TopUpStyles.statusIcon, { backgroundColor: '#E2E3E5', borderColor: '#D6D8DB' }]}>
+            <Ionicons name="help-circle" size={36} color="#6C757D" />
+          </View>
+        );
+    }
+  };
+
+  const getStatusTitle = () => {
+    switch (orderStatus) {
+      case ORDER_STATUS.QUEUED:
+        return "Topup Queued";
+      case ORDER_STATUS.PROCESSING:
+      case ORDER_STATUS.PENDING:
+        return "Processing Topup";
+      case ORDER_STATUS.SUCCEEDED:
+        return "Topup Successful!";
+      case ORDER_STATUS.FAILED:
+        return "Topup Failed";
+      default:
+        return "Processing";
+    }
+  };
+
+  const getStatusColor = () => {
+    switch (orderStatus) {
+      case ORDER_STATUS.QUEUED:
+        return "#FFA500";
+      case ORDER_STATUS.PROCESSING:
+      case ORDER_STATUS.PENDING:
+        return Colors.primary;
+      case ORDER_STATUS.SUCCEEDED:
+        return "#28A745";
+      case ORDER_STATUS.FAILED:
+        return "#DC3545";
+      default:
+        return "#6C757D";
+    }
+  };
+
+  const resetFlow = () => {
+    setOrderStatus(null);
+    setOrderDetails(null);
+    setStep(0);
+    setLocalNumber("");
+    setAmountAfn("");
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+
+    if (lottieRef.current) {
+      lottieRef.current.reset();
+    }
   };
 
   const ContactsModal = () => (
@@ -398,65 +613,106 @@ export default function MerchantTopupFlowScreen({ navigation }) {
   );
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white, paddingBottom: 100, }}>
       <ServiceHeader title="Mobile Top-up" onBack={goBack} />
 
-      {success ? (
-        <ScrollView
-          contentContainerStyle={{ padding: 24, alignItems: "center" }}
-        >
-          <View style={TopUpStyles.successCircle}>
-            <Ionicons name="checkmark" size={56} color="#4CAF50" />
-          </View>
-          <Text style={TopUpStyles.successTitle}>Topup Successful!</Text>
+      {orderStatus ? (
 
-          <View style={TopUpStyles.kv}>
-            <Text style={TopUpStyles.k}>Receiver Number</Text>
-            <Text style={TopUpStyles.v}>{success.mobile}</Text>
-          </View>
-          <View style={TopUpStyles.kv}>
-            <Text style={TopUpStyles.k}>Transaction ID</Text>
-            <Text style={TopUpStyles.v}>{success.txId}</Text>
-          </View>
-          <View style={TopUpStyles.kv}>
-            <Text style={TopUpStyles.k}>Date</Text>
-            <Text style={TopUpStyles.v}>
-              {new Date(success.date).toLocaleString()}
-            </Text>
-          </View>
-
-          <View style={TopUpStyles.totalBox}>
-            <Text style={TopUpStyles.totalLabel}>Total Amount</Text>
-            <Text style={TopUpStyles.totalValue}>{success.amountAfn} AFN</Text>
-          </View>
-
-          <PrimaryButton
-            label="Done"
-            onPress={() => {
-              navigation.popToTop();
-            }}
-            style={{ width: "100%" }}
-          />
-          <TouchableOpacity
-            onPress={() => {
-              setSuccess(null);
-              setStep(0);
-              setLocalNumber("");
-              setAmountAfn("");
+        <View style={{ flex: 1 }}>
+          <ScrollView
+            contentContainerStyle={{ 
+              flexGrow: 1,
+              padding: 24, 
+              alignItems: "center",
+              justifyContent: 'center'
             }}
           >
-            <Text
-              style={{
-                color: Colors.primary,
-                marginTop: 14,
-                fontWeight: "600",
-              }}
-            >
-              Topup More
-            </Text>
-          </TouchableOpacity>
-        </ScrollView>
+            <View style={TopUpStyles.statusHeader}>
+              {getStatusIcon()}
+              <Text style={[TopUpStyles.statusTitle, { color: getStatusColor() }]}>
+                {getStatusTitle()}
+              </Text>
+            </View>
+
+            <View style={TopUpStyles.detailsCard}>
+              <View style={TopUpStyles.detailRow}>
+                <Text style={TopUpStyles.detailLabel}>Receiver Number</Text>
+                <Text style={TopUpStyles.detailValue}>{orderDetails?.mobile}</Text>
+              </View>
+              {/* <View style={TopUpStyles.detailRow}>
+                <Text style={TopUpStyles.detailLabel}>Operator</Text>
+                <Text style={TopUpStyles.detailValue}>{orderDetails?.operator}</Text>
+              </View> */}
+              <View style={TopUpStyles.detailRow}>
+                <Text style={TopUpStyles.detailLabel}>Transaction ID</Text>
+                <Text style={TopUpStyles.detailValue}>{orderDetails?.txnNumber}</Text>
+              </View>
+              {/* <View style={TopUpStyles.detailRow}>
+                <Text style={TopUpStyles.detailLabel}>Order ID</Text>
+                <Text style={TopUpStyles.detailValue}>{orderDetails?.orderId}</Text>
+              </View> */}
+              <View style={TopUpStyles.detailRow}>
+                <Text style={TopUpStyles.detailLabel}>Date</Text>
+                <Text style={TopUpStyles.detailValue}>
+                  {new Date(orderDetails?.date).toLocaleString()}
+                </Text>
+              </View>
+
+              <View style={TopUpStyles.amountSection}>
+                <Text style={TopUpStyles.amountLabel}>Total Amount</Text>
+                <Text style={TopUpStyles.amountValue}>{orderDetails?.amountAfn} AFN</Text>
+              </View>
+            </View>
+
+            <View style={TopUpStyles.statusMessageContainer}>
+              <Text style={[TopUpStyles.statusMessage, { color: getStatusColor() }]}>
+                {getStatusMessage()}
+              </Text>
+            </View>
+
+            {(orderStatus === ORDER_STATUS.QUEUED || orderStatus === ORDER_STATUS.PROCESSING || orderStatus === ORDER_STATUS.PENDING) && (
+              <View style={TopUpStyles.progressContainer}>
+                <View style={TopUpStyles.progressBar}>
+                  <View 
+                    style={[
+                      TopUpStyles.progressFill,
+                      { 
+                        width: orderStatus === ORDER_STATUS.QUEUED ? '30%' : 
+                              (orderStatus === ORDER_STATUS.PROCESSING ? '60%' : '80%'),
+                        backgroundColor: getStatusColor()
+                      }
+                    ]} 
+                  />
+                </View>
+                <Text style={TopUpStyles.progressText}>
+                  {orderStatus === ORDER_STATUS.QUEUED ? 'Queued' : 
+                  orderStatus === ORDER_STATUS.PROCESSING ? 'Processing' : 'Finalizing...'}
+                </Text>
+              </View>
+            )}
+
+            {(orderStatus === ORDER_STATUS.SUCCEEDED || orderStatus === ORDER_STATUS.FAILED) && (
+              <PrimaryButton
+                label="Done"
+                onPress={() => {
+                  if (pollingRef.current) {
+                    clearInterval(pollingRef.current);
+                  }
+                  navigation.popToTop();
+                }}
+                style={{ width: "100%", marginTop: 20 }}
+              />
+            )}
+
+            <TouchableOpacity onPress={resetFlow} style={TopUpStyles.moreButton}>
+              <Text style={TopUpStyles.moreButtonText}>
+                {orderStatus === ORDER_STATUS.FAILED ? "Try Again" : "Topup More"}
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
       ) : (
+        // Regular Flow (unchanged)
         <KeyboardAvoidingView
           style={{ flex: 1 }}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -500,6 +756,7 @@ export default function MerchantTopupFlowScreen({ navigation }) {
                 summary={{
                   mobile: `${dial} ${formatLocal(localNumber)}`,
                   amount: amountAfn,
+                  operator: operator?.name || "Unknown"
                 }}
                 onEditNumber={() => jumpTo(BASE_STEPS.NUMBER)}
               />
@@ -510,6 +767,7 @@ export default function MerchantTopupFlowScreen({ navigation }) {
               onPress={step === lastStep ? recharge : goNext}
               style={{ marginTop: 24, opacity: canNext ? 1 : 0.5 }}
               loading={loading}
+              disabled={!canNext || loading}
             />
             {step > 0 && (
               <PrimaryButton
@@ -573,6 +831,64 @@ function StepCountry({ country, onOpen }) {
   );
 }
 
+const OPERATOR_LOGOS = {
+
+  'AWCC': require('../../assets/mnos/awcc.png'),
+  'Roshan': require('../../assets/mnos/roshan.png'),
+  'MTN': require('../../assets/mnos/mtn.png'),
+  'Salaam': require('../../assets/mnos/salaam.png'),
+  'Etisalat': require('../../assets/mnos/etisalat.png'),
+  'default': require('../../assets/mnos/awcc.png'),
+};
+const getOperatorLogo = (operatorName) => {
+  if (!operatorName) return OPERATOR_LOGOS.default;
+  
+  const normalizedName = operatorName.toLowerCase();
+  
+  if (normalizedName.includes('awcc')) return OPERATOR_LOGOS.AWCC;
+  if (normalizedName.includes('roshan')) return OPERATOR_LOGOS.Roshan;
+  if (normalizedName.includes('mtn')) return OPERATOR_LOGOS.MTN;
+  if (normalizedName.includes('salaam')) return OPERATOR_LOGOS.Salaam;
+  if (normalizedName.includes('etisalat')) return OPERATOR_LOGOS.Etisalat;
+  
+  return OPERATOR_LOGOS.default;
+};
+
+const VALID_PREFIXES = ['71', '72', '73', '74', '76', '77', '78', '79'];
+const validateMobileNumber = (number) => {
+  const cleanNumber = number.replace(/\D/g, "");
+  
+
+  if (cleanNumber.length > 0 && !cleanNumber.startsWith('7')) {
+    return {
+      isValid: false,
+      message: "mobileNumberStartWith7"
+    };
+  }
+
+  if (cleanNumber.startsWith('75')) {
+    return {
+      isValid: false,
+      message: "invalidPrefix75"
+    };
+  }
+  
+
+  if (cleanNumber.length >= 2) {
+    const prefix = cleanNumber.substring(0, 2);
+    if (!VALID_PREFIXES.includes(prefix)) {
+      return {
+        isValid: false,
+        message: `invalidPrefix ${prefix}`
+      };
+    }
+  }
+  
+  return {
+    isValid: true,
+    message: ""
+  };
+};
 function StepNumber({
   dial,
   country,
@@ -580,23 +896,64 @@ function StepNumber({
   onChange,
   localNumber,
   operator,
-  operatorLogo,
   onEditCountry,
   openContacts,
 }) {
+  const { t } = useTranslation();
   const [isFocused, setIsFocused] = useState(false);
+  const [validationError, setValidationError] = useState("");
   const formatted = formatLocal(value);
+
+  const handleNumberChange = (input) => {
+
+    const numericInput = input.replace(/\D/g, "");
+    
+
+    const limitedInput = numericInput.slice(0, 9);
+    
+  
+    const validation = validateMobileNumber(limitedInput);
+    
+    if (!validation.isValid && limitedInput.length > 0) {
+      const errorMessage = t(validation.message);
+      setValidationError(errorMessage);
+      
+ 
+      if (limitedInput.startsWith('75') || !limitedInput.startsWith('7')) {
+        return;
+      }
+    } else {
+      setValidationError("");
+    }
+    
+
+    onChange(limitedInput);
+  };
+
+  const handleFocus = () => {
+    setIsFocused(true);
+    setValidationError("");
+  };
+
+  const handleBlur = () => {
+    setIsFocused(false);
+    
+    if (value.length > 0) {
+      const validation = validateMobileNumber(value);
+      if (!validation.isValid) {
+        const errorMessage = t(validation.message);
+        setValidationError(errorMessage);
+      }
+    }
+  };
 
   return (
     <View style={{ marginTop: 12 }}>
       <View style={TopUpStyles.editHeader}>
-        <Text style={TopUpStyles.sectionTitle}>Mobile Number</Text>
+        <Text style={TopUpStyles.sectionTitle}>{t('mobileNumber')}</Text>
         <View style={{ flexDirection: "row", gap: 16 }}>
           <TouchableOpacity onPress={openContacts}>
-            <Text style={TopUpStyles.editLink}>Contacts</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={onEditCountry}>
-            <Text style={TopUpStyles.editLink}>Change country</Text>
+            <Text style={TopUpStyles.editLink}>{t('contacts')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -604,9 +961,9 @@ function StepNumber({
       <View style={[
         TopUpStyles.phoneRow,
         {
-          borderColor: isFocused ? Colors.primary : '#E4E7EC',
+          borderColor: validationError ? '#EF4444' : (isFocused ? Colors.primary : '#E4E7EC'),
           backgroundColor: '#FFFFFF',
-          shadowColor: Colors.primary,
+          shadowColor: validationError ? '#EF4444' : Colors.primary,
           shadowOffset: { width: 0, height: 4 },
           shadowOpacity: isFocused ? 0.15 : 0,
           shadowRadius: isFocused ? 10 : 0,
@@ -615,46 +972,47 @@ function StepNumber({
         }
       ]}>
         <View style={TopUpStyles.phonePrefix}>
-          <Text style={{ fontSize: 20, marginRight: 8 }}>
-            {codeToFlag(country?.countryCode)}
-          </Text>
+          {operator ? (
+            <Image 
+              source={getOperatorLogo(operator.name)}
+              style={{
+                width: 24,
+                height: 24,
+                marginRight: 8,
+                borderRadius: 4,
+              }}
+              resizeMode="contain"
+            />
+          ) : (
+            <View style={{
+              width: 24,
+              height: 24,
+              marginRight: 8,
+              borderRadius: 4,
+              backgroundColor: '#E5E7EB',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}>
+              <Ionicons name="cellular-outline" size={16} color="#6B7280" />
+            </View>
+          )}
           <Text style={{ fontWeight: "700", color: Colors.textPrimary, fontFamily: 'dmsansRegular' }}>
             {dial}
           </Text>
         </View>
         <TextInput
           value={formatted}
-          onChangeText={(t) => {
-            const trimmed = t.trim()
-            if(t.startsWith("0") && trimmed.length == 0){
-              Alert.alert(
-                "Invalid Number",
-                "Please start your phone number with 7 instead of 0, as the 0 is already included in your country code."
-              );
-              const numeric = trimmed.replace(/^0+/, "");
-              onChange(numeric)
-              return 
-            }
-            onChange(t.replace(/\D/g, "").slice(0, 9))
-          }}
+          onChangeText={handleNumberChange}
           keyboardType="number-pad"
           placeholder="700-000-000"
           placeholderTextColor="#9E9E9E"
-          style={TopUpStyles.phoneInput}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
+          style={[
+            TopUpStyles.phoneInput,
+            validationError && { color: '#EF4444' }
+          ]}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
         />
-        
-        {/* Operator Image */}
-        {localNumber.length > 1 && operatorLogo && (
-          <View style={{ width: 40, height: 40, paddingHorizontal: 8, justifyContent: "center", alignItems: "center" }}>
-            <Image 
-              source={operatorLogo} 
-              style={{ width: "100%", height: "100%", resizeMode: "contain", borderRadius: 8 }} 
-            />
-          </View>
-        )}
-        
         <TouchableOpacity
           onPress={openContacts}
           style={{ paddingHorizontal: 12, justifyContent: "center" }}
@@ -663,37 +1021,22 @@ function StepNumber({
         </TouchableOpacity>
       </View>
 
-      <View style={{ marginTop: 10, minHeight: 24 }}>
-        {operator ? (
-          <View
-            style={[
-              TopUpStyles.operatorPill,
-              {
-                backgroundColor: hexFade(operator.color, 0.14),
-                borderColor: operator.color,
-              },
-            ]}
-          >
-            <Ionicons
-              name="radio-outline"
-              size={14}
-              color={operator.color}
-              style={{ marginRight: 6 }}
-            />
-            <Text
-              style={{ color: operator.color, fontWeight: "600", fontSize: 12, fontFamily: 'dmsansRegular' }}
-            >
-              {operator.name}
-            </Text>
-          </View>
-        ) : (
-          value.length > 0 && (
-            <Text style={{ color: "#9E9E9E", fontSize: 12, fontFamily: 'dmsansRegular' }}>
-              We'll detect the operator automatically
-            </Text>
-          )
-        )}
-      </View>
+      {validationError ? (
+        <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center' }}>
+          <Ionicons name="warning-outline" size={16} color="#EF4444" />
+          <Text style={{ 
+            color: '#EF4444', 
+            fontSize: 12, 
+            fontFamily: 'dmsansRegular',
+            marginLeft: 4
+          }}>
+            {validationError}
+          </Text>
+        </View>
+      ) : (
+        <View style={{ marginTop: 10, minHeight: 24 }}>
+        </View>
+      )}
     </View>
   );
 }
@@ -754,6 +1097,10 @@ function StepPay({
         <View style={TopUpStyles.summaryRow}>
           <Text style={TopUpStyles.summaryKey}>Mobile Number</Text>
           <Text style={TopUpStyles.summaryValue}>{summary.mobile}</Text>
+        </View>
+        <View style={TopUpStyles.summaryRow}>
+          <Text style={TopUpStyles.summaryKey}>Operator</Text>
+          <Text style={TopUpStyles.summaryValue}>{summary.operator}</Text>
         </View>
         <View style={TopUpStyles.summaryRow}>
           <Text style={TopUpStyles.summaryKey}>Amount</Text>

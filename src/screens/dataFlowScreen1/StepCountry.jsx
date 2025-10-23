@@ -5,9 +5,10 @@ import { codeToFlag } from "../../utils/flag";
 import { DIAL_CODES } from "../../constants/dialing";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../theme/colors";
+import { useTranslation } from "react-i18next";
 function StepCountry({ country, onOpen }) {
   const [isFocused, setIsFocused] = useState(false);
-
+  const {t} = useTranslation();
   return (
     <View style={{ marginTop: 16 }}>
       <Text style={DataStyles.sectionTitle}>{t('selectCountryYouWantToSend')}</Text>

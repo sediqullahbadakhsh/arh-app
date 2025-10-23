@@ -19,6 +19,217 @@ const OrderStyles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
+  receiptModalOverlay: {
+  flex: 1,
+  backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+receiptModalBackdrop: {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+},
+receiptModalContainer: {
+  width: '90%',
+  maxWidth: 400,
+  height: '90%',
+  backgroundColor: '#fff',
+  borderRadius: 24,
+  overflow: 'hidden',
+  shadowColor: '#000',
+  shadowOffset: {
+    width: 0,
+    height: 10,
+  },
+  shadowOpacity: 0.3,
+  shadowRadius: 20,
+  elevation: 10,
+},
+
+// Receipt Header Styles
+receiptHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  paddingHorizontal: 20,
+  paddingVertical: 16,
+  backgroundColor: Colors.primary,
+  borderTopLeftRadius: 24,
+  borderTopRightRadius: 24,
+},
+receiptHeaderLeft: {
+  flex: 1,
+},
+receiptHeaderCenter: {
+  flex: 2,
+  alignItems: 'center',
+},
+receiptHeaderRight: {
+  flex: 1,
+  flexDirection: 'row',
+  justifyContent: 'flex-end',
+  alignItems: 'center',
+},
+receiptCloseButton: {
+  width: 32,
+  height: 32,
+  borderRadius: 16,
+  backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+receiptHeaderActionButton: {
+  width: 36,
+  height: 36,
+  borderRadius: 18,
+  backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginLeft: 8,
+},
+receiptTitle: {
+  fontSize: 18,
+  fontWeight: 'bold',
+  color: '#fff',
+  textAlign: 'center',
+},
+
+receiptContent: {
+  flex: 1,
+  padding: 20,
+},
+
+// Receipt Status Section
+receiptStatusSection: {
+  alignItems: 'center',
+  marginBottom: 12,
+},
+receiptStatusIconContainer: {
+  width: 100,
+  height: 100,
+  borderRadius: 100,
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+
+// Receipt Top Section
+receiptTopSection: {
+  alignItems: 'center',
+},
+receiptAmountValueTop: {
+  fontSize: 24,
+  textAlign: 'center',
+  fontWeight: 'bold',
+  marginBottom: 24,
+  color: Colors.textPrimary,
+},
+
+// Receipt Details Grid
+receiptDetailsGrid: {
+  marginBottom: 24,
+},
+receiptDetailItem: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  paddingVertical: 12,
+  borderBottomWidth: 1,
+  borderBottomColor: '#F3F4F6',
+},
+receiptDetailLabel: {
+  fontSize: 14,
+  color: '#6B7280',
+  flex: 1,
+},
+receiptDetailValue: {
+  fontSize: 14,
+  fontWeight: '500',
+  color: Colors.textPrimary,
+  flex: 1,
+  textAlign: 'right',
+},
+
+// Receipt Amount Section
+receiptAmountSection: {
+  alignItems: 'center',
+  marginBottom: 24,
+  backgroundColor: '#F3F4F6',
+  borderRadius: 12,
+  padding: 16,
+},
+receiptAmountLabel: {
+  fontSize: 14,
+  color: '#6B7280',
+  marginBottom: 4,
+},
+receiptAmountValue: {
+  fontSize: 24,
+  fontWeight: 'bold',
+  color: Colors.textPrimary,
+},
+
+// Receipt Additional Info
+receiptAdditionalInfo: {
+  backgroundColor: '#F9FAFB',
+  borderRadius: 12,
+  padding: 16,
+  marginBottom: 24,
+},
+receiptInfoRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginBottom: 8,
+},
+receiptInfoText: {
+  fontSize: 12,
+  color: '#6B7280',
+  marginLeft: 8,
+  flex: 1,
+},
+
+
+  receiptActions: {
+    padding: 40,
+    paddingHorizontal: 20,
+    paddingTop: 0,
+    gap: 12, // Add gap between buttons
+  },
+  receiptPrimaryButton: {
+    backgroundColor: Colors.primary,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    width: "100%",
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  receiptPrimaryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  // New Share Button Styles
+  receiptShareButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    width: "100%",
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    backgroundColor: 'transparent',
+  },
+  receiptShareButtonText: {
+    color: Colors.primary,
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
@@ -368,11 +579,7 @@ const OrderStyles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
   },
-  receiptActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
+
   receiptButton: {
     flexDirection: 'row',
     alignItems: 'center',

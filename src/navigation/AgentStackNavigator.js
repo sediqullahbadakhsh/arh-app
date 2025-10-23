@@ -7,6 +7,8 @@ import AgentViewScreen from "../screens/agents/AgentViewScreen";
 import SignupResultScreen from "../screens/SignupResultScreen";
 import AssignSlabScreen from "../screens/agents/AssignSlabScreen";
 import AgentEditScreen from "../screens/agents/AgentEditScreen";
+import AllTransactionsScreen from "../screens/AllTransactionsScreen";
+import MerchantAnalyticsScreen from "../screens/MerchantAnalyticsScreen";
  
 // import SignupResultScreen from "../screens/SignupResultScreen";
 
@@ -21,6 +23,15 @@ export default function AgentStackNavigator() {
       <Stack.Screen name="SignupResult" component={SignupResultScreen} />
       <Stack.Screen name="AgentEdit" component={AgentEditScreen} />
       <Stack.Screen name="AssignSlab" component={AssignSlabScreen} />
+               <Stack.Screen 
+        name="AllTransactions" 
+        component={AllTransactionsScreen} 
+   
+      />
+      <Stack.Screen 
+  name="MerchantAnalytics" 
+  component={MerchantAnalyticsScreen} 
+/>
     </Stack.Navigator>
   );
 }

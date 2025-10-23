@@ -38,15 +38,17 @@ export function AuthProvider({ children }) {
   const [token, setTokenState] = useState(null);
   const [pending, setPending] = useState(null);
   const [initializing, setInitializing] = useState(true);
-const fetchUserProfile = async (token) => {
-  try {
-    const response = await getCustomerProfile(token); 
-    return response?.data;
-  } catch (err) {
-    console.error("❌ Failed to fetch user profile:", err);
-    return null;
-  }
-};
+
+  const fetchUserProfile = async (token) => {
+    try {
+      const response = await getCustomerProfile(token); 
+      console.log("❤❤❤ this is user profile:", response);
+      return response?.data;
+    } catch (err) {
+      console.error("❌ Failed to fetch user profile:", err);
+      return null;
+    }
+  };
 
   useEffect(() => {
     if (token) {
@@ -54,7 +56,7 @@ const fetchUserProfile = async (token) => {
     }
   }, [token]);
 
-
+  // Initialize auth state
   useEffect(() => {
     (async () => {
       try {
@@ -62,14 +64,24 @@ const fetchUserProfile = async (token) => {
           AsyncStorage.getItem("auth_token"),
           AsyncStorage.getItem("auth_role"),
         ]);
+        
         if (t) {
-         const userProfile = await fetchUserProfile(t);
-await setToken(t, {
-  role,
-  id: userProfile?.id,
-  username: userProfile?.fullName,
-  role_id: userProfile?.roleData?.id,
-});
+          console.log("🔄 Restoring auth from storage...");
+          const userProfile = await fetchUserProfile(t);
+          
+          if (userProfile) {
+            // Use the actual user profile data
+            await setToken(t, {
+              role: role || "b2b",
+              id: userProfile.id,
+              username: userProfile.username,
+              role_id: userProfile.role_id,
+              ...userProfile // Include all profile data
+            });
+          } else {
+            // Fallback: set token with basic info
+            await setToken(t, { role });
+          }
         }
       } catch (err) {
         console.error("❌ Error restoring auth:", err);
@@ -95,19 +107,31 @@ await setToken(t, {
 
     const role = meta.role || (await AsyncStorage.getItem("auth_role")) || null;
 
+    // Create user object - prioritize meta data over existing user data
     const u = {
-      ...(user || {}),
-      ...meta,
       token: newToken,
-      role,
-      role_id: meta.role_id ?? user?.role_id,
-      username: meta.username ?? user?.username,
-      id: meta.id ?? user?.id,
+      role: role,
+      id: meta.id !== undefined ? meta.id : (user?.id !== undefined ? user.id : null),
+      username: meta.username !== undefined ? meta.username : (user?.username !== undefined ? user.username : null),
+      role_id: meta.role_id !== undefined ? meta.role_id : (user?.role_id !== undefined ? user.role_id : null),
+      // Include any additional profile data
+      ...meta,
     };
 
-    console.log("✅ AuthProvider: Final user object after login:", u);
+    // Remove duplicate token and role if they exist in meta spread
+    delete u.token;
+    delete u.role;
+    
+    // Final user object with correct structure
+    const finalUser = {
+      token: newToken,
+      role: role,
+      ...u
+    };
+
+    console.log("✅ AuthProvider: Final user object after login:", finalUser);
     console.log("✅ AuthProvider: Token set:", newToken);
-    setUser(u);
+    setUser(finalUser);
   };
 
   const clearToken = async () => {
@@ -124,10 +148,17 @@ await setToken(t, {
 
   const loginPasswordFn = async ({ identifier, password }) => {
     const data = await loginWithPassword({ identifier, password });
+    
+    // Fetch user profile after login to get complete user data
+    const userProfile = await fetchUserProfile(data.access_token);
+    
     await setRoleLocal("b2b");
     await setToken(data.access_token, {
       role: "b2b",
       role_id: data.role_id,
+      id: userProfile?.id,
+      username: userProfile?.username,
+      ...userProfile // Include all profile data
     });
     setPending(null);
     return data;
@@ -144,16 +175,20 @@ await setToken(t, {
     const data = await loginOtpVerify({ identifier, otp });
     console.log(data, "this is data");
 
+    // Fetch user profile after OTP verification
+    const userProfile = await fetchUserProfile(data.access_token);
+
     await setRoleLocal("b2c");
 
     const userData = {
       role: "b2c",
       role_id: data.role_id,
       username: data.fullName,
+      id: userProfile?.id || data.customer?.id || data.id,
+      fullName: data.fullName || data.customer?.fullName,
       ...data.customer,
       ...data,
-      id: data.customer?.id || data.id,
-      fullName: data.fullName || data.customer?.fullName,
+      ...userProfile // Include profile data
     };
 
     await setToken(data.access_token, userData);
@@ -170,7 +205,19 @@ await setToken(t, {
 
   const signupCustomerVerifyOtpFn = async ({ identifier, otp }) => {
     const data = await signupOtpVerify({ otp });
+    
+    // Fetch user profile after signup
+    const userProfile = await fetchUserProfile(data.access_token);
+    
     await setRoleLocal("b2c");
+    
+    await setToken(data.access_token, {
+      role: "b2c",
+      id: userProfile?.id,
+      username: userProfile?.username,
+      ...userProfile
+    });
+    
     setPending(null);
     return data;
   };

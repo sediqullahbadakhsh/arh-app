@@ -182,3 +182,13 @@ export const updateAgentDetails = (agentId, payload) => {
 export const getAgentById = (agentId) => {
   return api.get(`/merchant-downlineAgent/agent/${agentId}?lang=en`).then((r) => r.data);
 };
+
+export const getOrderStatus = async (orderId) => {
+  try {
+    const response = await api.get(`/orders/${orderId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Get order status API error:', error);
+    throw error;
+  }
+};

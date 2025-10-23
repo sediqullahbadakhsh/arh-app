@@ -1,8 +1,8 @@
 import React from "react";
 import {
-  SafeAreaView,
   View,
   Text,
+   SafeAreaView ,
   StyleSheet,
   ScrollView,
   TouchableOpacity,

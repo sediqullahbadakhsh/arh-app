@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, Image, SafeAreaView } from "react-native";
+import { View, Text, StyleSheet, Image,SafeAreaView  } from "react-native";
 import { Colors } from "../theme/colors";
 import PrimaryButton from "../components/PrimaryButton";
 import OutlineButton from "../components/OutlineButton";

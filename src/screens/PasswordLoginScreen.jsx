@@ -16,6 +16,7 @@ import PrimaryButton from "../components/PrimaryButton";
 import { useAuth } from "../auth/AuthProvider";
 import RoundedInput from "../components/RoundedInput";
 import InputField from "../components/InputField";
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import Checkbox from "../components/Checkbox";
 import { useUser } from "../context/userContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -97,14 +98,17 @@ const onLogin = async () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <AuthHeader title={"Sign in to your\nAccount"} onBack={() => navigation.goBack()} />
-    <KeyboardAvoidingView
-  behavior={Platform.OS === "ios" ? "padding" : "height"}
-  style={{ flex: 1, backgroundColor: "transparent" }}
-  keyboardVerticalOffset={hp(2)}
+   <KeyboardAwareScrollView
+  contentContainerStyle={{ flexGrow: 1 }}
+  enableOnAndroid
+  extraScrollHeight={20}
+  keyboardShouldPersistTaps="handled"
 >
+    <View style={{ flex: 1 }}>
          <ScrollView
               contentContainerStyle={{ flexGrow: 1 }}
               keyboardShouldPersistTaps="handled"
+               showsVerticalScrollIndicator={false}
             >  
         <View style={styles.container}>
         
@@ -142,14 +146,7 @@ const onLogin = async () => {
            onSubmitEditing={canSubmit ? onLogin : undefined}
         />
 
-           {/* <PasswordField
-            value={password}
-            onChangeText={setPassword}
-            placeholder="xxxxxxx"
-            returnKeyType="done"
-            onSubmitEditing={canSubmit ? onLogin : undefined}
-            style={ {marginBottom: 16, backgroundColor: Colors.pageBackColor} }
-          /> */}
+          
          </View>
        </View>
        <View style={{display: "flex", flexDirection: "row", marginTop: 8, justifyContent: "space-between" }}>
@@ -169,8 +166,8 @@ const onLogin = async () => {
           />
           </View>
         </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+        </ScrollView></View>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

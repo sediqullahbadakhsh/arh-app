@@ -8,15 +8,16 @@ import {
   RefreshControl,
   TextInput,
   Modal,
+  SafeAreaView,
   ScrollView,
   ActivityIndicator,
-  SafeAreaView,
   Alert,
   Share,
   Platform,
   Dimensions,
   Animated,
-  Easing
+  Easing,
+  Image
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,11 +27,282 @@ import ViewShot from 'react-native-view-shot';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system';
 import OrderStyles from './OrderStyles';
-const { height: screenHeight } = Dimensions.get('window');
+const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 import { Colors } from "../../theme/colors";
 import OrdersHeader from './OrdersHeader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
+
+// ReceiptModal Component (same as from HomeScreen)
+const ReceiptModal = ({ visible, onClose, transaction }) => {
+  const [slideAnim] = useState(new Animated.Value(screenHeight));
+  const { t } = useTranslation();
+
+  useEffect(() => {
+    if (visible) {
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 400,
+        easing: Easing.out(Easing.back(1.2)),
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(slideAnim, {
+        toValue: screenHeight,
+        duration: 300,
+        easing: Easing.in(Easing.ease),
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [visible]);
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'succeeded':
+        return '#10B981';
+      case 'failed':
+        return '#EF4444';
+      case 'pending':
+        return '#F59E0B';
+      default:
+        return '#6B7280';
+    }
+  };
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'succeeded':
+        return 'checkmark-circle';
+      case 'failed':
+        return 'close-circle';
+      case 'pending':
+        return 'time';
+      default:
+        return 'help-circle';
+    }
+  };
+
+  const getStatusText = (status) => {
+    switch (status) {
+      case 'succeeded':
+        return t('status.succeeded');
+      case 'failed':
+        return t('status.failed');
+      case 'pending':
+        return t('status.pending');
+      default:
+        return status;
+    }
+  };
+
+  const getServiceName = (source) => {
+    switch (source) {
+      case 'stripe_card':
+        return t('services.mobileTopup');
+      case 'data_bundle':
+        return t('services.dataBundle');
+      case 'game_coins':
+        return t('services.gameCoins');
+      default:
+        return t('transaction');
+    }
+  };
+
+  const getServiceIcon = (source) => {
+    switch (source) {
+      case 'stripe_card':
+        return 'phone-portrait-outline';
+      case 'data_bundle':
+        return 'wifi-outline';
+      case 'game_coins':
+        return 'game-controller-outline';
+      default:
+        return 'document-text-outline';
+    }
+  };
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric',
+      month: 'long', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const shareReceipt = async () => {
+    try {
+      const receiptText = `
+🎫 Transaction Receipt
+
+Service: ${getServiceName(transaction.source)}
+Amount: ${Number(transaction.amount).toFixed(2)} ${transaction.currency}
+Receiver: ${transaction.receiver}
+Status: ${getStatusText(transaction.status)}
+Date: ${formatDate(transaction.createdAt)}
+Transaction ID: ${transaction.txnNumber}
+
+Thank you for your business!
+      `.trim();
+
+      await Share.share({
+        message: receiptText,
+        title: 'Transaction Receipt',
+      });
+    } catch (error) {
+      console.error('Error sharing receipt:', error);
+      Alert.alert('Error', 'Failed to share receipt');
+    }
+  };
+
+  const downloadPDF = async () => {
+    Alert.alert(
+      'Download PDF',
+      'PDF download functionality will be implemented soon.',
+      [{ text: 'OK' }]
+    );
+  };
+
+  if (!transaction) return null;
+
+  return (
+    <Modal
+      visible={visible}
+      transparent={true}
+      animationType="none"
+      statusBarTranslucent={true}
+      onRequestClose={onClose}
+    >
+      <View style={OrderStyles.receiptModalOverlay}>
+        <TouchableOpacity 
+          style={OrderStyles.receiptModalBackdrop}
+          activeOpacity={1}
+          onPress={onClose}
+        />
+        <Animated.View 
+          style={[
+            OrderStyles.receiptModalContainer,
+            { transform: [{ translateY: slideAnim }] }
+          ]}
+        >
+          <View style={OrderStyles.receiptHeader}>
+            <View style={OrderStyles.receiptHeaderLeft}>
+              <TouchableOpacity onPress={onClose} style={OrderStyles.receiptCloseButton}>
+                <Ionicons name="close" size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={OrderStyles.receiptHeaderCenter}>
+              <Text style={OrderStyles.receiptTitle}>Receipt</Text>
+            </View>
+            
+            <View style={OrderStyles.receiptHeaderRight}>
+              <TouchableOpacity onPress={shareReceipt} style={OrderStyles.receiptHeaderActionButton}>
+                <Ionicons name="share-outline" size={20} color="#fff" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={downloadPDF} style={OrderStyles.receiptHeaderActionButton}>
+                <Ionicons name="download-outline" size={20} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <ScrollView style={OrderStyles.receiptContent}>
+            <View style={OrderStyles.receiptStatusSection}>
+              <View style={[
+                OrderStyles.receiptStatusIconContainer,
+                { backgroundColor: `${getStatusColor(transaction.status)}15` }
+              ]}>
+                <Ionicons 
+                  name={getStatusIcon(transaction.status)} 
+                  size={80} 
+                  color={getStatusColor(transaction.status)} 
+                />
+              </View>
+            </View>
+
+            <View style={OrderStyles.receiptTopSection}>
+              <Text style={OrderStyles.receiptAmountValueTop}>
+                {transaction.status === 'succeeded' ? 'Top-Up Success' : 
+                 transaction.status === 'failed' ? 'Top-Up Failed' : 
+                 'Processing Top-Up'}
+              </Text>
+            </View>
+
+            <View style={OrderStyles.receiptDetailsGrid}>
+              <View style={OrderStyles.receiptDetailItem}>
+                <Text style={OrderStyles.receiptDetailLabel}>Transaction ID</Text>
+                <Text style={OrderStyles.receiptDetailValue} numberOfLines={1} ellipsizeMode="middle">
+                  {transaction.txnNumber}
+                </Text>
+              </View>
+              
+              <View style={OrderStyles.receiptDetailItem}>
+                <Text style={OrderStyles.receiptDetailLabel}>Date & Time</Text>
+                <Text style={OrderStyles.receiptDetailValue}>
+                  {formatDate(transaction.createdAt)}
+                </Text>
+              </View>
+              
+              <View style={OrderStyles.receiptDetailItem}>
+                <Text style={OrderStyles.receiptDetailLabel}>Receiver</Text>
+                <Text style={OrderStyles.receiptDetailValue}>
+                  {transaction.receiver}
+                </Text>
+              </View>
+              
+              <View style={OrderStyles.receiptDetailItem}>
+                <Text style={OrderStyles.receiptDetailLabel}>Service</Text>
+                <Text style={OrderStyles.receiptDetailValue}>
+                  {getServiceName(transaction.source)}
+                </Text>
+              </View>
+            </View>
+
+            <View style={OrderStyles.receiptAmountSection}>
+              <Text style={OrderStyles.receiptAmountLabel}>Total Amount</Text>
+              <Text style={OrderStyles.receiptAmountValue}>
+                {Number(transaction.amount).toFixed(2)} {transaction.currency}
+              </Text>
+            </View>
+
+            <View style={OrderStyles.receiptAdditionalInfo}>
+              <View style={OrderStyles.receiptInfoRow}>
+                <Ionicons name="information-circle-outline" size={16} color="#6B7280" />
+                <Text style={OrderStyles.receiptInfoText}>
+                  {transaction.status === 'succeeded' 
+                    ? 'Your transaction was completed successfully.' 
+                    : transaction.status === 'failed'
+                    ? 'Your transaction failed. Please try again.'
+                    : 'Your transaction is being processed.'}
+                </Text>
+              </View>
+            </View>
+          </ScrollView>
+
+          <View style={OrderStyles.receiptActions}>
+            <TouchableOpacity 
+              style={OrderStyles.receiptPrimaryButton}
+              onPress={onClose}
+            >
+              <Text style={OrderStyles.receiptPrimaryButtonText}>Done</Text>
+            </TouchableOpacity>
+            
+            {/* Added Share Button Below Done Button */}
+            <TouchableOpacity 
+              style={OrderStyles.receiptShareButton}
+              onPress={shareReceipt}
+            >
+              <Ionicons name="share-outline" size={20} color={Colors.primary} />
+              <Text style={OrderStyles.receiptShareButtonText}>Share Receipt</Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+};
 
 const OrdersScreen = () => {
   const [filters, setFilters] = useState({
@@ -42,13 +314,12 @@ const OrdersScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const navigation = useNavigation(); 
   const [selectedOrder, setSelectedOrder] = useState(null);
-  const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [receiptModalVisible, setReceiptModalVisible] = useState(false);
   const queryClient = useQueryClient();
   const viewShotRef = useRef();
   const {t} = useTranslation();
  
-  const [detailSlideAnim] = useState(new Animated.Value(screenHeight));
   const [filterSlideAnim] = useState(new Animated.Value(screenHeight));
   const insets = useSafeAreaInsets();
 
@@ -68,25 +339,6 @@ const OrdersScreen = () => {
       Alert.alert('Error', 'Failed to retry order. Please try again.');
     },
   });
-
-
-  useEffect(() => {
-    if (detailModalVisible) {
-      Animated.timing(detailSlideAnim, {
-        toValue: 0,
-        duration: 350,
-        easing: Easing.out(Easing.back(1)),
-        useNativeDriver: true,
-      }).start();
-    } else {
-      Animated.timing(detailSlideAnim, {
-        toValue: screenHeight,
-        duration: 250,
-        easing: Easing.in(Easing.ease),
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [detailModalVisible]);
 
   useEffect(() => {
     if (filterModalVisible) {
@@ -129,7 +381,7 @@ const OrdersScreen = () => {
 
   const handleViewDetails = (order) => {
     setSelectedOrder(order);
-    setDetailModalVisible(true);
+    setReceiptModalVisible(true);
   };
 
   const handleResendOrder = (order) => {
@@ -141,82 +393,26 @@ const OrdersScreen = () => {
     });
   };
 
-  const requestMediaPermission = async () => {
-    if (Platform.OS !== 'web') {
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      return status === 'granted';
-    }
-    return false;
-  };
-
-  const downloadReceipt = async () => {
-    try {
-      if (Platform.OS === 'web') {
-        Alert.alert('Info', 'Download feature is not available on web');
-        return;
-      }
-
-      const hasPermission = await requestMediaPermission();
-      if (!hasPermission) {
-        Alert.alert('Permission required', 'Please allow access to save the receipt');
-        return;
-      }
-
-      const uri = await viewShotRef.current.capture();
-      const asset = await MediaLibrary.createAssetAsync(uri);
-      await MediaLibrary.createAlbumAsync('Receipts', asset, false);
-      
-      Alert.alert('Success', 'Receipt saved to your gallery');
-    } catch (error) {
-      console.error('Error saving receipt:', error);
-      Alert.alert('Error', 'Failed to save receipt');
-    }
-  };
-
-  const shareReceipt = async () => {
-    try {
-      if (Platform.OS === 'web') {
-        Alert.alert('Info', 'Share feature is not available on web');
-        return;
-      }
-
-      const uri = await viewShotRef.current.capture();
-      await Share.share({
-        url: uri,
-        title: 'Order Receipt',
-        message: 'Here is my order receipt',
-      });
-    } catch (error) {
-      console.error('Error sharing receipt:', error);
-    }
-  };
-
-
   const SkeletonLoader = () => (
     <SafeAreaView style={OrderStyles.container}>
       <OrdersHeader title="Orders" onBack={goBack} onFilter={() => {}} />
       
-  
       <View style={OrderStyles.searchContainer}>
         <View style={OrderStyles.skeletonSearchIcon} />
         <View style={OrderStyles.skeletonSearchInput} />
       </View>
 
-
       <FlatList
         data={[1, 2, 3, 4, 5]}
         renderItem={() => (
           <View style={OrderStyles.skeletonOrderItem}>
- 
             <View style={OrderStyles.skeletonOrderHeader}>
               <View style={OrderStyles.skeletonTxnId} />
               <View style={OrderStyles.skeletonStatus} />
             </View>
             
-         
             <View style={OrderStyles.skeletonDate} />
             
-        
             <View style={OrderStyles.skeletonOrderBody}>
               <View style={OrderStyles.skeletonReceiverInfo}>
                 <View style={OrderStyles.skeletonReceiverIcon} />
@@ -228,7 +424,6 @@ const OrdersScreen = () => {
               </View>
             </View>
             
-        
             <View style={OrderStyles.skeletonOrderFooter}>
               <View style={OrderStyles.skeletonActionButtons}>
                 <View style={OrderStyles.skeletonActionButton} />
@@ -243,77 +438,6 @@ const OrdersScreen = () => {
         showsVerticalScrollIndicator={false}
       />
     </SafeAreaView>
-  );
-
-  const OrderReceipt = ({ order }) => (
-    <ViewShot ref={viewShotRef} options={{ format: 'jpg', quality: 0.9 }}>
-      <View style={OrderStyles.receiptContainer}>
-        <View style={OrderStyles.receiptHeader}>
-          <Text style={OrderStyles.receiptTitle}>{t("orderReceipt")}</Text>
-          <Text style={OrderStyles.receiptSubtitle}>{t("transactionConfirmation")}</Text>
-        </View>
-        
-        <View style={OrderStyles.receiptDivider} />
-        
-        <View style={OrderStyles.receiptDetails}>
-          <View style={OrderStyles.receiptRow}>
-            <Text style={OrderStyles.receiptLabel}>{t("transactionIdLabel")}</Text>
-            <Text style={OrderStyles.receiptValue}>{order.txnNumber}</Text>
-          </View>
-          
-          <View style={OrderStyles.receiptRow}>
-            <Text style={OrderStyles.receiptLabel}>Date:{t("date")}</Text>
-            <Text style={OrderStyles.receiptValue}>
-              {new Date(order.createdAt).toLocaleString()}
-            </Text>
-          </View>
-          
-          <View style={OrderStyles.receiptRow}>
-            <Text style={OrderStyles.receiptLabel}>{t("status:")}</Text>
-            <View style={[
-              OrderStyles.receiptStatus, 
-              { backgroundColor: 
-                order.status === 'succeeded' ? '#4caf50' : 
-                order.status === 'failed' ? '#f44336' : 
-                '#ff9800' 
-              }
-            ]}>
-              <Text style={OrderStyles.receiptStatusText}>{order.status}</Text>
-            </View>
-          </View>
-          
-          <View style={OrderStyles.receiptDividerThin} />
-          
-          <View style={OrderStyles.receiptRow}>
-            <Text style={OrderStyles.receiptLabel}>{t("receiver:")}</Text>
-            <Text style={OrderStyles.receiptValue}>{order.receiver}</Text>
-          </View>
-          
-          <View style={OrderStyles.receiptRow}>
-            <Text style={OrderStyles.receiptLabel}>{t("amount:")}</Text>
-            <Text style={[OrderStyles.receiptValue, OrderStyles.amountText]}>
-              {Number(order.amount).toFixed(2)} {order.currency}
-            </Text>
-          </View>
-          
-          <View style={OrderStyles.receiptRow}>
-            <Text style={OrderStyles.receiptLabel}>{t("paymentMethod:")}</Text>
-            <Text style={OrderStyles.receiptValue}>
-              {order.source?.replace('_', ' ').toUpperCase()}
-            </Text>
-          </View>
-        </View>
-        
-        <View style={OrderStyles.receiptDivider} />
-        
-        <View style={OrderStyles.receiptFooter}>
-          <Text style={OrderStyles.thankYouText}>{t("thankYouForYourOrder")}</Text>
-          <Text style={OrderStyles.supportText}>
-          {t("forSupportContact")}
-          </Text>
-        </View>
-      </View>
-    </ViewShot>
   );
 
   const FilterModal = () => (
@@ -336,7 +460,6 @@ const OrdersScreen = () => {
             { 
               transform: [{ translateY: filterSlideAnim }],
               height: '60%',
-              // marginBottom: -insets.bottom
             }
           ]}
         >
@@ -396,81 +519,6 @@ const OrdersScreen = () => {
     </Modal>
   );
 
-  const DetailModal = () => (
-    <Modal
-      visible={detailModalVisible}
-      transparent={true}
-      animationType="none"
-      statusBarTranslucent={true}
-      onRequestClose={() => setDetailModalVisible(false)}
-    >
-      <View style={OrderStyles.modalOverlay}>
-        <TouchableOpacity 
-          style={OrderStyles.modalBackdrop}
-          activeOpacity={1}
-          onPress={() => setDetailModalVisible(false)}
-        />
-        <Animated.View 
-          style={[
-            OrderStyles.modalCard,
-            { 
-              transform: [{ translateY: detailSlideAnim }],
-              height: '95%',
-              marginBottom: -insets.bottom
-            }
-          ]}
-        >
-          <View style={OrderStyles.modalHeader}>
-            <Text style={OrderStyles.modalTitle}>{t("orderReceipt")}</Text>
-            <TouchableOpacity 
-              onPress={() => setDetailModalVisible(false)}
-              style={OrderStyles.closeButton}
-            >
-              <Ionicons name="close" size={24} color="#666" />
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView style={OrderStyles.orderDetails}>
-            {selectedOrder && <OrderReceipt order={selectedOrder} />}
-            
-            <View style={OrderStyles.receiptActions}>
-              <TouchableOpacity 
-                style={[OrderStyles.receiptButton, OrderStyles.downloadButton]}
-                onPress={downloadReceipt}
-              >
-                <Ionicons name="download" size={20} color="#fff" />
-                <Text style={OrderStyles.receiptButtonText}>{t("download")}</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[OrderStyles.receiptButton, OrderStyles.shareButton]}
-                onPress={shareReceipt}
-              >
-                <Ionicons name="share" size={20} color="#fff" />
-                <Text style={OrderStyles.receiptButtonText}>{t("share")}</Text>
-              </TouchableOpacity>
-            </View>
-            
-            {selectedOrder?.status === 'failed' && (
-              <TouchableOpacity 
-                style={OrderStyles.retryButton}
-                onPress={() => {
-                  handleRetryOrder(selectedOrder.id);
-                  setDetailModalVisible(false);
-                }}
-                disabled={retryOrderMutation.isLoading}
-              >
-                <Text style={OrderStyles.retryButtonText}>
-                  {retryOrderMutation.isLoading ? t('processing...') : 'retryOrder'}
-                </Text>
-              </TouchableOpacity>
-            )}
-          </ScrollView>
-        </Animated.View>
-      </View>
-    </Modal>
-  );
-
   const renderOrderItem = ({ item }) => (
     <View style={OrderStyles.orderItem}>
       <View style={OrderStyles.orderHeader}>
@@ -503,9 +551,6 @@ const OrdersScreen = () => {
           <Text style={OrderStyles.amountText}>
             {Number(item.amount).toFixed(2)} {item.currency}
           </Text>
-          {/* <Text style={OrderStyles.sourceText}>
-            {item.source?.replace('_', ' ')}
-          </Text> */}
         </View>
       </View>
       
@@ -570,7 +615,6 @@ const OrdersScreen = () => {
     </View>
   );
 
-
   if (isLoading) {
     return <SkeletonLoader />;
   }
@@ -604,7 +648,12 @@ const OrdersScreen = () => {
       )}
 
       <FilterModal />
-      <DetailModal />
+
+      <ReceiptModal
+        visible={receiptModalVisible}
+        onClose={() => setReceiptModalVisible(false)}
+        transaction={selectedOrder}
+      />
     </SafeAreaView>
   );
 };

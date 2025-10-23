@@ -1,4 +1,5 @@
-import { SafeAreaView, Text, View } from "react-native"
+import { Text, View, SafeAreaView } from "react-native"
+
 import ServiceHeader from "../../components/ServiceHeader";
 import { Colors } from "../../theme/colors";
 

@@ -273,18 +273,7 @@ export default function ProfileScreenMerchant({ navigation }) {
                 onPress={goSecurity}
               />
               
-              <ProfileRow
-                icon={
-                  <Ionicons
-                    name="business-outline"
-                    size={22}
-                    color={Colors.primary}
-                  />
-                }
-                title="Apply for merchant account"
-                subtitle="Upgrade your account"
-                onPress={goMerchant}
-              />
+          
 
               <ProfileRow
                 icon={
@@ -385,6 +374,7 @@ const styles = StyleSheet.create({
     height: AVATAR_SIZE,
     borderRadius: AVATAR_SIZE / 2,
     borderWidth: 3,
+    backgroundColor: "#f9f9f9",
     borderColor: "#fff",
   },
   avatarPlaceholder: {

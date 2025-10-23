@@ -46,17 +46,17 @@ export const SocketProvider = ({ children }) => {
 
   const isExpoGo = Constants.appOwnership === 'expo';
 
- 
+  // Load notifications from storage on mount
   useEffect(() => {
     loadNotificationsFromStorage();
   }, []);
 
-
+  // Save notifications to storage when they change
   useEffect(() => {
     saveNotificationsToStorage();
   }, [notifications, unreadCount]);
 
-
+  // Handle language changes
   useEffect(() => {
     const handleLanguageChange = () => {
       console.log('🌐 Language changed, refreshing notifications');
@@ -69,7 +69,6 @@ export const SocketProvider = ({ children }) => {
       i18n.off('languageChanged', handleLanguageChange);
     };
   }, [i18n]);
-
 
   const loadNotificationsFromStorage = async () => {
     try {
@@ -94,7 +93,6 @@ export const SocketProvider = ({ children }) => {
     }
   };
 
-
   const saveNotificationsToStorage = async () => {
     try {
       await Promise.all([
@@ -107,7 +105,7 @@ export const SocketProvider = ({ children }) => {
     }
   };
 
-
+  // Clear storage when user logs out
   useEffect(() => {
     if (!authed) {
       clearStorage();
@@ -126,6 +124,7 @@ export const SocketProvider = ({ children }) => {
     }
   };
 
+  // Initialize notifications
   useEffect(() => {
     console.log('🔧 Initializing Expo notifications...');
     console.log('🏠 App ownership:', Constants.appOwnership);
@@ -273,31 +272,23 @@ export const SocketProvider = ({ children }) => {
       const soundObject = new Audio.Sound();
       
       try {
-
         await soundObject.loadAsync(
           require('../../assets/sounds/notification.mp3') 
         );
         await soundObject.playAsync();
         
-
         setTimeout(() => {
           soundObject.unloadAsync();
         }, 2000);
         
       } catch (soundError) {
         console.log('Custom sound not found, using system sound');
-        
-
         Vibration.vibrate(500);
       }
     } catch (error) {
       console.log('Error playing notification sound:', error);
       Vibration.vibrate(500);
     }
-  };
-
-  const playNotificationVibration = () => {
-    Vibration.vibrate([0, 500, 200, 500]); 
   };
 
   const showNotification = async (notification) => {
@@ -324,7 +315,6 @@ export const SocketProvider = ({ children }) => {
 
     console.log('📱 Notification content:', { title, message });
 
-
     await playNotificationSound();
 
     if (notificationsAvailable) {
@@ -339,11 +329,10 @@ export const SocketProvider = ({ children }) => {
               id: notification.id,
               type: getNotificationType(notification),
             },
-            sound: true, 
+            sound: true,
             badge: unreadCount + 1,
-
           },
-          trigger: null, 
+          trigger: null,
         });
         
         console.log('✅ Local notification shown successfully');
@@ -403,7 +392,7 @@ export const SocketProvider = ({ children }) => {
     }
   };
 
-
+  // Notification management
   const addNotification = (notification) => {
     setNotifications(prev => {
       const exists = prev.some(notif => notif.id === notification.id);
@@ -430,20 +419,16 @@ export const SocketProvider = ({ children }) => {
   const markAsRead = async (notificationId) => {
     console.log('📝 Marking notification as read:', notificationId);
     
-
     setNotifications(prev =>
       prev.map(notif =>
         notif.id === notificationId ? { ...notif, isRead: true } : notif
       )
     );
     
-
     setUnreadCount(prev => Math.max(0, prev - 1));
     
-
     updateBadgeCount(Math.max(0, unreadCount - 1));
     
-
     if (socket && isConnected) {
       socket.emit('mark_as_read', { notificationId });
     }
@@ -458,7 +443,6 @@ export const SocketProvider = ({ children }) => {
       const notificationToDelete = prev.find(notif => notif.id === notificationId);
       const newNotifications = prev.filter(notif => notif.id !== notificationId);
       
-
       if (notificationToDelete && !notificationToDelete.isRead) {
         setUnreadCount(prev => Math.max(0, prev - 1));
       }
@@ -466,7 +450,6 @@ export const SocketProvider = ({ children }) => {
       return newNotifications;
     });
     
-
     if (socket && isConnected) {
       socket.emit('delete_notification', { notificationId });
     }
@@ -477,14 +460,11 @@ export const SocketProvider = ({ children }) => {
   const markAllAsRead = async () => {
     console.log('📝 Marking all notifications as read');
     
-
     setUnreadCount(0);
     setNotifications(prev => prev.map(notif => ({ ...notif, isRead: true })));
     
- 
     updateBadgeCount(0);
     
-
     if (socket && isConnected && user?.id) {
       socket.emit('mark_all_read', { userId: user.id });
     }
@@ -500,7 +480,7 @@ export const SocketProvider = ({ children }) => {
     clearStorage();
   };
 
-
+  // Socket connection and event handlers
   const setupSocketListeners = (socketInstance) => {
     socketInstance.removeAllListeners();
 
@@ -513,19 +493,37 @@ export const SocketProvider = ({ children }) => {
         console.log('👤 Registering user with socket server');
         
         const userId = user.id.toString();
+        const userRole = user.role || 'b2c'; 
         
-        socketInstance.emit('register', {
-          userId: userId,
-          role: 'customer',
-          username: user.username || user.fullName || 'Customer',
-          email: user.email || '',
-          type: 'customer',
-        });
+ 
+       let userType = 'customer';
+if (userRole === 'b2b' || userRole === 'merchant') {
+  userType = 'merchant';
+} else if (userRole === 'b2c') {
+  userType = 'customer'; 
+}
+
+
         
-        console.log('📨 User registration sent');
+       socketInstance.emit('register', {
+  userId: userId,
+  role: userType,
+  username: user.username || user.fullName || (userType === 'merchant' ? 'Merchant' : 'Customer'),
+  email: user.email || '',
+  type: userType,
+});
+
+
         
-      
-        getNotifications();
+        console.log('📨 User registration sent:', { userId, role: userRole, type: userType });
+        
+        socketInstance.once('registered', () => {
+  console.log('✅ User registered with socket server');
+  getNotifications(); // Now safe to fetch
+});
+
+        // Get notifications after registration
+   
       }
     });
 
@@ -555,21 +553,31 @@ export const SocketProvider = ({ children }) => {
       }
     });
 
-    socketInstance.on('system_notification', (notification) => {
-      console.log('📨 New notification received:', {
-        id: notification.id,
-        title: notification.title,
-        receiver: notification.receiver,
-        type: notification.notificationType?.name
-      });
-      
-      if (notification.receiver === 'customer' || 
-          (notification.receiverDetails && notification.receiverDetails.id === user?.id)) {
-        addNotification(notification);
-      } else {
-        console.log('📭 Notification not for current user, skipping');
-      }
-    });
+socketInstance.on('system_notification', (notification) => {
+  console.log('📨 New notification received:', {
+    id: notification.id,
+    title: notification.title,
+    receiver: notification.receiver,
+    type: notification.notificationType?.name
+  });
+
+  // Normalize user role to match receiver format
+  const rawRole = user?.role || 'customer';
+  const normalizedRole = (rawRole === 'b2c') ? 'customer'
+                      : (rawRole === 'b2b' || rawRole === 'merchant') ? 'merchant'
+                      : rawRole;
+
+  const isForCurrentUser =
+    notification.receiver === normalizedRole ||
+    notification.receiver === 'all' ||
+    (notification.receiverDetails && notification.receiverDetails.id === user?.id);
+
+  if (isForCurrentUser) {
+    addNotification(notification);
+  } else {
+    console.log('📭 Notification not for current user, skipping. User role:', normalizedRole, 'Receiver:', notification.receiver);
+  }
+});
 
     socketInstance.on('new_notification', (notification) => {
       console.log('📨 New notification (legacy event):', notification);
@@ -583,7 +591,6 @@ export const SocketProvider = ({ children }) => {
     socketInstance.on('all_notifications', (notificationsList) => {
       console.log('📋 Received all notifications from server:', notificationsList.length);
       
-
       setNotifications(prev => {
         const mergedNotifications = [...prev];
         
@@ -621,8 +628,20 @@ export const SocketProvider = ({ children }) => {
   const connectSocket = async () => {
     console.log('🧪 connectSocket() called');
 
-    if (!authed || !user?.id || !user?.token) {
-      console.warn('🚫 Missing user.id or token, skipping socket connection');
+    // Check if we have a valid user - updated for merchant support
+    const hasValidUser = Boolean(authed && user?.token);
+    const userId = user?.id;
+    
+    console.log('🔐 Socket connection check:', {
+      authed,
+      hasToken: !!user?.token,
+      userId: userId,
+      userRole: user?.role,
+      hasValidUser
+    });
+
+    if (!hasValidUser) {
+      console.warn('🚫 Missing authentication, skipping socket connection');
       return;
     }
 
@@ -674,7 +693,10 @@ export const SocketProvider = ({ children }) => {
   const getNotifications = () => {
     if (socket && isConnected && user?.id) {
       console.log('📋 Requesting notifications from server for user:', user.id);
-      socket.emit('get_notifications', { userId: user.id });
+      socket.emit('get_notifications', { 
+        userId: user.id,
+        role: user.role || 'customer' 
+      });
     } else {
       console.log('⚠️ Cannot get notifications: socket not connected or no user');
     }
@@ -693,13 +715,15 @@ export const SocketProvider = ({ children }) => {
   const testSocketConnection = () => {
     if (socket && isConnected) {
       socket.emit('test', { 
-        message: 'Test from React Native customer app',
+        message: 'Test from React Native app',
         timestamp: Date.now(),
-        userId: user?.id
+        userId: user?.id,
+        role: user?.role || 'customer'
       });
     }
   };
 
+  // Fetch notifications when connected and user is available
   useEffect(() => {
     if (isConnected && user?.id) {
       console.log('📋 Fetching initial notifications for user:', user.id);
@@ -707,17 +731,23 @@ export const SocketProvider = ({ children }) => {
     }
   }, [isConnected, user?.id]);
 
+  // Main socket connection effect - UPDATED FOR MERCHANT SUPPORT
   useEffect(() => {
-    const hasValidUser = Boolean(authed && user?.id && user?.token);
-
-    console.log('🔐 authed:', authed);
-    console.log('🔍 hasValidUser:', hasValidUser);
+    const hasValidUser = Boolean(authed && user?.token);
+    
+    console.log('🔐 Socket Provider - Auth State:', {
+      authed,
+      hasToken: !!user?.token,
+      userId: user?.id,
+      userRole: user?.role,
+      hasValidUser
+    });
 
     if (hasValidUser) {
       console.log('🧪 connectSocket() conditions met');
       connectSocket();
     } else {
-      console.log('🚫 Incomplete user object, skipping socket connection');
+      console.log('🚫 Missing authentication, skipping socket connection');
       disconnectSocket();
       setNotifications([]);
       setUnreadCount(0);
@@ -726,11 +756,12 @@ export const SocketProvider = ({ children }) => {
     return () => {
       disconnectSocket();
     };
-  }, [authed, user?.id, user?.token]);
+  }, [authed, user?.token, user?.id, user?.role]);
 
+  // Reconnect when app comes to foreground
   useEffect(() => {
     const handleAppStateChange = (nextAppState) => {
-      if (nextAppState === 'active' && !isConnected && authed && user?.id && user?.token) {
+      if (nextAppState === 'active' && !isConnected && authed && user?.token) {
         console.log('🔄 App came to foreground, reconnecting socket');
         connectSocket();
       }
@@ -738,7 +769,7 @@ export const SocketProvider = ({ children }) => {
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => subscription.remove();
-  }, [isConnected, authed, user?.id, user?.token]);
+  }, [isConnected, authed, user?.token]);
 
   const value = {
     socket,

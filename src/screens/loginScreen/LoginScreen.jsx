@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { SafeAreaView, View, Text, StyleSheet, Alert } from "react-native";
+import {  View, Text, StyleSheet, Alert, SafeAreaView } from "react-native";
+
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../theme/colors";
 import AuthHeader from "../../components/AuthHeader";
@@ -10,7 +11,8 @@ import SocialButton from "../../components/SocialButton";
 import { useAuth } from "../../auth/AuthProvider";
 import RoundedInput from "../../components/RoundedInput";
 import WhiteSpinner from "../../components/Spinner";
-import { KeyboardAvoidingView, Platform, ScrollView } from "react-native";
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+import {  Platform, ScrollView } from "react-native";
 import { useTranslation } from "react-i18next";
 
 export default function LoginScreen({ navigation }) {
@@ -105,14 +107,17 @@ export default function LoginScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={hp(2)} 
-      > 
+   <KeyboardAwareScrollView
+  contentContainerStyle={{ flexGrow: 1 }}
+  enableOnAndroid
+  extraScrollHeight={20}
+  keyboardShouldPersistTaps="handled"
+>
+      <View style={{ flex: 1 }}>
         <ScrollView
           contentContainerStyle={{ flexGrow: 1 }}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         > 
           <AuthHeader
             title={t('signInToAccount')}
@@ -208,8 +213,8 @@ export default function LoginScreen({ navigation }) {
               />
             </View>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+        </ScrollView></View>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

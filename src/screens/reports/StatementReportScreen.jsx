@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import {
-  SafeAreaView,
   View,
   Text,
   StyleSheet,
@@ -10,16 +9,24 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  SafeAreaView,
   RefreshControl,
+  Modal,
+  ActionSheetIOS,
+  Platform,
+  Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../theme/colors";
 import ServiceHeader from "../../components/ServiceHeader";
 import { getStatementReport } from "../../services/merchantApi";
 
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import * as Print from 'expo-print';
 import StatementFilterModal from "./StatementFilterModal";
+
+const { width } = Dimensions.get("window");
 
 export default function StatementReportScreen({ navigation, route }) {
   const [data, setData] = useState([]);
@@ -27,6 +34,7 @@ export default function StatementReportScreen({ navigation, route }) {
   const [refreshing, setRefreshing] = useState(false);
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
+  const [exportMenuVisible, setExportMenuVisible] = useState(false);
   
   const [filter, setFilter] = useState({
     search: "",
@@ -99,8 +107,6 @@ export default function StatementReportScreen({ navigation, route }) {
 
   const handleSearch = (text) => {
     setFilter(prev => ({ ...prev, search: text, page: 1 }));
-    // Implement search filtering locally for now
-    // In a real app, you might want to debounce and call API
   };
 
   const filteredData = data.filter(item => {
@@ -115,57 +121,208 @@ export default function StatementReportScreen({ navigation, route }) {
     );
   });
 
-  const handleExport = async () => {
+  const handleExportMenu = () => {
     if (data.length === 0) {
       Alert.alert("No Data", "There is no data to export.");
       return;
     }
 
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: ['Cancel', 'Export as Excel (CSV)', 'Export as PDF'],
+          cancelButtonIndex: 0,
+        },
+        (buttonIndex) => {
+          if (buttonIndex === 1) {
+            handleExportCSV();
+          } else if (buttonIndex === 2) {
+            handleExportPDF();
+          }
+        }
+      );
+    } else {
+      setExportMenuVisible(true);
+    }
+  };
+
+const handleExportCSV = async () => {
+  try {
+    setExportLoading(true);
+    setExportMenuVisible(false);
+
+    if (data.length === 0) {
+      Alert.alert("No Data", "There is no data to export.");
+      return;
+    }
+
+    // Create CSV content
+    const headers = ["Date", "Transaction ID", "Type", "Debit", "Credit", "Balance", "Remarks", "Agent"].join(',') + '\n';
+    
+    const csvRows = data.map(item => {
+      return [
+        `"${new Date(item.createdAt).toLocaleDateString()}"`,
+        `"${item.transactionId || ''}"`,
+        `"${item.transactionType || ''}"`,
+        `"${item.debit ? parseFloat(item.debit).toFixed(2) : '0.00'}"`,
+        `"${item.credit ? parseFloat(item.credit).toFixed(2) : '0.00'}"`,
+        `"${parseFloat(item.walletBalance || 0).toFixed(2)}"`,
+        `"${(item.remarks || 'N/A').replace(/"/g, '""')}"`,
+        `"${(item.agent?.username || 'N/A').replace(/"/g, '""')}"`
+      ].join(',');
+    });
+
+    const csvContent = headers + csvRows.join('\n');
+    const fileName = `statement-report-${Date.now()}.csv`;
+    const fileUri = FileSystem.documentDirectory + fileName;
+
+    // Use the legacy API (this should work)
+    await FileSystem.writeAsStringAsync(fileUri, csvContent);
+
+    // Check if sharing is available
+    if (!(await Sharing.isAvailableAsync())) {
+      Alert.alert("Sharing not available", "Sharing is not available on this device.");
+      return;
+    }
+
+    // Share the file
+    await Sharing.shareAsync(fileUri, {
+      mimeType: 'text/csv',
+      dialogTitle: 'Share Statement Report',
+      UTI: 'public.comma-separated-values-text'
+    });
+
+  } catch (error) {
+    console.error("CSV Export failed:", error);
+    Alert.alert(
+      "Export Failed", 
+      "Could not export the report. Please try again.\nError: " + error.message
+    );
+  } finally {
+    setExportLoading(false);
+  }
+};
+  const handleExportPDF = async () => {
     try {
       setExportLoading(true);
+      setExportMenuVisible(false);
 
-      // Create CSV content
-      const headers = "Date,Transaction ID,Type,Debit,Credit,Balance,Remarks,Agent\n";
-      
-      const csvContent = data.map(item => {
-        const row = [
-          `"${new Date(item.createdAt).toLocaleDateString()}"`,
-          `"${item.transactionId}"`,
-          `"${item.transactionType}"`,
-          `"${item.debit ? parseFloat(item.debit).toFixed(2) : '0.00'}"`,
-          `"${item.credit ? parseFloat(item.credit).toFixed(2) : '0.00'}"`,
-          `"${parseFloat(item.walletBalance).toFixed(2)}"`,
-          `"${item.remarks || 'N/A'}"`,
-          `"${item.agent?.username || 'N/A'}"`
-        ].join(',');
-        return row;
-      }).join('\n');
+      // Create HTML content for PDF
+      const htmlContent = `
+        <html>
+          <head>
+            <meta charset="UTF-8">
+            <style>
+              body { font-family: Arial, sans-serif; margin: 20px; }
+              .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 10px; }
+              .title { font-size: 24px; font-weight: bold; color: #333; }
+              .date-range { font-size: 14px; color: #666; margin-top: 5px; }
+              .summary { background: #f5f5f5; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+              .summary-row { display: flex; justify-content: space-between; margin-bottom: 5px; }
+              .table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+              .table th { background-color: #333; color: white; padding: 12px; text-align: left; }
+              .table td { padding: 10px; border-bottom: 1px solid #ddd; }
+              .debit { color: #EF4444; }
+              .credit { color: #10B981; }
+              .footer { margin-top: 30px; text-align: center; color: #666; font-size: 12px; }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <div class="title">Statement Report</div>
+              <div class="date-range">
+                ${filter.startDate && filter.endDate 
+                  ? `From ${formatDate(filter.startDate)} to ${formatDate(filter.endDate)}`
+                  : 'All Transactions'
+                }
+              </div>
+            </div>
 
-      const fullCsv = headers + csvContent;
+            <div class="summary">
+              <div class="summary-row">
+                <strong>Total Records:</strong>
+                <span>${data.length}</span>
+              </div>
+              <div class="summary-row">
+                <strong>Total Debit:</strong>
+                <span>AFN ${calculateTotalDebit().toFixed(2)}</span>
+              </div>
+              <div class="summary-row">
+                <strong>Total Credit:</strong>
+                <span>AFN ${calculateTotalCredit().toFixed(2)}</span>
+              </div>
+              <div class="summary-row">
+                <strong>Net Amount:</strong>
+                <span>AFN ${(calculateTotalCredit() - calculateTotalDebit()).toFixed(2)}</span>
+              </div>
+            </div>
 
-      // Save CSV file
-      const uri = FileSystem.documentDirectory + `statement-report-${Date.now()}.csv`;
-      
-      await FileSystem.writeAsStringAsync(uri, fullCsv, {
-        encoding: FileSystem.EncodingType.UTF8,
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Transaction ID</th>
+                  <th>Type</th>
+                  <th>Debit</th>
+                  <th>Credit</th>
+                  <th>Balance</th>
+                  <th>Remarks</th>
+                  <th>Agent</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${data.map(item => `
+                  <tr>
+                    <td>${new Date(item.createdAt).toLocaleDateString()}</td>
+                    <td>${item.transactionId}</td>
+                    <td>${item.transactionType}</td>
+                    <td class="${item.debit ? 'debit' : ''}">${item.debit ? `AFN ${parseFloat(item.debit).toFixed(2)}` : '-'}</td>
+                    <td class="${item.credit ? 'credit' : ''}">${item.credit ? `AFN ${parseFloat(item.credit).toFixed(2)}` : '-'}</td>
+                    <td>AFN ${parseFloat(item.walletBalance).toFixed(2)}</td>
+                    <td>${item.remarks || 'N/A'}</td>
+                    <td>${item.agent?.username || 'N/A'}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+
+            <div class="footer">
+              Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}
+            </div>
+          </body>
+        </html>
+      `;
+
+      // Generate PDF
+      const { uri } = await Print.printToFileAsync({
+        html: htmlContent,
+        base64: false
       });
 
-      // Share the file
+      // Share the PDF file
       await Sharing.shareAsync(uri, {
-        mimeType: 'text/csv',
-        dialogTitle: 'Share Statement Report',
+        mimeType: 'application/pdf',
+        dialogTitle: 'Share Statement Report as PDF',
       });
 
     } catch (error) {
-      console.error("Export failed:", error);
-      Alert.alert("Export Failed", "Could not export the report. Please try again.");
+      console.error("PDF Export failed:", error);
+      Alert.alert("Export Failed", "Could not generate PDF. Please try again.");
     } finally {
       setExportLoading(false);
     }
   };
 
+  const calculateTotalDebit = () => {
+    return data.reduce((total, item) => total + (parseFloat(item.debit) || 0), 0);
+  };
+
+  const calculateTotalCredit = () => {
+    return data.reduce((total, item) => total + (parseFloat(item.credit) || 0), 0);
+  };
+
   const formatCurrency = (value) => {
-    if (!value) return "-";
+    if (!value) return "AFN 0.00";
     return `AFN ${parseFloat(value).toFixed(2)}`;
   };
 
@@ -177,79 +334,90 @@ export default function StatementReportScreen({ navigation, route }) {
     });
   };
 
+  const formatDateTime = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  // Skeleton for Transaction Item
+  const renderSkeletonTransaction = ({ item, index }) => (
+    <View style={styles.txRow}>
+      <View style={styles.txLeft}>
+        <View style={styles.skeletonTxIcon} />
+        <View style={styles.txInfo}>
+          <View style={styles.skeletonTxTitle} />
+          <View style={styles.skeletonTxSub} />
+        </View>
+      </View>
+      <View style={styles.skeletonTxAmount} />
+    </View>
+  );
+
   const renderStatementItem = ({ item }) => (
     <TouchableOpacity 
-      style={styles.statementCard}
+      style={styles.txRow}
       onPress={() => navigation.navigate('StatementDetail', { statement: item })}
+      activeOpacity={0.7}
     >
-      <View style={styles.cardHeader}>
-        <View style={styles.transactionInfo}>
-          <Text style={styles.transactionId}>{item.transactionId}</Text>
-          <Text style={styles.transactionType}>
+      <View style={styles.txLeft}>
+        <View
+          style={[
+            styles.txIconWrap,
+            item.debit ? styles.txOutIcon : styles.txInIcon,
+          ]}
+        >
+          <Ionicons
+            name={item.debit ? "arrow-up" : "arrow-down"}
+            size={18}
+            color={item.debit ? Colors.primary : "#0BA360"}
+          />
+        </View>
+        <View style={styles.txInfo}>
+          <Text style={styles.txTitle}>
             {item.transactionType}
           </Text>
-        </View>
-        <View style={styles.amountSection}>
-          {item.debit ? (
-            <Text style={[styles.amount, styles.debit]}>
-              -{formatCurrency(item.debit)}
-            </Text>
-          ) : (
-            <Text style={[styles.amount, styles.credit]}>
-              +{formatCurrency(item.credit)}
-            </Text>
-          )}
-          <Text style={styles.balance}>
-            {formatCurrency(item.walletBalance)}
+          <Text style={styles.txSub}>
+            {formatDateTime(item.createdAt)} • {item.transactionId}
           </Text>
-        </View>
-      </View>
-
-      <View style={styles.cardBody}>
-        <View style={styles.detailRow}>
-          <Ionicons name="calendar-outline" size={14} color={Colors.textSecondary} />
-          <Text style={styles.detailText}>{formatDate(item.createdAt)}</Text>
-        </View>
-        
-        {item.remarks && (
-          <View style={styles.detailRow}>
-            <Ionicons name="document-text-outline" size={14} color={Colors.textSecondary} />
-            <Text style={styles.detailText} numberOfLines={1}>
+          {item.remarks && (
+            <Text style={styles.txRemarks} numberOfLines={1}>
               {item.remarks}
             </Text>
-          </View>
-        )}
-
-        {item.agent?.username && (
-          <View style={styles.detailRow}>
-            <Ionicons name="person-outline" size={14} color={Colors.textSecondary} />
-            <Text style={styles.detailText}>{item.agent.username}</Text>
-          </View>
-        )}
-      </View>
-
-      <View style={styles.cardFooter}>
-        <View style={[
-          styles.statusBadge,
-          { backgroundColor: item.debit ? '#FEF2F2' : '#F0FDF4' }
-        ]}>
-          <Text style={[
-            styles.statusText,
-            { color: item.debit ? '#EF4444' : '#10B981' }
-          ]}>
-            {item.debit ? 'Debit' : 'Credit'}
-          </Text>
+          )}
+          {item.agent?.username && (
+            <Text style={styles.txAgent}>
+              Agent: {item.agent.username}
+            </Text>
+          )}
         </View>
-        <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} />
+      </View>
+      <View style={styles.txRight}>
+        <Text
+          style={[
+            styles.txAmount,
+            { color: item.debit ? Colors.primary : "#0BA360" },
+          ]}
+        >
+          {item.debit ? "-" : "+"}
+          {formatCurrency(item.debit || item.credit)}
+        </Text>
+        <Text style={styles.txBalance}>
+          Bal: {formatCurrency(item.walletBalance)}
+        </Text>
       </View>
     </TouchableOpacity>
   );
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
-      <Ionicons name="document-text-outline" size={64} color="#CBD5E1" />
-      <Text style={styles.emptyTitle}>No Statements Found</Text>
-      <Text style={styles.emptySubtitle}>
+      <Ionicons name="document-text-outline" size={48} color="#CCCCCC" />
+      <Text style={styles.emptyStateText}>No statements found</Text>
+      <Text style={styles.emptyStateSubText}>
         {filter.startDate && filter.endDate 
           ? "No statements match your current filters."
           : "Generate a statement report by selecting a date range."
@@ -266,7 +434,7 @@ export default function StatementReportScreen({ navigation, route }) {
 
   const renderHeader = () => (
     <View style={styles.header}>
-      <View style={styles.searchContainer}>
+      {/* <View style={styles.searchContainer}>
         <Ionicons name="search" size={20} color={Colors.textSecondary} />
         <TextInput
           style={styles.searchInput}
@@ -275,7 +443,7 @@ export default function StatementReportScreen({ navigation, route }) {
           value={filter.search}
           onChangeText={handleSearch}
         />
-      </View>
+      </View> */}
 
       <View style={styles.actionButtons}>
         <TouchableOpacity 
@@ -291,7 +459,7 @@ export default function StatementReportScreen({ navigation, route }) {
             styles.exportButton,
             (data.length === 0 || exportLoading) && styles.exportButtonDisabled
           ]}
-          onPress={handleExport}
+          onPress={handleExportMenu}
           disabled={data.length === 0 || exportLoading}
         >
           {exportLoading ? (
@@ -300,7 +468,7 @@ export default function StatementReportScreen({ navigation, route }) {
             <Ionicons name="download-outline" size={20} color={Colors.white} />
           )}
           <Text style={styles.exportButtonText}>
-            {exportLoading ? "Exporting..." : "Export CSV"}
+            {exportLoading ? "Exporting..." : "Export"}
           </Text>
         </TouchableOpacity>
       </View>
@@ -311,7 +479,12 @@ export default function StatementReportScreen({ navigation, route }) {
             Showing statements from {formatDate(filter.startDate)} to {formatDate(filter.endDate)}
           </Text>
           {meta.total > 0 && (
-            <Text style={styles.recordCount}>{meta.total} records found</Text>
+            <View style={styles.summaryRow}>
+              <Text style={styles.recordCount}>{meta.total} records found</Text>
+              <Text style={styles.summaryText}>
+                Debit: {formatCurrency(calculateTotalDebit())} • Credit: {formatCurrency(calculateTotalCredit())}
+              </Text>
+            </View>
           )}
         </View>
       )}
@@ -319,16 +492,16 @@ export default function StatementReportScreen({ navigation, route }) {
   );
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
+    <SafeAreaView style={styles.container}>
       <ServiceHeader 
         title="Statement Report" 
         onBack={() => navigation.goBack()} 
       />
       
       <FlatList
-        data={filteredData}
-        renderItem={renderStatementItem}
-        keyExtractor={(item) => item.id}
+        data={loading ? [...Array(5)] : filteredData}
+        renderItem={loading ? renderSkeletonTransaction : renderStatementItem}
+        keyExtractor={(item, index) => item?.id || `skeleton-${index}`}
         ListHeaderComponent={renderHeader}
         ListEmptyComponent={!loading && renderEmptyState}
         contentContainerStyle={styles.listContainer}
@@ -350,6 +523,53 @@ export default function StatementReportScreen({ navigation, route }) {
         </View>
       )}
 
+      {/* Export Options Modal for Android */}
+      <Modal
+        visible={exportMenuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setExportMenuVisible(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setExportMenuVisible(false)}
+        >
+          <View style={styles.exportMenu}>
+            <Text style={styles.exportMenuTitle}>Export As</Text>
+            
+            <TouchableOpacity 
+              style={styles.exportOption}
+              onPress={handleExportCSV}
+            >
+              <Ionicons name="document-text-outline" size={24} color="#10B981" />
+              <View style={styles.exportOptionInfo}>
+                <Text style={styles.exportOptionTitle}>Excel (CSV)</Text>
+                <Text style={styles.exportOptionDesc}>Export as spreadsheet</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.exportOption}
+              onPress={handleExportPDF}
+            >
+              <Ionicons name="document-attach-outline" size={24} color="#EF4444" />
+              <View style={styles.exportOptionInfo}>
+                <Text style={styles.exportOptionTitle}>PDF Document</Text>
+                <Text style={styles.exportOptionDesc}>Export as printable document</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.cancelButton}
+              onPress={() => setExportMenuVisible(false)}
+            >
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       <StatementFilterModal
         visible={isFilterModalOpen}
         onClose={() => setIsFilterModalOpen(false)}
@@ -361,6 +581,11 @@ export default function StatementReportScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    marginBottom: 100,
+    backgroundColor: Colors.white,
+  },
   listContainer: {
     paddingHorizontal: 20,
     paddingTop: 16,
@@ -434,116 +659,108 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.textPrimary,
     fontWeight: '500',
+    marginBottom: 4,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   recordCount: {
     fontSize: 12,
     color: Colors.textSecondary,
-    marginTop: 4,
   },
-  statementCard: {
-    backgroundColor: Colors.white,
-    borderRadius: 16,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  transactionInfo: {
-    flex: 1,
-  },
-  transactionId: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.textPrimary,
-    marginBottom: 4,
-  },
-  transactionType: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-  },
-  amountSection: {
-    alignItems: 'flex-end',
-  },
-  amount: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  debit: {
-    color: '#EF4444',
-  },
-  credit: {
-    color: '#10B981',
-  },
-  balance: {
-    fontSize: 14,
+  summaryText: {
+    fontSize: 12,
     color: Colors.textSecondary,
     fontWeight: '500',
   },
-  cardBody: {
-    gap: 8,
-    marginBottom: 12,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  detailText: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    flex: 1,
-  },
-  cardFooter: {
+  txRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F8F8F8',
   },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+  txLeft: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    flex: 1,
+  },
+  txIconWrap: {
+    width: 40,
+    height: 40,
     borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
-  statusText: {
-    fontSize: 12,
+  txInIcon: {
+    backgroundColor: 'rgba(11, 163, 96, 0.1)',
+  },
+  txOutIcon: {
+    backgroundColor: 'rgba(215, 0, 0, 0.1)',
+  },
+  txInfo: {
+    flex: 1,
+  },
+  txTitle: {
+    color: Colors.textPrimary,
+    fontSize: 15,
     fontWeight: '600',
+    marginBottom: 2,
+  },
+  txSub: {
+    color: '#9E9E9E',
+    fontSize: 12,
+    marginBottom: 2,
+  },
+  txRemarks: {
+    color: '#9E9E9E',
+    fontSize: 12,
+    marginBottom: 2,
+    fontStyle: 'italic',
+  },
+  txAgent: {
+    color: '#9E9E9E',
+    fontSize: 11,
+  },
+  txRight: {
+    alignItems: 'flex-end',
+    marginLeft: 8,
+  },
+  txAmount: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  txBalance: {
+    color: '#9E9E9E',
+    fontSize: 11,
+    fontWeight: '500',
   },
   separator: {
-    height: 12,
+    height: 1,
+    backgroundColor: '#F8F8F8',
   },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 40,
+    paddingVertical: 40,
   },
-  emptyTitle: {
-    fontSize: 18,
+  emptyStateText: {
+    color: '#666',
+    fontSize: 16,
     fontWeight: '600',
-    color: Colors.textPrimary,
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: 12,
+    marginBottom: 4,
   },
-  emptySubtitle: {
+  emptyStateSubText: {
+    color: '#999',
     fontSize: 14,
-    color: Colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 24,
+    marginBottom: 16,
   },
   generateButton: {
     backgroundColor: Colors.primary,
@@ -566,5 +783,86 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 16,
     color: Colors.textSecondary,
+  },
+  skeletonTxIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
+    backgroundColor: '#E0E0E0',
+  },
+  skeletonTxTitle: {
+    width: 180,
+    height: 15,
+    marginBottom: 6,
+    borderRadius: 4,
+    backgroundColor: '#E0E0E0',
+  },
+  skeletonTxSub: {
+    width: 140,
+    height: 12,
+    borderRadius: 4,
+    backgroundColor: '#E0E0E0',
+  },
+  skeletonTxAmount: {
+    width: 80,
+    height: 15,
+    borderRadius: 4,
+    backgroundColor: '#E0E0E0',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  exportMenu: {
+    backgroundColor: Colors.white,
+    borderRadius: 16,
+    padding: 20,
+    width: '100%',
+    maxWidth: 400,
+  },
+  exportMenuTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  exportOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: '#F8FAFC',
+    marginBottom: 12,
+  },
+  exportOptionInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  exportOptionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+    marginBottom: 2,
+  },
+  exportOptionDesc: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+  },
+  cancelButton: {
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.textPrimary,
   },
 });

@@ -15,6 +15,8 @@ import TopupFlowScreen1 from "../screens/topupScreen/TopupFlowScreen1";
 import GameCoinsScreen from "../screens/gameCoinsScreen/GameCoinsScreen";
 import MerchantApplicationScreen from "../screens/profileScreens/MerchantApllicationScreen";
 import DataFlowScreenMerchant from "../screens/dataFlowScreen1/DataFlowScreen";
+import AllTransactionsScreen from "../screens/AllTransactionsScreen";
+import MerchantAnalyticsScreen from "../screens/MerchantAnalyticsScreen";
 
 
 const Stack = createNativeStackNavigator();
@@ -33,6 +35,15 @@ export default function HomeStackNavigator() {
       <Stack.Screen name="TopupProducts" component={ProductSelectScreen} />
       <Stack.Screen name="Data" component={DataFlowScreen} />
       <Stack.Screen name="DataMerchant" component={DataFlowScreenMerchant} />
+                 <Stack.Screen 
+              name="AllTransactions" 
+              component={AllTransactionsScreen} 
+              options={{ headerShown: false }}
+            />
+                <Stack.Screen 
+              name="MerchantAnalytics" 
+              component={MerchantAnalyticsScreen} 
+            />
       <Stack.Screen name="GameCoins" component={GameCoinsScreen} /> 
           <Stack.Screen 
        name="MerchantApplication" 

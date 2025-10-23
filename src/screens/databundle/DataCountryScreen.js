@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { SafeAreaView, View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
+import {  View, Text, StyleSheet, TouchableOpacity,SafeAreaView, FlatList } from 'react-native';
 import { Colors } from '../../theme/colors';
 import ServiceHeader from '../../components/ServiceHeader';
 import { COUNTRIES } from '../../constants/dataBundles';

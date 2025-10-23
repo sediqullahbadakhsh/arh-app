@@ -1,6 +1,6 @@
+
 import React, { useState } from 'react';
 import {
-    SafeAreaView,
     View,
     Text,
     StyleSheet,
@@ -8,6 +8,7 @@ import {
     ScrollView,
     KeyboardAvoidingView,
     Platform,
+    SafeAreaView ,
 } from 'react-native';
 import { Colors } from '../../theme/colors';
 import ServiceHeader from '../../components/ServiceHeader';

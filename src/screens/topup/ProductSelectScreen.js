@@ -1,5 +1,5 @@
 import React from 'react';
-import { SafeAreaView, View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import { View, Text,SafeAreaView, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { Colors } from '../../theme/colors';
 import ServiceHeader from '../../components/ServiceHeader';
 import { TOPUP_PRODUCTS } from '../../constants/products';

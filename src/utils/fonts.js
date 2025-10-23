@@ -1,5 +1,5 @@
 export const Fonts = {
-    REGULAR: "dmsansRegular",
+  REGULAR: "dmsansRegular",
   MEDIUM: "dmsansMedium",
   BOLD: "dmsansBold",
 };

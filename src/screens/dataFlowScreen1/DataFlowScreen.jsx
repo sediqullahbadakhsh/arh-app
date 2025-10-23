@@ -1,6 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import {
-  SafeAreaView,
   View,
   Text,
   TouchableOpacity,
@@ -12,9 +11,11 @@ import {
   KeyboardAvoidingView,
   Alert,
   Animated,
+  SafeAreaView,
   Easing,
   Dimensions,
   Image,
+  StyleSheet,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../theme/colors";
@@ -33,8 +34,12 @@ import StepNumber from "./StepNumber";
 import StepProducts from "./StepProducts";
 import StepPay from "./StepPay";
 import { useTranslation } from "react-i18next";
+import SuccessModal from "../../components/modals/SuccessModal";
+import ErrorModal from "../../components/modals/ErrorModal";
+
 const { height: screenHeight } = Dimensions.get('window');
 const BASE_STEPS = { COUNTRY: 0, NUMBER: 1, PRODUCT: 2, PAY: 3 };
+
 export default function DataFlowScreenMerchant({ navigation }) {
   const { user } = useAuth?.() || { user: null };
   const isB2B = (user?.role || "").toLowerCase().includes("b2b");
@@ -60,15 +65,27 @@ export default function DataFlowScreenMerchant({ navigation }) {
   const [countriesSlideAnim] = useState(new Animated.Value(screenHeight));
   const insets = useSafeAreaInsets();
 
+  // Modal states
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successData, setSuccessData] = useState(null);
+
   const dial = DIAL_CODES[country?.countryCode] || "";
   const operator = guessOperator(country?.countryCode, localNumber.replace(/\D/g, ""));
 
   useEffect(() => {
     const getAllCountries = async () => {
-      const res = await getCountries();
-      setCountries(res?.data);
-      const afgCountry = res?.data.find((c) => c.countryCode === "AF");
-      setCountry(afgCountry);
+      try {
+        const res = await getCountries();
+        setCountries(res?.data);
+        const afgCountry = res?.data.find((c) => c.countryCode === "AF");
+        setCountry(afgCountry);
+      } catch (error) {
+        console.error("Error loading countries:", error);
+        setErrorMessage("Failed to load countries. Please try again.");
+        setShowErrorModal(true);
+      }
     };
     getAllCountries();
   }, []);
@@ -87,6 +104,8 @@ export default function DataFlowScreenMerchant({ navigation }) {
       } catch (error) {
         console.error("Error fetching products:", error);
         setProducts([]);
+        setErrorMessage("Failed to load products. Please try again.");
+        setShowErrorModal(true);
       }
     };
 
@@ -155,13 +174,18 @@ export default function DataFlowScreenMerchant({ navigation }) {
         if (data.length > 0) {
           setContacts(data);
           setFilteredContacts(data);
+        } else {
+          setErrorMessage("No contacts found on your device.");
+          setShowErrorModal(true);
         }
       } else {
-        Alert.alert('Permission denied', 'Cannot access contacts without permission');
+        setErrorMessage("Cannot access contacts without permission. Please enable contacts permission in settings.");
+        setShowErrorModal(true);
       }
     } catch (error) {
       console.error('Error loading contacts:', error);
-      Alert.alert('Error', 'Failed to load contacts');
+      setErrorMessage("Failed to load contacts. Please try again.");
+      setShowErrorModal(true);
     }
   };
 
@@ -200,24 +224,34 @@ export default function DataFlowScreenMerchant({ navigation }) {
 
       const res = await activateDataBundle(payload);
       
-      setSuccess({
+      const successData = {
         mobile: `${dial} ${formatLocal(localNumber)}`,
         txId: res?.txnNumber || "#DB" + Math.floor(100000 + Math.random() * 899999),
         date: new Date().toISOString(),
         product,
         amount: product?.price,
-      });
+      };
+
+      setSuccessData(successData);
+      setShowSuccessModal(true);
+      
+      // Reset form
+      setProduct(null);
+      setLocalNumber("");
+      setStep(0);
     } catch (error) {
       console.error("Failed To Activate Bundle:", error);
       const message = error.response?.data?.error || error.message || "Oops, Something Went Wrong!";
-      Alert.alert("Failed To Activate Bundle", message);
+      setErrorMessage(message);
+      setShowErrorModal(true);
     }
     setLoading(false);
   };
 
   const handleContactSelect = (phoneNumber) => {
     if (!phoneNumber) {
-      Alert.alert('Error', 'Invalid phone number selected');
+      setErrorMessage("Invalid phone number selected");
+      setShowErrorModal(true);
       return;
     }
 
@@ -231,6 +265,16 @@ export default function DataFlowScreenMerchant({ navigation }) {
     setLocalNumber(number);
     setContactsModalVisible(false);
     setSearchQuery('');
+  };
+
+  const handleSuccessClose = () => {
+    setShowSuccessModal(false);
+    setSuccessData(null);
+  };
+
+  const handleErrorClose = () => {
+    setShowErrorModal(false);
+    setErrorMessage("");
   };
 
   const filteredProducts = useMemo(() => {
@@ -411,152 +455,126 @@ export default function DataFlowScreenMerchant({ navigation }) {
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
       <ServiceHeader title="Internet Bundle" onBack={goBack} />
 
-      {success ? (
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
         <ScrollView
-          contentContainerStyle={{ padding: 24, alignItems: "center" }}
+          contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 30 }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          <View style={DataStyles.successCircle}>
-            <Ionicons name="checkmark" size={56} color="#4CAF50" />
-          </View>
-          <Text style={DataStyles.successTitle}>Bundle Activated!</Text>
+          {step === BASE_STEPS.COUNTRY && (
+            <StepCountry
+              country={country}
+              onOpen={() => setCountryOpen(true)}
+            />
+          )}
 
-          <View style={DataStyles.kv}>
-            <Text style={DataStyles.k}>Receiver Number</Text>
-            <Text style={DataStyles.v}>{success.mobile}</Text>
-          </View>
-          <View style={DataStyles.kv}>
-            <Text style={DataStyles.k}>Plan</Text>
-            <Text style={DataStyles.v}>{success.product?.productName}</Text>
-          </View>
-          <View style={DataStyles.kv}>
-            <Text style={DataStyles.k}>Transaction ID</Text>
-            <Text style={DataStyles.v}>{success.txId}</Text>
-          </View>
-          <View style={DataStyles.kv}>
-            <Text style={DataStyles.k}>Date</Text>
-            <Text style={DataStyles.v}>
-              {new Date(success.date).toLocaleString()}
-            </Text>
-          </View>
+          {step === BASE_STEPS.NUMBER && (
+            <StepNumber
+              dial={dial}
+              country={country}
+              value={localNumber}
+              onChange={setLocalNumber}
+              localNumber={localNumber}
+              operator={operator}
+              onEditCountry={() => jumpTo(BASE_STEPS.COUNTRY)}
+              openContacts={() => setContactsModalVisible(true)}
+            />
+          )}
 
-          <View style={DataStyles.totalBox}>
-            <Text style={DataStyles.totalLabel}>Total Amount</Text>
-            <Text style={DataStyles.totalValue}>{success.amount} AFN</Text>
-          </View>
+          {step === BASE_STEPS.PRODUCT && (
+            <StepProducts
+              country={country}
+              category={category}
+              setCategory={setCategory}
+              search={search}
+              setSearch={setSearch}
+              products={filteredProducts}
+              product={product}
+              setProduct={setProduct}
+              onEditNumber={() => jumpTo(BASE_STEPS.NUMBER)}
+              summary={{ dial, localNumber, product }}
+            />
+          )}
+
+          {step === BASE_STEPS.PAY && !isB2B && (
+            <StepPay
+              summary={{
+                mobile: `${dial} ${formatLocal(localNumber)}`,
+                product: product,
+                amount: product?.price,
+              }}
+              onEditProduct={() => jumpTo(BASE_STEPS.PRODUCT)}
+            />
+          )}
 
           <PrimaryButton
-            label="Done"
-            onPress={() => navigation.popToTop()}
-            style={{ width: "100%" }}
+            label={
+              step === lastStep
+                ? isB2B
+                  ? "Activate Bundle"
+                  : `Pay ${product?.price} AFN`
+                : "Continue"
+            }
+            onPress={goNext}
+            style={{ marginTop: 24, opacity: canNext ? 1 : 0.5 }}
+            loading={loading}
           />
-          <TouchableOpacity
-            onPress={() => {
-              setSuccess(null);
-              setStep(0);
-              setProduct(null);
-              setLocalNumber("");
-            }}
-          >
-            <Text
-              style={{
-                color: Colors.primary,
-                marginTop: 14,
-                fontWeight: "600",
-              }}
-            >
-              Activate another bundle
-            </Text>
-          </TouchableOpacity>
-        </ScrollView>
-      ) : (
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-        >
-          <ScrollView
-            contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 30 }}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            {step === BASE_STEPS.COUNTRY && (
-              <StepCountry
-                country={country}
-                onOpen={() => setCountryOpen(true)}
-              />
-            )}
-
-            {step === BASE_STEPS.NUMBER && (
-              <StepNumber
-                dial={dial}
-                country={country}
-                value={localNumber}
-                onChange={setLocalNumber}
-                localNumber={localNumber}
-                operator={operator}
-                onEditCountry={() => jumpTo(BASE_STEPS.COUNTRY)}
-                openContacts={() => setContactsModalVisible(true)}
-              />
-            )}
-
-            {step === BASE_STEPS.PRODUCT && (
-              <StepProducts
-                country={country}
-                category={category}
-                setCategory={setCategory}
-                search={search}
-                setSearch={setSearch}
-                products={filteredProducts}
-                product={product}
-                setProduct={setProduct}
-                onEditNumber={() => jumpTo(BASE_STEPS.NUMBER)}
-                summary={{ dial, localNumber, product }}
-              />
-            )}
-
-            {step === BASE_STEPS.PAY && !isB2B && (
-              <StepPay
-                summary={{
-                  mobile: `${dial} ${formatLocal(localNumber)}`,
-                  product: product,
-                  amount: product?.price,
-                }}
-                onEditProduct={() => jumpTo(BASE_STEPS.PRODUCT)}
-              />
-            )}
-
+          {step > 0 && (
             <PrimaryButton
-              label={
-                step === lastStep
-                  ? isB2B
-                    ? "Activate Bundle"
-                    : `Pay ${product?.price} AFN`
-                  : "Continue"
-              }
-              onPress={goNext}
-              style={{ marginTop: 24, opacity: canNext ? 1 : 0.5 }}
-              loading={loading}
+              label="Back"
+              onPress={goBack}
+              style={{ marginTop: 12, marginBottom: 110, backgroundColor: "#4A4A4A" }}
             />
-            {step > 0 && (
-              <PrimaryButton
-                label="Back"
-                onPress={goBack}
-                style={{ marginTop: 12, marginBottom: 110, backgroundColor: "#4A4A4A" }}
-              />
-            )}
-          </ScrollView>
-        </KeyboardAvoidingView>
-      )}
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
+
+      {/* Success Modal */}
+      <SuccessModal
+        visible={showSuccessModal}
+        onClose={handleSuccessClose}
+        title="Bundle Activated Successfully!"
+        message={`Your ${successData?.product?.productName} bundle has been activated for ${successData?.mobile}. Transaction ID: ${successData?.txId}`}
+        buttonText="Continue"
+        autoHideDuration={0}
+      />
+
+      {/* Error Modal */}
+      <ErrorModal
+        visible={showErrorModal}
+        onClose={handleErrorClose}
+        title="Operation Failed"
+        message={errorMessage}
+        buttonText="Try Again"
+        showRetryButton={true}
+      />
 
       <ContactsModal />
       <CountriesModal />
+
+      {loading && (
+        <View style={styles.loadingOverlay}>
+          <Text style={styles.loadingText}>Activating Bundle...</Text>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
 
-
-
-
-
-
-
-
+const styles = {
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(255,255,255,0.8)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 999,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: Colors.textPrimary,
+    fontWeight: "600",
+  },
+};

@@ -5,9 +5,9 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
-  SafeAreaView,
   StatusBar,
   Dimensions,
+  SafeAreaView,
   Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
