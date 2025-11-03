@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import {
   View,
@@ -25,7 +24,12 @@ import PrimaryButton from "../../components/PrimaryButton";
 import { codeToFlag } from "../../utils/flag";
 import { DIAL_CODES, guessOperator } from "../../constants/dialing";
 import { useAuth } from "../../auth/AuthProvider";
-import { activateDataBundleCustomer, getCountries, getDataProductsCustomer } from "../../services/merchantApi";
+import { 
+  activateDataBundleCustomer, 
+  getCountries, 
+  getDataProductsCustomer,
+  getProductCategories 
+} from "../../services/merchantApi";
 import * as Contacts from 'expo-contacts';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import formatLocal from "../../utils/formatLocal";
@@ -46,6 +50,7 @@ export default function DataFlowScreenMerchant({ navigation }) {
   const isB2B = (user?.role || "").toLowerCase().includes("b2b");
   const lastStep = isB2B ? BASE_STEPS.PRODUCT : BASE_STEPS.PAY;
   const [countries, setCountries] = useState([]);
+  const [productCategories, setProductCategories] = useState([]);
   const [step, setStep] = useState(0);
   const [success, setSuccess] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -58,15 +63,14 @@ export default function DataFlowScreenMerchant({ navigation }) {
   const [countrySearch, setCountrySearch] = useState('');
   const [localNumber, setLocalNumber] = useState("");
   const [products, setProducts] = useState([]);
-  const [category, setCategory] = useState("Data");
+  const [category, setCategory] = useState(null);
   const [product, setProduct] = useState(null);
   const [search, setSearch] = useState("");
-  const {t} = useTranslation();  
+  const { t } = useTranslation();  
   const [contactsSlideAnim] = useState(new Animated.Value(screenHeight));
   const [countriesSlideAnim] = useState(new Animated.Value(screenHeight));
   const insets = useSafeAreaInsets();
 
-  // Modal states
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -92,13 +96,33 @@ export default function DataFlowScreenMerchant({ navigation }) {
   }, []);
 
   useEffect(() => {
+    const fetchProductCategories = async () => {
+      try {
+        const res = await getProductCategories();
+        console.log(res, "this is product data")
+        setProductCategories(res?.data || []);
+        
+        if (res?.data && res.data.length > 0) {
+          setCategory(res.data[0]);
+        }
+      } catch (error) {
+        console.error("Error fetching product categories:", error);
+        setErrorMessage("Failed to load product categories. Please try again.");
+        setShowErrorModal(true);
+      }
+    };
+
+    fetchProductCategories();
+  }, []);
+
+  useEffect(() => {
     const getProductsForAgent = async () => {
       if (!country?.id) return;
       
       try {
         const filter = {
           countryId: country?.id,
-          productCategoryId: category?.id || 1
+          productCategoryId: category?.id
         };
         const res = await getDataProductsCustomer(filter);
         setProducts(res?.data || []);
@@ -497,6 +521,7 @@ export default function DataFlowScreenMerchant({ navigation }) {
               setProduct={setProduct}
               onEditNumber={() => jumpTo(BASE_STEPS.NUMBER)}
               summary={{ dial, localNumber, product }}
+              productCategories={productCategories}
             />
           )}
 
@@ -565,7 +590,7 @@ export default function DataFlowScreenMerchant({ navigation }) {
   );
 }
 
-const styles = {
+const styles = StyleSheet.create({
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(255,255,255,0.8)",
@@ -578,11 +603,4 @@ const styles = {
     color: Colors.textPrimary,
     fontWeight: "600",
   },
-};
-
-
-
-
-
-
-
+});

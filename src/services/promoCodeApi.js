@@ -2,7 +2,7 @@ import apiClient from "./apiClient";
 
 export const getCustomerPromoCodeStatus = async () => {
   try {
-    const res = await apiClient.get("/promo-code-requests/customer/status");
+    const res = await apiClient.get("/promo-code-request/customer/status");
     return res.data;
   } catch (error) {
     console.error("Error fetching promo code status:", error);
@@ -38,7 +38,7 @@ export const applyForPromoCode = async (formData) => {
       });
     }
 
-    const res = await apiClient.post("/promo-code-requests/apply", data, {
+    const res = await apiClient.post("/promo-code-request/apply", data, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -67,7 +67,7 @@ export const updatePromoCodeRequest = async (id, formData) => {
       });
     }
 
-    const res = await apiClient.patch(`/promo-code-requests/applier/${id}`, data, {
+    const res = await apiClient.patch(`/promo-code-request/apply/${id}`, data, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },

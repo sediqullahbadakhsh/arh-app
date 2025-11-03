@@ -4,6 +4,14 @@ import { buildQueryString } from "./queryBuilder";
 export const merchantSignup = (payload) =>
   api.post("/merchant/sign-up?lang=en", payload).then((r) => r.data);
 
+export const applyForMerchant = (payload) =>
+  api.post("/apply/create?lang=en", payload).then((r) => r.data);
+
+export const getMyMerchantApplication = () =>
+  api.get("/apply/my-application?lang=en").then((r) => r.data);
+
+export const updateMerchantApplication = (id, payload) =>
+  api.put(`/apply/update/${id}?lang=en`, payload).then((r) => r.data);
 
 export const getCountries = ()=>{
   return api.get('/country?lang=en').then((r)=>r.data)
@@ -20,7 +28,9 @@ export const getProvinces = (countryId)=>{
   return api.get(`/orders?lang=en&limit=10&page=1`).then((r)=>r.data)
 }
 
-
+export const getProductCategories = (filters = {}) => {
+  return api.get(`/productCategory?lang=en`).then((r) => r.data);
+};
   export const getMerchantWallets = ()=>{
   return api.get(`/wallet/user/19?lang=en&limit=10&page=1`).then((r)=>r.data)
 }
@@ -50,16 +60,44 @@ export const getDataProducts = (filters = {})=>{
   // return api.get(`/product/admin?lang=en&countryId=${filters?.countryId}&productCategoryId=${filters?.productCategoryId}&search=${filters?.search}`).then((r)=>r.data)
   return api.get(`/product/admin?lang=en`).then((r)=>r?.data)
 }
-export const getDataProductsCustomer = (filters = {})=>{
-  // const query = buildQueryString({
-  //   lang: "en",
-  //   ...filters,
-  // });
+// In merchantApi.js
+// In merchantApi.js - enhance the products endpoint
+export const getDataProductsCustomer = (filters = {}, options = {}) => {
+  const params = new URLSearchParams();
+  params.append('lang', 'en');
   
-  // return api.get(`/product/admin?lang=en&countryId=${filters?.countryId}&productCategoryId=${filters?.productCategoryId}&search=${filters?.search}`).then((r)=>r.data)
-  return api.get(`/product/admin/customer?lang=en`).then((r)=>r?.data)
-}
+  // FORCE FRESH DATA - Always add cache busters
+  params.append('_t', Date.now());
+  params.append('fresh', 'true');
+  params.append('nocache', '1');
+  
+  // Add filters if they exist
+  if (filters.countryId) {
+    params.append('countryId', filters.countryId);
+  }
+  if (filters.productCategoryId) {
+    params.append('productCategoryId', filters.productCategoryId);
+  }
+  if (filters.search) {
+    params.append('search', filters.search);
+  }
+  if (filters.productTypeId) {
+    params.append('productTypeId', filters.productTypeId);
+  }
+  
 
+  params.append('real_time', 'true');
+  params.append('skip_cache', 'true');
+  
+  const url = `/product/admin/customer?${params.toString()}`;
+  
+  console.log(`🔄 Fetching fresh products from: ${url}`);
+  
+  return api.get(url).then((r) => {
+    console.log(`✅ Products fetched: ${r?.data?.data?.length || 0} items`);
+    return r?.data;
+  });
+};
 export const activateDataBundle = (payload = {})=>{
 
   

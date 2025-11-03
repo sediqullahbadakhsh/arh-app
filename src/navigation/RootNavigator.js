@@ -16,6 +16,7 @@ import { useUser } from "../context/userContext";
 import { Text } from "react-native";
 import AllTransactionsScreen from "../screens/AllTransactionsScreen";
 import MerchantAnalyticsScreen from "../screens/MerchantAnalyticsScreen";
+import TopupFlowScreen from "../screens/topupScreen/TopupFlowScreen1";
 
 const Stack = createNativeStackNavigator();
 
@@ -30,7 +31,7 @@ export default function RootNavigator() {
   return (
     <Stack.Navigator
       screenOptions={{ headerShown: false }}
-      initialRouteName={authed ? "Tabs" : "Onboarding"}
+      initialRouteName={authed ? "Tabs" : "Welcome"}
 
       
     >
@@ -40,7 +41,7 @@ export default function RootNavigator() {
         </>
       ) : (
         <>
-          {/* <Stack.Screen name="Welcome" component={CountrySelectScreen} /> */}
+          <Stack.Screen name="Welcome" component={CountrySelectScreen} />
           {/* <Stack.Screen name="Welcome" component={WelcomeScreen} /> */}
           <Stack.Screen name="Onboarding" component={OnboardingScreen} />
           <Stack.Screen name="Login" component={LoginScreen} />
@@ -62,6 +63,10 @@ export default function RootNavigator() {
           <Stack.Screen
             name="SignUpMerchant"
             component={SignUpMerchantScreen}
+          />
+           <Stack.Screen
+            name="Topup1"
+            component={TopupFlowScreen}
           />
           <Stack.Screen name="SignupResult" component={SignupResultScreen} />
           <Stack.Screen

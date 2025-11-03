@@ -97,7 +97,7 @@
   "payWithGooglePay": "Pay with Google Pay",
   "amountToSend": "Amount to send",
   "baseAmount": "Base Amount",
-  "fee": "Fee",
+  "fee": "Service Fee",
   "totalAmount": "Total Amount",
   "changeAmount": "Change amount",
   "processingPayment": "Processing Payment",
@@ -303,7 +303,6 @@
   "retryOrder": "Retry Order",
   "retry": "Retry",
   "resend": "Resend",
-  "receipt": "Receipt",
   "noOrdersFound": "No Orders Found",
   "tryAdjustingSearchOrFilters": "Try adjusting your search or filters",
   "yourOrdersWillAppearHere": "Your orders will appear here.",
@@ -419,7 +418,95 @@
       "validUrl": "Please enter a valid URL"
     }
   },
-  "promoCodes": "Promo Codes"
+  "promoCodes": "Promo Codes",
+  "invalidEmailFormat": "Please enter a valid email address",
+  "onlyGmailAllowed": "Please enter a valid email address",
+  "invalidGmailDidYouMean": "Invalid Gmail address. Did you mean {{correct}}?",
+  "invalidGmailDomain": "Invalid Gmail domain. Please use @gmail.com",
+  "gmailOnly": "Gmail only",
+  "gmailPlaceholder": "example@gmail.com",
+    "googleSignInSuccess": "Google Sign-In Successful",
+  "emailAutoFilledProceed": "Your Gmail has been auto-filled. Would you like to proceed?",
+  "noEmailFoundGoogleAccount": "No email found in Google account",
+  "playServicesNotAvailable": "Google Play Services not available",
+  "googleSignInFailed": "Google Sign-In failed. Please try again.",
+  "loading": "Loading...",
+  "searchLanguages": "Search Language",
+  "onboarding": {
+    "slide1": {
+      "title": "Top-up Anytime, Anywhere",
+      "subtitle": "Send airtime and data to any mobile number in any country — instantly."
+    },
+    "slide2": {
+      "title": "All Networks. All Wallets.",
+      "subtitle": "Top-up across networks, pay with your preferred wallet in your local currency."
+    },
+    "slide3": {
+      "title": "Your Security, Our Priority", 
+      "subtitle": "Bank-grade encryption, OTPs, and real-time monitoring keep your transactions safe."
+    },
+    "skip": "Skip",
+    "next": "Next",
+    "getStarted": "Get Started",
+    
+  },
+  "otpVerification": {
+    "title": "OTP Verification",
+    "infoEmail": "We sent a {{length}}-digit code to {{target}}.",
+    "infoPhone": "We sent a {{length}}-digit code to {{target}}.",
+    "resendText": "Send code reload in ",
+    "resend": "Resend",
+    "didNotReceive": "Did Not Receive OTP?",
+    "verify": "Verify",
+    "enterCode": "Please enter the {{length}}-digit code.",
+    "success": "Success",
+    "verificationFailed": "Verification failed",
+    "otpResent": "OTP has been resent successfully",
+    "resendFailed": "Failed to resend OTP. Please try again.",
+    "emailVerified": "Your email is verified. You can now sign in.",
+    "unsupportedMode": "Unsupported mode",
+    
+    "helpModal": {
+      "title": "Did Not Receive OTP?",
+      "subtitle": "Please check the following:",
+      "checkEmail": "Confirm that you entered the correct email address",
+      "checkJunk": "Check your Trash/Junk Folder",
+      "checkMailbox": "Confirm your mailbox is not full",
+      "checkDomain": "Confirm your email domain is correct and operational \"Contact Your Domain Provider\"",
+      "edit": "Edit",
+      "resendOtp": "Resend OTP",
+      "close": "Close"
+    }
+  },
+   "receipt": {
+    "title": "Receipt",
+    "transactionReceipt": "Transaction Receipt",
+    "topupSuccessful": "TopUp Successful!",
+    "topupFailed": "Top-Up Failed",
+    "processingTopup": "Processing Top-Up",
+    "transactionDetails": "Transaction Details",
+    "totalAmount": "Total Amount",
+    "thankYou": "Thank you for using yes Charge",
+    "transactionId": "Transaction ID",
+    "dateTime": "Date & Time",
+    "receiver": "Receiver",
+    "service": "Service",
+    "status": "Status",
+    "processing": "Processing...",
+    "done": "Done",
+    "shareReceipt": "Share Receipt",
+    "downloadReceipt": "Download Receipt",
+    "permissionRequired": "Permission Required",
+    "grantPermission": "Please grant media library permissions to download receipts.",
+    "downloadSuccess": "Success",
+    "downloadSuccessMessage": "Receipt has been downloaded to your gallery!",
+    "downloadError": "Error",
+    "downloadErrorMessage": "Failed to download receipt. Please try again.",
+    "pleaseWait": "Please wait",
+    "preparingReceipt": "Receipt is being prepared..."
+  },
+  "receipt1": "Receipt"
+
  
  
 

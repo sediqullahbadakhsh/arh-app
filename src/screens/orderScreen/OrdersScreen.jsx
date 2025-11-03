@@ -32,8 +32,9 @@ import { Colors } from "../../theme/colors";
 import OrdersHeader from './OrdersHeader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
+import ReceiptModal1 from './ReceiptModal';
 
-// ReceiptModal Component (same as from HomeScreen)
+
 const ReceiptModal = ({ visible, onClose, transaction }) => {
   const [slideAnim] = useState(new Animated.Value(screenHeight));
   const { t } = useTranslation();
@@ -164,6 +165,19 @@ Thank you for your business!
       [{ text: 'OK' }]
     );
   };
+  const SuccessAnimation = ({ play = true, size = 200 }) => {
+    return (
+      <View style={successStyles.successAnimationContainer}>
+        <LottieView
+          source={require('../../../assets/lotties/succcess.json')}
+          autoPlay={play}
+          loop={false}
+          style={[successStyles.successAnimation, { width: size, height: size }]}
+        />
+      </View>
+    );
+  };
+  
 
   if (!transaction) return null;
 
@@ -195,7 +209,7 @@ Thank you for your business!
             </View>
             
             <View style={OrderStyles.receiptHeaderCenter}>
-              <Text style={OrderStyles.receiptTitle}>Receipt</Text>
+              <Text style={OrderStyles.receiptTitle}>Receipts</Text>
             </View>
             
             <View style={OrderStyles.receiptHeaderRight}>
@@ -209,7 +223,22 @@ Thank you for your business!
           </View>
 
           <ScrollView style={OrderStyles.receiptContent}>
+       
             <View style={OrderStyles.receiptStatusSection}>
+              <View style={OrderStyles.header1}>
+                <View>
+                <Ionicons name="arrow-back" size={30} color={Colors.textPrimary} />
+                </View>
+                <View style={OrderStyles.headerButton}>
+                  <View style={OrderStyles.DownloadBut}>
+                  <Ionicons name="share" size={30} color={Colors.primary} /> </View>
+                  <View style={OrderStyles.ShareBut}>
+                  <Ionicons name="download" size={30} color={Colors.primary} /></View>
+                </View>
+              </View>
+            {showAnimation && (
+              <SuccessAnimation play={visible} size={animationSize} />
+            )}
               <View style={[
                 OrderStyles.receiptStatusIconContainer,
                 { backgroundColor: `${getStatusColor(transaction.status)}15` }
@@ -267,18 +296,7 @@ Thank you for your business!
               </Text>
             </View>
 
-            <View style={OrderStyles.receiptAdditionalInfo}>
-              <View style={OrderStyles.receiptInfoRow}>
-                <Ionicons name="information-circle-outline" size={16} color="#6B7280" />
-                <Text style={OrderStyles.receiptInfoText}>
-                  {transaction.status === 'succeeded' 
-                    ? 'Your transaction was completed successfully.' 
-                    : transaction.status === 'failed'
-                    ? 'Your transaction failed. Please try again.'
-                    : 'Your transaction is being processed.'}
-                </Text>
-              </View>
-            </View>
+          
           </ScrollView>
 
           <View style={OrderStyles.receiptActions}>
@@ -289,14 +307,8 @@ Thank you for your business!
               <Text style={OrderStyles.receiptPrimaryButtonText}>Done</Text>
             </TouchableOpacity>
             
-            {/* Added Share Button Below Done Button */}
-            <TouchableOpacity 
-              style={OrderStyles.receiptShareButton}
-              onPress={shareReceipt}
-            >
-              <Ionicons name="share-outline" size={20} color={Colors.primary} />
-              <Text style={OrderStyles.receiptShareButtonText}>Share Receipt</Text>
-            </TouchableOpacity>
+ 
+         
           </View>
         </Animated.View>
       </View>
@@ -383,16 +395,28 @@ const OrdersScreen = () => {
     setSelectedOrder(order);
     setReceiptModalVisible(true);
   };
+useEffect(() => {
+  const state = navigation.getState();
+  console.log("=== AVAILABLE ROUTES ===");
+  console.log("Current route:", state.routes[state.index]?.name);
+  console.log("All routes:", state.routes.map(route => ({
+    name: route.name,
+    state: route.state
+  })));
+}, [navigation]);
 
-  const handleResendOrder = (order) => {
-    navigation.navigate('Topup1', { 
-      resendOrder: {
-        receiver: order.receiver,
-        amount: order.amount
-      }
-    });
-  };
+const handleResendOrder = (order) => {
+  console.log("Resend order data:", order);
+  console.log("Navigating to TopupTab with resend order");
+  
 
+  navigation.navigate('TopupTab', { 
+    resendOrder: {
+      receiver: order.receiver,
+      amount: order.amount
+    }
+  });
+};
   const SkeletonLoader = () => (
     <SafeAreaView style={OrderStyles.container}>
       <OrdersHeader title="Orders" onBack={goBack} onFilter={() => {}} />
@@ -584,7 +608,7 @@ const OrdersScreen = () => {
             onPress={() => handleViewDetails(item)}
           >
             <Ionicons name="receipt" size={20} color="#CD0202" />
-            <Text style={OrderStyles.actionButtonText}>{t("receipt")}</Text>
+            <Text style={OrderStyles.actionButtonText}>{t("receipt1")}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -649,7 +673,7 @@ const OrdersScreen = () => {
 
       <FilterModal />
 
-      <ReceiptModal
+      <ReceiptModal1
         visible={receiptModalVisible}
         onClose={() => setReceiptModalVisible(false)}
         transaction={selectedOrder}

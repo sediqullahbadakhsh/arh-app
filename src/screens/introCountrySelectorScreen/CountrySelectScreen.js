@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
+import LottieView from 'lottie-react-native';
 import { Colors } from "../../theme/colors";
 import { COUNTRIES } from "../../constants/countries";
 import { codeToFlag } from "../../utils/flag";
@@ -24,25 +25,25 @@ import { useTranslation } from "react-i18next";
 import { useLanguage } from "../../context/LanguageContext";
 import { DIAL_CODES } from "../../constants/dialing";
 
-const { height: screenHeight } = Dimensions.get('window');
+const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 
 export default function CountrySelectScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { t } = useTranslation();
-  const { selectedLang, LANGS, changeLanguage } = useLanguage();
+  const { t, i18n } = useTranslation();
+  const { selectedLang, LANGS, changeLanguage, isChangingLanguage } = useLanguage();
   
   const [booting, setBooting] = useState(true);
   const [selectedCountry, setSelectedCountry] = useState(null);
-  const [selectedLanguage, setSelectedLanguage] = useState(null);
   
-  // Modal states
+  // Remove local selectedLanguage state since we're using the context
   const [countryModalVisible, setCountryModalVisible] = useState(false);
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  
-  // Use useRef for animations to prevent recreation
+  const [changingLanguage, setChangingLanguage] = useState(false);
+
   const countryModalAnim = useRef(new Animated.Value(screenHeight)).current;
   const languageModalAnim = useRef(new Animated.Value(screenHeight)).current;
+  const lottieRef = useRef(null);
 
   useEffect(() => {
     (async () => {
@@ -57,14 +58,27 @@ export default function CountrySelectScreen({ navigation }) {
     })();
   }, [navigation]);
 
-  // Set default language on mount
-  useEffect(() => {
-    if (LANGS && LANGS.length > 0 && !selectedLanguage) {
-      setSelectedLanguage(selectedLang || LANGS[0]);
+  const handleLanguageChange = async (lang) => {
+    if (isChangingLanguage || changingLanguage) return;
+    
+    setChangingLanguage(true);
+    try {
+      const languageChanged = await changeLanguage(lang);
+      
+      if (!languageChanged) {
+        throw new Error('Failed to change app language');
+      }
+      
+      // Language change successful, close modal
+      setLanguageModalVisible(false);
+    } catch (error) {
+      console.error('Error changing language:', error);
+      // You might want to show an error message here
+    } finally {
+      setChangingLanguage(false);
     }
-  }, [LANGS, selectedLang]);
+  };
 
-  // Country modal animation
   useEffect(() => {
     if (countryModalVisible) {
       Animated.timing(countryModalAnim, {
@@ -82,7 +96,6 @@ export default function CountrySelectScreen({ navigation }) {
     }
   }, [countryModalVisible]);
 
-  // Language modal animation
   useEffect(() => {
     if (languageModalVisible) {
       Animated.timing(languageModalAnim, {
@@ -101,22 +114,9 @@ export default function CountrySelectScreen({ navigation }) {
   }, [languageModalVisible]);
 
   const onContinue = useCallback(async () => {
-    if (!selectedCountry || !selectedLanguage) return;
-    
-    try {
-      // Save country code
-      await AsyncStorage.setItem("countryCode", selectedCountry.code);
-      
-      // Change app language
-      if (selectedLanguage) {
-        await changeLanguage(selectedLanguage);
-      }
-      
-      navigation.replace("Onboarding");
-    } catch (error) {
-      console.error('Error saving preferences:', error);
-    }
-  }, [selectedCountry, selectedLanguage, navigation, changeLanguage]);
+    // No need to change language here since it's already handled by handleLanguageChange
+    navigation.replace("Onboarding");
+  }, [navigation]);
 
   const filteredCountries = useMemo(() => {
     if (!searchQuery) return COUNTRIES || [];
@@ -163,7 +163,7 @@ export default function CountrySelectScreen({ navigation }) {
   }, [selectedCountry, filteredCountries.length]);
 
   const renderLanguageItem = useCallback(({ item, index }) => {
-    const active = selectedLanguage?.code === item.code;
+    const active = selectedLang?.code === item.code;
     
     const renderFlag = () => {
       if (!item?.flag) {
@@ -182,11 +182,9 @@ export default function CountrySelectScreen({ navigation }) {
 
     return (
       <TouchableOpacity
-        onPress={() => {
-          setSelectedLanguage(item);
-          setLanguageModalVisible(false);
-        }}
+        onPress={() => handleLanguageChange(item)}
         activeOpacity={0.8}
+        disabled={isChangingLanguage || changingLanguage}
         style={[
           styles.modalRow,
           index === 0 && styles.modalRowFirst,
@@ -198,12 +196,14 @@ export default function CountrySelectScreen({ navigation }) {
           <Text style={styles.languageName}>{item.label}</Text>
           <Text style={styles.languageCode}>{(item.code || item.value).toUpperCase()}</Text>
         </View>
-        {active && (
+        {(isChangingLanguage || changingLanguage) && selectedLang?.code === item.code ? (
+          <ActivityIndicator size="small" color={Colors.primary} />
+        ) : active ? (
           <Ionicons name="checkmark-circle" size={20} color={Colors.primary} />
-        )}
+        ) : null}
       </TouchableOpacity>
     );
-  }, [selectedLanguage, filteredLanguages.length]);
+  }, [selectedLang, filteredLanguages.length, isChangingLanguage, changingLanguage]);
 
   const CountryModal = () => (
     <Modal
@@ -307,6 +307,15 @@ export default function CountrySelectScreen({ navigation }) {
             />
           </View>
 
+          {(isChangingLanguage || changingLanguage) && (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color={Colors.primary} />
+              <Text style={styles.loadingText}>
+                {t("ChangingLanguage") || "Changing language..."}
+              </Text>
+            </View>
+          )}
+
           <FlatList
             data={filteredLanguages}
             keyExtractor={(item) => item.code || item.value || Math.random().toString()}
@@ -323,8 +332,8 @@ export default function CountrySelectScreen({ navigation }) {
     return (
       <LinearGradient
         colors={GRADIENT}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        start={{ x: 1, y: 0 }} 
+        end={{ x: 0, y: 1 }}   
         style={styles.full}
       >
         <ActivityIndicator color="#fff" size="large" />
@@ -336,64 +345,39 @@ export default function CountrySelectScreen({ navigation }) {
     <SafeAreaView style={{ flex: 1, backgroundColor: "transparent" }}>
       <LinearGradient
         colors={GRADIENT}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        start={{ x: 1, y: 0 }}
+        end={{ x: 0, y: 1 }}   
         style={styles.full}
       >
-        <View
-          style={[
-            styles.content,
-            {
-              paddingTop: insets.top + 60,
-              paddingBottom: 22,
-              paddingHorizontal: 24,
-            },
-          ]}
-        >
-          <Text style={styles.title}>{t("welcome") || "Welcome"}</Text>
-          <Text style={styles.subtitle}>
-            {t("selectPreferences") || "Select your preferences to get started"}
-          </Text>
-
-          {/* Country Selection */}
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>{t('country') || "Country"}</Text>
-            <TouchableOpacity
-              style={styles.selectionField}
-              onPress={() => setCountryModalVisible(true)}
-              activeOpacity={0.8}
-            >
-              <View style={styles.selectionContent}>
-                {selectedCountry ? (
-                  <>
-                    <Text style={styles.fieldFlag}>{codeToFlag(selectedCountry.code)}</Text>
-                    <View style={styles.fieldInfo}>
-                      <Text style={styles.fieldPrimary}>{selectedCountry.name}</Text>
-                      <Text style={styles.fieldSecondary}>{DIAL_CODES[selectedCountry.code] || ''}</Text>
-                    </View>
-                  </>
-                ) : (
-                  <Text style={styles.placeholder}>{t('selectCountry') || "Select Country"}</Text>
-                )}
-              </View>
-              <Ionicons name="chevron-down" size={20} color="rgba(255,255,255,0.8)" />
-            </TouchableOpacity>
+        <View style={styles.mainContainer}>
+          <View style={styles.lottieContainer}>
+            <LottieView
+              ref={lottieRef}
+              source={require('../../../assets/lotties/logo6.json')}
+              autoPlay={true}
+              loop={true}
+              style={styles.lottieAnimation}
+              resizeMode="contain"
+            />
           </View>
+             
+          <Text style={styles.title}>{t("welcome") || "Welcome"}</Text>
+       
 
-          {/* Language Selection */}
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>{t('language') || "Language"}</Text>
+            <Text style={styles.sectionLabel}>{t('selectLanguage1') || "Language"}</Text>
             <TouchableOpacity
               style={styles.selectionField}
               onPress={() => setLanguageModalVisible(true)}
               activeOpacity={0.8}
+              disabled={isChangingLanguage || changingLanguage}
             >
               <View style={styles.selectionContent}>
-                {selectedLanguage ? (
+                {selectedLang ? (
                   <>
-                    {selectedLanguage?.flag ? (
+                    {selectedLang?.flag ? (
                       <Image
-                        source={{ uri: selectedLanguage.flag }}
+                        source={{ uri: selectedLang.flag }}
                         style={styles.languageFlagSmall}
                         resizeMode="contain"
                       />
@@ -401,35 +385,38 @@ export default function CountrySelectScreen({ navigation }) {
                       <View style={styles.flagPlaceholderSmall} />
                     )}
                     <View style={styles.fieldInfo}>
-                      <Text style={styles.fieldPrimary}>{selectedLanguage.label}</Text>
+                      <Text style={styles.fieldPrimary}>{selectedLang.label}</Text>
                       <Text style={styles.fieldSecondary}>
-                        {(selectedLanguage.code || selectedLanguage.value).toUpperCase()}
+                        {(selectedLang.code || selectedLang.value).toUpperCase()}
                       </Text>
                     </View>
                   </>
                 ) : (
-                  <Text style={styles.placeholder}>{t('selectLanguage') || "Select Language"}</Text>
+                  <Text style={styles.placeholder}>{t('selectLanguage1') || "Select Language"}</Text>
                 )}
               </View>
-              <Ionicons name="chevron-down" size={20} color="rgba(255,255,255,0.8)" />
+              {(isChangingLanguage || changingLanguage) ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Ionicons name="chevron-down" size={20} color="#fff" />
+              )}
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Continue Button */}
         <View
           style={[
             styles.footer,
-            { paddingBottom: insets.bottom + 24, paddingHorizontal: 24 },
+            { paddingBottom: insets.bottom + 100, paddingHorizontal: 24 },
           ]}
         >
           <TouchableOpacity
-            disabled={!selectedCountry || !selectedLanguage}
+            disabled={!selectedLang || isChangingLanguage || changingLanguage}
             onPress={onContinue}
             activeOpacity={0.9}
           >
             <LinearGradient
-              colors={selectedCountry && selectedLanguage ? CTA_GRADIENT : DISABLED_GRADIENT}
+              colors={selectedLang ? CTA_GRADIENT : DISABLED_GRADIENT}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.cta}
@@ -439,7 +426,6 @@ export default function CountrySelectScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* Modals */}
         <CountryModal />
         <LanguageModal />
       </LinearGradient>
@@ -447,29 +433,53 @@ export default function CountrySelectScreen({ navigation }) {
   );
 }
 
-const GRADIENT = ["#D70000", "#E52421", "#F0533F"];
+
+const GRADIENT = ["#E20E02", "#9F0901"];
 const CTA_GRADIENT = ["#F6B12A", "#E59A12"];
 const DISABLED_GRADIENT = ["#CCCCCC", "#999999"];
 const MODAL_RADIUS = 25;
 
 const styles = StyleSheet.create({
-  full: { flex: 1 },
-  content: {
+  full: { 
+    flex: 1 
+  },
+  mainContainer: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 20,
+    paddingBottom: 22,
+    paddingHorizontal: 24,
+  },
+  lottieContainer: {
+    width: 420,
+    marginTop: 100,
+    height: 280,
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    alignSelf: 'center',
+  },
+  lottieAnimation: {
+    width: '100%',
+    height: '100%',
   },
   title: {
     color: "#fff",
-    fontSize: 32,
+    fontSize: 42,
     fontWeight: "800",
     textAlign: "center",
-    marginBottom: 8,
+    marginBottom: 40,
+    width: '100%',
   },
   subtitle: {
-    color: "rgba(255,255,255,0.8)",
+    color: "#fff",
     fontSize: 16,
     textAlign: "center",
     marginBottom: 48,
     fontWeight: "500",
+    opacity: 0.9,
+    width: '100%',
   },
   section: {
     width: '100%',
@@ -491,7 +501,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "rgba(255,255,255,0.15)",
   },
   selectionContent: {
     flexDirection: "row",
@@ -512,7 +521,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   fieldSecondary: {
-    color: "rgba(255,255,255,0.7)",
+    color: "rgba(255,255,255,0.8)",
     fontSize: 14,
     fontWeight: "500",
   },
@@ -542,11 +551,7 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+
   },
   ctaText: {
     color: "#fff",
@@ -554,7 +559,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  // Modal Styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'transparent',
@@ -566,6 +570,7 @@ const styles = StyleSheet.create({
   modalCard: {
     position: 'absolute',
     bottom: 0,
+    height: "60%",
     left: 0,
     right: 0,
     backgroundColor: '#fff',

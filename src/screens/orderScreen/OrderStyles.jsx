@@ -32,12 +32,32 @@ receiptModalBackdrop: {
   right: 0,
   bottom: 0,
 },
+header1: {
+  display: "flex",
+  flexDirection: "row",
+  width: "100%",
+  justifyContent: "space-between"
+},
+DownloadBut: {
+  padding: 7,
+  borderRadius: 14,
+  backgroundColor: "#F3F4F6"
+},
+ShareBut: {
+  padding: 7,
+  borderRadius: 14,
+  backgroundColor: "#F3F4F6"
+},
+headerButton: {
+  display: "flex",
+  flexDirection: "row",
+  gap: 10,
+  justifyContent: "space-between"
+},
 receiptModalContainer: {
-  width: '90%',
-  maxWidth: 400,
-  height: '90%',
+  width: '100%',
+  height: '100%',
   backgroundColor: '#fff',
-  borderRadius: 24,
   overflow: 'hidden',
   shadowColor: '#000',
   shadowOffset: {
@@ -49,7 +69,7 @@ receiptModalContainer: {
   elevation: 10,
 },
 
-// Receipt Header Styles
+
 receiptHeader: {
   flexDirection: 'row',
   alignItems: 'center',
@@ -152,7 +172,7 @@ receiptDetailValue: {
   textAlign: 'right',
 },
 
-// Receipt Amount Section
+
 receiptAmountSection: {
   alignItems: 'center',
   marginBottom: 24,
@@ -201,7 +221,7 @@ receiptInfoText: {
     backgroundColor: Colors.primary,
     paddingVertical: 14,
     paddingHorizontal: 24,
-    borderRadius: 12,
+    borderRadius: 100,
     width: "100%",
     alignItems: 'center',
     justifyContent: 'center',
@@ -211,7 +231,6 @@ receiptInfoText: {
     fontSize: 16,
     fontWeight: '600',
   },
-  // New Share Button Styles
   receiptShareButton: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -193,30 +193,30 @@ function StepPay({
                 </Text>
               )}
 
-              {cardDetails?.complete && !paymentMethodId && (
+              {/* {cardDetails?.complete && !paymentMethodId && (
                 <View style={styles.processingContainer}>
                   <Text style={styles.processingText}>
                     {t('validatingCard')}
                   </Text>
                 </View>
-              )}
+              )} */}
             </View>
 
-            {isCreatingPaymentMethod && (
+            {/* {isCreatingPaymentMethod && (
               <View style={styles.processingContainer}>
                 <Text style={styles.processingText}>
                   {t('creatingPaymentMethod')}
                 </Text>
               </View>
-            )}
+            )} */}
 
-            {paymentMethodId && (
+            {/* {paymentMethodId && (
               <View style={styles.successContainer}>
                 <Text style={styles.successMessage}>
                   {t('paymentMethodReady')}
                 </Text>
               </View>
-            )}
+            )} */}
 
             <Text style={[TopUpStyles.smallLabel, { marginTop: 16 }]}>
               {t('securePaymentNotice')}

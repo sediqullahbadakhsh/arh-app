@@ -37,6 +37,7 @@ import * as Print from 'expo-print';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as MediaLibrary from 'expo-media-library';
+import ReceiptModal1 from "../orderScreen/ReceiptModal";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -393,28 +394,26 @@ Thank you for your business!
     try {
       setDownloading(true);
       
-      // Generate PDF
+ 
       const html = generatePDFHtml();
       const { uri } = await Print.printToFileAsync({ html });
       
-      // Generate file name
+
       const fileName = `Receipt_${transaction.txnNumber}_${new Date().getTime()}.pdf`;
       const newPath = `${FileSystem.documentDirectory}${fileName}`;
       
-      // Move file to permanent location
+
       await FileSystem.moveAsync({
         from: uri,
         to: newPath,
       });
       
       if (Platform.OS === 'ios') {
-        // For iOS, share the file
         await Sharing.shareAsync(newPath, {
           mimeType: 'application/pdf',
           dialogTitle: 'Save Receipt as PDF',
         });
       } else {
-        // For Android, save to downloads
         const permission = await MediaLibrary.requestPermissionsAsync();
         
         if (permission.granted) {
@@ -1059,7 +1058,7 @@ const TransactionRow = ({ item }) => (
         </View>   
       </ScrollView>
 
-      <ReceiptModal
+      <ReceiptModal1
         visible={receiptModalVisible}
         onClose={() => setReceiptModalVisible(false)}
         transaction={selectedTransaction}

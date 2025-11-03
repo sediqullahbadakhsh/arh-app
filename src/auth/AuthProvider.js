@@ -15,6 +15,7 @@ import {
   signupOtpVerify,
   getCustomerProfile,
 } from "../services/authApi";
+import { jwtDecode } from 'jwt-decode';
 
 const AuthCtx = createContext({
   user: null,
@@ -39,8 +40,26 @@ export function AuthProvider({ children }) {
   const [pending, setPending] = useState(null);
   const [initializing, setInitializing] = useState(true);
 
+    const isTokenExpired = (token) => {
+    if (!token) return true;
+    
+    try {
+      const decoded = jwtDecode(token);
+      const currentTime = Date.now() / 1000;
+      return decoded.exp < currentTime;
+    } catch (error) {
+      console.error("❌ Error decoding token:", error);
+      return true;
+    }
+  };
+
   const fetchUserProfile = async (token) => {
     try {
+
+        if (isTokenExpired(token)) {
+        await logout();
+        throw new Error("Token expired");
+      }
       const response = await getCustomerProfile(token); 
       console.log("❤❤❤ this is user profile:", response);
       return response?.data;
@@ -50,14 +69,23 @@ export function AuthProvider({ children }) {
     }
   };
 
-  useEffect(() => {
+    useEffect(() => {
     if (token) {
       console.log("🔐 Current token in AuthProvider:", token);
+      const checkTokenInterval = setInterval(() => {
+        if (isTokenExpired(token)) {
+          console.log("🚨 Token expired, logging out...");
+          logout();
+        }
+      }, 60000); 
+
+      return () => clearInterval(checkTokenInterval);
     }
   }, [token]);
 
-  // Initialize auth state
-  useEffect(() => {
+
+
+useEffect(() => {
     (async () => {
       try {
         const [t, role] = await Promise.all([
@@ -66,20 +94,25 @@ export function AuthProvider({ children }) {
         ]);
         
         if (t) {
+          if (isTokenExpired(t)) {
+            console.log("🚨 Token expired on app start");
+            await logout();
+            setInitializing(false);
+            return;
+          }
+
           console.log("🔄 Restoring auth from storage...");
           const userProfile = await fetchUserProfile(t);
           
           if (userProfile) {
-            // Use the actual user profile data
             await setToken(t, {
               role: role || "b2b",
               id: userProfile.id,
               username: userProfile.username,
               role_id: userProfile.role_id,
-              ...userProfile // Include all profile data
+              ...userProfile 
             });
           } else {
-            // Fallback: set token with basic info
             await setToken(t, { role });
           }
         }
@@ -91,6 +124,30 @@ export function AuthProvider({ children }) {
     })();
   }, []);
 
+ useEffect(() => {
+    const originalFetch = global.fetch;
+    
+    global.fetch = async (...args) => {
+      try {
+        const response = await originalFetch(...args);
+        
+  
+        if (response.status === 401) {
+          console.log("Unauthorized access detected");
+          await logout();
+          throw new Error("Authentication required");
+        }
+        
+        return response;
+      } catch (error) {
+        throw error;
+      }
+    };
+
+    return () => {
+      global.fetch = originalFetch;
+    };
+  }, []);
   const setRoleLocal = async (role) => {
     if (!role) return;
     await AsyncStorage.setItem("auth_role", role);
@@ -107,22 +164,19 @@ export function AuthProvider({ children }) {
 
     const role = meta.role || (await AsyncStorage.getItem("auth_role")) || null;
 
-    // Create user object - prioritize meta data over existing user data
+
     const u = {
       token: newToken,
       role: role,
       id: meta.id !== undefined ? meta.id : (user?.id !== undefined ? user.id : null),
       username: meta.username !== undefined ? meta.username : (user?.username !== undefined ? user.username : null),
       role_id: meta.role_id !== undefined ? meta.role_id : (user?.role_id !== undefined ? user.role_id : null),
-      // Include any additional profile data
       ...meta,
     };
 
-    // Remove duplicate token and role if they exist in meta spread
     delete u.token;
     delete u.role;
-    
-    // Final user object with correct structure
+
     const finalUser = {
       token: newToken,
       role: role,
@@ -149,7 +203,7 @@ export function AuthProvider({ children }) {
   const loginPasswordFn = async ({ identifier, password }) => {
     const data = await loginWithPassword({ identifier, password });
     
-    // Fetch user profile after login to get complete user data
+
     const userProfile = await fetchUserProfile(data.access_token);
     
     await setRoleLocal("b2b");
@@ -158,7 +212,7 @@ export function AuthProvider({ children }) {
       role_id: data.role_id,
       id: userProfile?.id,
       username: userProfile?.username,
-      ...userProfile // Include all profile data
+      ...userProfile 
     });
     setPending(null);
     return data;
@@ -175,7 +229,7 @@ export function AuthProvider({ children }) {
     const data = await loginOtpVerify({ identifier, otp });
     console.log(data, "this is data");
 
-    // Fetch user profile after OTP verification
+
     const userProfile = await fetchUserProfile(data.access_token);
 
     await setRoleLocal("b2c");
@@ -188,7 +242,7 @@ export function AuthProvider({ children }) {
       fullName: data.fullName || data.customer?.fullName,
       ...data.customer,
       ...data,
-      ...userProfile // Include profile data
+      ...userProfile
     };
 
     await setToken(data.access_token, userData);
@@ -206,7 +260,7 @@ export function AuthProvider({ children }) {
   const signupCustomerVerifyOtpFn = async ({ identifier, otp }) => {
     const data = await signupOtpVerify({ otp });
     
-    // Fetch user profile after signup
+
     const userProfile = await fetchUserProfile(data.access_token);
     
     await setRoleLocal("b2c");

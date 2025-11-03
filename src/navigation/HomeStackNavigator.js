@@ -3,9 +3,9 @@ import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import HomeConsumerScreen from "../screens/homeConsumerScreen/HomeConsumerScreen";
 import HomeMerchantScreen from "../screens/homeMerchantScreen/HomeMerchantScreen";
-import TodoScreen from "../screens/TodoScreen";
+
 import NotificationsScreen from "../screens/notificationScreen/NotificationsScreen";
-import { SERVICES } from "../constants/services";
+
 import ProductSelectScreen from "../screens/topup/ProductSelectScreen";
 import { useAuth } from "../auth/AuthProvider";
 import TopupFlowScreen from "../screens/TopupFlowScreen";
@@ -52,16 +52,7 @@ export default function HomeStackNavigator() {
       <Stack.Screen name="Topup" component={TopupFlowScreen} />
       <Stack.Screen name="Topup1" component={TopupFlowScreen1} />
       <Stack.Screen name="StockTransfer" component={StockTransferScreen} />
-      {SERVICES.filter(
-        (s) => !["MobileTopup", "DataBundle"].includes(s.key)
-      ).map((s) => (
-        <Stack.Screen
-          key={s.key}
-          name={s.key}
-          component={TodoScreen}
-          initialParams={{ title: s.label }}
-        />
-      ))}
+     
     </Stack.Navigator>
   );
 }

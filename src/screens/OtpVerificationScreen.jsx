@@ -10,14 +10,175 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Modal,
+  ScrollView,
+  AppState,
+  Image,
 } from "react-native";
 import { Colors } from "../theme/colors";
 import AuthHeader from "../components/AuthHeader";
 import PrimaryButton from "../components/PrimaryButton";
 import { useAuth } from "../auth/AuthProvider";
+import { useTranslation } from "react-i18next";
 
 const CODE_LENGTH = 6;
 const RESEND_SECONDS = 120;
+
+// Fixed Timer Hook that works even when app is in background
+const useTimer = (initialTime) => {
+  const [timeLeft, setTimeLeft] = useState(initialTime);
+  const timerRef = useRef(null);
+  const appStateRef = useRef(AppState.currentState);
+  const endTimeRef = useRef(null);
+
+  useEffect(() => {
+    // Set the end time when timer starts
+    if (!endTimeRef.current) {
+      endTimeRef.current = Date.now() + initialTime * 1000;
+    }
+
+    const calculateTimeLeft = () => {
+      const now = Date.now();
+      const remaining = Math.max(0, Math.ceil((endTimeRef.current - now) / 1000));
+      return remaining;
+    };
+
+    const updateTimer = () => {
+      const remaining = calculateTimeLeft();
+      setTimeLeft(remaining);
+
+      if (remaining > 0) {
+        timerRef.current = setTimeout(updateTimer, 1000);
+      }
+    };
+
+    const handleAppStateChange = (nextAppState) => {
+      if (
+        appStateRef.current.match(/inactive|background/) &&
+        nextAppState === "active"
+      ) {
+        // App came to foreground - recalculate time
+        const remaining = calculateTimeLeft();
+        setTimeLeft(remaining);
+        
+        if (remaining > 0) {
+          timerRef.current = setTimeout(updateTimer, 1000);
+        }
+      }
+      appStateRef.current = nextAppState;
+    };
+
+    // Start the timer
+    updateTimer();
+
+    // Subscribe to app state changes
+    const subscription = AppState.addEventListener("change", handleAppStateChange);
+
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+      subscription.remove();
+    };
+  }, [initialTime]);
+
+  const resetTimer = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
+    // Reset end time
+    endTimeRef.current = Date.now() + initialTime * 1000;
+    setTimeLeft(initialTime);
+  };
+
+  return { timeLeft, resetTimer };
+};
+
+// Move HelpModal to a separate component to prevent recreation
+const HelpModal = ({ 
+  visible, 
+  onClose, 
+  target, 
+  onResend, 
+  onEditEmail 
+}) => {
+  const { t } = useTranslation();
+
+  return (
+    <Modal
+      visible={visible}
+      transparent={true}
+      statusBarTranslucent={true}
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>{t('otpVerification.helpModal.title')}</Text>
+          <ScrollView style={styles.modalScrollView}>
+            <Text style={styles.modalSubtitle}>
+              {t('otpVerification.helpModal.subtitle')}
+            </Text>
+            
+            <View style={styles.helpItem}>
+              <Text style={styles.helpNumber}>1.</Text>
+              <Text style={styles.helpText}>
+                {t('otpVerification.helpModal.checkEmail')}
+              </Text>
+            </View>
+
+            <TouchableOpacity 
+              style={styles.emailDisplay}
+              onPress={onEditEmail}
+            >
+              <Text style={styles.emailText}>{target}</Text>
+              <Text style={styles.editText}>{t('otpVerification.helpModal.edit')}</Text>
+            </TouchableOpacity>
+
+            <View style={styles.helpItem}>
+              <Text style={styles.helpNumber}>2.</Text>
+              <Text style={styles.helpText}>
+                {t('otpVerification.helpModal.checkJunk')}
+              </Text>
+            </View>
+
+            <View style={styles.helpItem}>
+              <Text style={styles.helpNumber}>3.</Text>
+              <Text style={styles.helpText}>
+                {t('otpVerification.helpModal.checkMailbox')}
+              </Text>
+            </View>
+
+            <View style={styles.helpItem}>
+              <Text style={styles.helpNumber}>4.</Text>
+              <Text style={styles.helpText}>
+                {t('otpVerification.helpModal.checkDomain')}
+              </Text>
+            </View>
+          </ScrollView>
+
+          <View style={styles.modalButtons}>
+            <TouchableOpacity 
+              style={[styles.modalButton, styles.resendButton]}
+              onPress={onResend}
+            >
+              <Text style={styles.resendButtonText}>
+                {t('otpVerification.helpModal.resendOtp')}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.modalButton, styles.closeButton]}
+              onPress={onClose}
+            >
+              <Text style={styles.closeButtonText}>
+                {t('otpVerification.helpModal.close')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+};
 
 export default function OtpVerificationScreen({ route, navigation }) {
   const {
@@ -27,18 +188,14 @@ export default function OtpVerificationScreen({ route, navigation }) {
   } = route?.params || {};
   const [codes, setCodes] = useState(Array(CODE_LENGTH).fill(""));
   const inputsRef = useRef([]);
-  const [timeLeft, setTimeLeft] = useState(RESEND_SECONDS);
+  const { timeLeft, resetTimer } = useTimer(RESEND_SECONDS);
+  const [showHelpModal, setShowHelpModal] = useState(false);
   const auth = useAuth();
+  const { t } = useTranslation();
 
   useEffect(() => {
     inputsRef.current[0]?.focus();
   }, []);
-
-  useEffect(() => {
-    if (timeLeft <= 0) return;
-    const t = setTimeout(() => setTimeLeft((x) => x - 1), 1000);
-    return () => clearTimeout(t);
-  }, [timeLeft]);
 
   const setFromString = (value, startIdx = 0) => {
     const arr = [...codes];
@@ -52,7 +209,6 @@ export default function OtpVerificationScreen({ route, navigation }) {
   };
 
   const handleChange = (text, idx) => {
-    // If user pasted or autocomplete filled more than one char, spread them
     if (text.length > 1) {
       return setFromString(text, idx);
     }
@@ -71,59 +227,95 @@ export default function OtpVerificationScreen({ route, navigation }) {
   const verify = async () => {
     const code = codes.join("");
     if (code.length !== CODE_LENGTH) {
-      Alert.alert("OTP", `Please enter the ${CODE_LENGTH}-digit code.`);
+      Alert.alert(
+        t('otpVerification.title'),
+        t('otpVerification.enterCode', { length: CODE_LENGTH })
+      );
       return;
     }
 
     try {
       if (mode === "login") {
-       const res =  await auth.loginOtpVerify({ identifier: target, otp: code });
-       console.log("this is customer login response",res)
-
+        const res = await auth.loginOtpVerify({ identifier: target, otp: code });
+        console.log("this is customer login response", res);
         navigation.replace("Tabs");
       } else if (mode === "signup_customer") {
         await auth.signupCustomerVerifyOtp({ identifier: target, otp: code });
-        Alert.alert("Success", "Your email is verified. You can now sign in.");
+        Alert.alert(
+          t('otpVerification.success'),
+          t('otpVerification.emailVerified')
+        );
         navigation.replace("Login");
       } else {
-        Alert.alert("Unsupported mode", String(mode));
+        Alert.alert(
+          t('otpVerification.unsupportedMode'),
+          String(mode)
+        );
       }
     } catch (e) {
-      Alert.alert("OTP", e.message || "Verification failed");
+      Alert.alert(
+        t('otpVerification.title'),
+        e.message || t('otpVerification.verificationFailed')
+      );
     }
   };
 
   const resend = async () => {
-    setTimeLeft(RESEND_SECONDS);
-    // Safe optional calls if you add these later:
+    resetTimer();
     try {
       if (mode === "login") {
         await auth?.loginOtpResend?.({ identifier: target });
+        Alert.alert(
+          t('otpVerification.success'),
+          t('otpVerification.otpResent')
+        );
       } else if (mode === "signup_customer") {
         await auth?.signupCustomerResendOtp?.({ identifier: target });
+        Alert.alert(
+          t('otpVerification.success'),
+          t('otpVerification.otpResent')
+        );
       }
     } catch (e) {
-      // Not fatal for UI; timer restarted anyway
+      Alert.alert(
+        t('otpVerification.title'),
+        t('otpVerification.resendFailed')
+      );
+    }
+  };
+
+  const handleGoBackToEditEmail = () => {
+    setShowHelpModal(false);
+    navigation.goBack();
+  };
+
+  const handleModalResend = () => {
+    setShowHelpModal(false);
+    resend();
+  };
+
+  const getInfoText = () => {
+    if (channel === "email") {
+      return t('otpVerification.infoEmail', { length: CODE_LENGTH, target });
+    } else {
+      return t('otpVerification.infoPhone', { length: CODE_LENGTH, target });
     }
   };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
-      <AuthHeader title="OTP Verification" onBack={() => navigation.goBack()} />
-
+      <AuthHeader 
+        title={t('otpVerification.title')} 
+        onBack={() => navigation.goBack()} 
+      />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={{ flex: 1 }}
       >
+        
         <View style={styles.container}>
           <Text style={styles.infoTxt}>
-            {channel === "email"
-              ? `We sent a ${CODE_LENGTH}-digit code to ${
-                  target || "your email"
-                }.`
-              : `We sent a ${CODE_LENGTH}-digit code to ${
-                  target || "your phone"
-                }.`}
+            {getInfoText()}
           </Text>
 
           <View style={styles.codeRow}>
@@ -148,7 +340,7 @@ export default function OtpVerificationScreen({ route, navigation }) {
           </View>
 
           <View style={styles.resendRow}>
-            <Text style={styles.resendText}>Send code reload in </Text>
+            <Text style={styles.resendText}>{t('otpVerification.resendText')}</Text>
             {timeLeft > 0 ? (
               <Text style={[styles.resendText, { color: Colors.primary }]}>
                 {formatTime(timeLeft)}
@@ -156,20 +348,44 @@ export default function OtpVerificationScreen({ route, navigation }) {
             ) : (
               <TouchableOpacity onPress={resend}>
                 <Text style={[styles.resendText, { color: Colors.primary }]}>
-                  Resend
+                  {t('otpVerification.resend')}
                 </Text>
               </TouchableOpacity>
             )}
           </View>
+   <View style={styles.watermarkContainer}>
+        <Image 
+          source={require('../../assets/logo4.png')} 
+          style={styles.watermarkLogo}
+          resizeMode="contain"
+        />
+      </View>
+          <TouchableOpacity 
+            style={styles.helpLink}
+            onPress={() => setShowHelpModal(true)}
+          >
+            <Text style={styles.helpLinkText}>
+              {t('otpVerification.didNotReceive')}
+            </Text>
+          </TouchableOpacity>
 
           <PrimaryButton
-            label="Verify"
+            label={t('otpVerification.verify')}
             onPress={verify}
             style={{ marginTop: 28 }}
             disabled={codes.join("").length !== CODE_LENGTH}
           />
         </View>
       </KeyboardAvoidingView>
+
+     
+      <HelpModal
+        visible={showHelpModal}
+        onClose={() => setShowHelpModal(false)}
+        target={target}
+        onResend={handleModalResend}
+        onEditEmail={handleGoBackToEditEmail}
+      />
     </SafeAreaView>
   );
 }
@@ -180,14 +396,31 @@ function formatTime(sec) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+// Styles remain the same...
 const styles = StyleSheet.create({
+  // ... (all your existing styles remain exactly the same)
   container: { flex: 1, paddingHorizontal: 24, paddingTop: 24 },
   infoTxt: { fontSize: 13, color: Colors.textSecondary, marginBottom: 24 },
-
   codeRow: {
     flexDirection: "row",
+    direction: "ltr",
     justifyContent: "space-between",
     marginBottom: 12,
+  },
+    watermarkContainer: {
+    position: 'absolute',
+    top: 100,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  watermarkLogo: {
+    width: 270,
+    height: 270,
+    opacity: 0.1, 
   },
   codeBox: {
     width: 48,
@@ -200,7 +433,134 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     backgroundColor: "#fff",
   },
-
-  resendRow: { flexDirection: "row", alignItems: "center", marginTop: 8 },
+  resendRow: { 
+    flexDirection: "row", 
+    alignItems: "center", 
+    marginTop: 8,
+    justifyContent: "center",
+  },
   resendText: { fontSize: 13, color: Colors.textSecondary },
+  helpLink: {
+    marginTop: 16,
+    alignItems: "center",
+  },
+  helpLinkText: {
+    fontSize: 14,
+    color: Colors.primary,
+    textDecorationLine: "underline",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: Colors.white,
+    borderRadius: 16,
+    padding: 24,
+    width: "100%",
+    maxHeight: "80%",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: Colors.textPrimary,
+    textAlign: "center",
+    marginBottom: 16,
+  },
+  modalScrollView: {
+    maxHeight: 300,
+  },
+  modalSubtitle: {
+    fontSize: 16,
+    color: Colors.textSecondary,
+    marginBottom: 16,
+    fontWeight: "600",
+  },
+  helpItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 16,
+  },
+  helpNumber: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: Colors.primary,
+    marginRight: 8,
+    lineHeight: 20,
+  },
+  helpText: {
+    fontSize: 14,
+    color: Colors.textPrimary,
+    lineHeight: 20,
+    flex: 1,
+  },
+  emailDisplay: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#f5f5f5",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    marginLeft: 20,
+  },
+  emailText: {
+    fontSize: 14,
+    color: Colors.textPrimary,
+    fontWeight: "500",
+  },
+  editText: {
+    fontSize: 14,
+    color: Colors.primary,
+    fontWeight: "500",
+  },
+  contactDomainButton: {
+    backgroundColor: "#f0f0f0",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 8,
+    marginLeft: 20,
+  },
+  contactDomainText: {
+    fontSize: 14,
+    color: Colors.primary,
+    fontWeight: "500",
+  },
+  modalButtons: {
+    marginTop: 24,
+    gap: 12,
+  },
+  modalButton: {
+    padding: 16,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  resendButton: {
+    backgroundColor: Colors.primary,
+  },
+  resendButtonText: {
+    color: Colors.white,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  closeButton: {
+    backgroundColor: "#f5f5f5",
+  },
+  closeButtonText: {
+    color: Colors.textSecondary,
+    fontSize: 16,
+    fontWeight: "600",
+  },
 });

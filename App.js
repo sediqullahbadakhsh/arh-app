@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import RootNavigator from "./src/navigation/RootNavigator";
@@ -22,6 +22,7 @@ import { isRTL } from './src/utils/rtl';
 import * as LocalAuthentication from 'expo-local-authentication';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import './src/utils/polyfills';
+import InternetConnectionMonitor from "./src/components/InternetConnectionMonitor";
 LogBox.ignoreAllLogs();
 
 
@@ -112,6 +113,17 @@ const CustomNavigationContainer = ({ children }) => {
 };
 
 function MainAppContent() {
+    const navigationRef = useRef();
+
+      const handleInternetDisconnected = useCallback(() => {
+  
+    if (navigationRef.current) {
+      navigationRef.current.reset({
+        index: 0,
+        routes: [{ name: "Login" }],
+      });
+    }
+  }, []);
     return (
         <QueryClientProvider client={new QueryClient()}>
             <SafeAreaProvider>
@@ -122,6 +134,9 @@ function MainAppContent() {
                         <AuthProvider>
                             <SocketProvider>
                             <AccessFromAuth>
+                                  <InternetConnectionMonitor 
+                    onInternetDisconnected={handleInternetDisconnected} 
+                  />
                                 <CustomNavigationContainer>
                                     <RootNavigator />
                                 </CustomNavigationContainer>
@@ -168,7 +183,7 @@ function LanguageAwareApp() {
     return <MainAppContent />;
 }
 
-// Biometric Authentication Wrapper Component
+
 function BiometricAuthWrapper({ children }) {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [isCheckingAuth, setIsCheckingAuth] = useState(true);
@@ -217,7 +232,6 @@ function BiometricAuthWrapper({ children }) {
                     onPress={() => {
                         setIsCheckingAuth(true);
                         setIsAuthenticated(false);
-                        // Retry authentication after a short delay
                         setTimeout(async () => {
                             const authResult = await authenticateWithBiometrics();
                             setIsAuthenticated(authResult);

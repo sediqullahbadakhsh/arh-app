@@ -24,7 +24,7 @@ import ServiceHeader from "../../components/ServiceHeader";
 import PrimaryButton from "../../components/PrimaryButton";
 import { codeToFlag } from "../../utils/flag";
 import { DIAL_CODES, guessOperator } from "../../constants/dialing";
-import { getCountries, makeRecharge, getCurrencies, getSlabs,  getOrderStatus } from "../../services/customerAPIOrder";
+import { getCountries, makeRecharge, getCurrencies, getSlabs, getOrderStatus } from "../../services/customerAPIOrder";
 import { getSetaraganMnoId } from "../../utils/getCompanyIdForSetaragan";
 import * as Contacts from 'expo-contacts';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -40,7 +40,6 @@ import { useStripe } from "@stripe/stripe-react-native";
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 const BASE_STEPS = { COUNTRY: 0, NUMBER: 1, AMOUNT: 2, PAY: 3 };
 
-
 const ORDER_STATUS = {
   QUEUED: 'queued',
   PROCESSING: 'processing',
@@ -49,7 +48,7 @@ const ORDER_STATUS = {
   PENDING: 'pending'
 };
 
-export default function TopupFlowScreen({ navigation }) {
+export default function TopupFlowScreen({ navigation, route }) {
   const { t } = useTranslation();
   const { confirmPayment } = useStripe();
   const lastStep = BASE_STEPS.PAY;
@@ -76,7 +75,7 @@ export default function TopupFlowScreen({ navigation }) {
   const [customAfn, setCustomAfn] = useState("");
   const [localNumber, setLocalNumber] = useState("");
   const [cardDetailsComplete, setCardDetailsComplete] = useState(false);
-
+  const [bundleActivated, setBundleActivated] = useState(false);
   const [contactsSlideAnim] = useState(new Animated.Value(screenHeight));
   const [countriesSlideAnim] = useState(new Animated.Value(screenHeight));
   const insets = useSafeAreaInsets();
@@ -87,6 +86,151 @@ export default function TopupFlowScreen({ navigation }) {
   const dial = DIAL_CODES[country?.countryCode] || "";
   const operator = guessOperator(country?.countryCode, localNumber.replace(/\D/g, ""));
 
+  // Calculate amounts with proper slab calculations
+  const calculateTotalAfnAmount = (baseAfn, productItem = null) => {
+    const baseAmount = parseFloat(baseAfn) || 0;
+    const targetProduct = productItem || product;
+    
+    if (!targetProduct) {
+      return baseAmount;
+    }
+
+    let totalAmount = baseAmount;
+    
+    // Apply slab percentage
+    if (targetProduct.slabDetails?.percentage) {
+      totalAmount += baseAmount * (targetProduct.slabDetails.percentage / 100);
+    }
+    
+    // Apply service slab percentage
+    if (targetProduct.serviceSlabDetails?.percentage) {
+      totalAmount += baseAmount * (targetProduct.serviceSlabDetails.percentage / 100);
+    }
+    
+    return totalAmount;
+  };
+
+  const calculateUsdAmount = (afnAmount, productItem = null) => {
+    if (!exchangeRate || !afnAmount) return 0;
+    
+    const totalAfn = calculateTotalAfnAmount(afnAmount, productItem);
+    const usdAmount = totalAfn * exchangeRate;
+    return parseFloat(usdAmount.toFixed(2));
+  };
+
+  const calculateBaseAmount = (afnAmount) => {
+    if (!exchangeRate || !afnAmount) return 0;
+    const baseAmount = parseFloat(afnAmount) * exchangeRate;
+    return parseFloat(baseAmount.toFixed(2));
+  };
+
+  const calculateFeeAmount = (afnAmount, productItem = null) => {
+    if (!exchangeRate || !afnAmount) return 0;
+    
+    const baseAmount = parseFloat(afnAmount) * exchangeRate;
+    const targetProduct = productItem || product;
+    let totalFee = 0;
+    
+    if (targetProduct?.slabDetails?.percentage) {
+      totalFee += baseAmount * (targetProduct.slabDetails.percentage / 100);
+    }
+    
+    if (targetProduct?.serviceSlabDetails?.percentage) {
+      totalFee += baseAmount * (targetProduct.serviceSlabDetails.percentage / 100);
+    }
+    
+    return parseFloat(totalFee.toFixed(2));
+  };
+
+  // Get the actual AFN amount
+  const getActualAfnAmount = () => {
+    if (product && product.price) {
+      return parseFloat(product.price);
+    }
+    if (customAfn && !isNaN(parseFloat(customAfn))) {
+      return parseFloat(customAfn);
+    }
+    return 0;
+  };
+
+  const afn = getActualAfnAmount();
+  const totalAfn = calculateTotalAfnAmount(afn);
+  const usd = calculateUsdAmount(afn);
+  useEffect(() => {
+  console.log("Topup1 route params:", route.params);
+  console.log("Current step:", step);
+  
+  // Check if we have a resend order from navigation params
+  const resendOrder = route.params?.resendOrder;
+  console.log("Resend order detected:", resendOrder);
+  
+  if (resendOrder) {
+    console.log("Processing resend order:", resendOrder);
+    
+    // Pre-fill the phone number
+    if (resendOrder.receiver) {
+      const cleanNumber = resendOrder.receiver.replace(/\D/g, "");
+      console.log("Setting local number to:", cleanNumber);
+      setLocalNumber(cleanNumber);
+    }
+    
+    // Pre-fill the custom amount
+    if (resendOrder.amount) {
+      const amount = parseFloat(resendOrder.amount);
+      if (!isNaN(amount) && amount > 0) {
+        console.log("Setting custom AFN to:", amount);
+        setCustomAfn(amount.toString());
+        setProduct(null); // Clear any selected product
+      }
+    }
+    
+    // Auto-proceed to AMOUNT step only (not PAY)
+    // Don't check for step condition, just proceed after a delay
+    setTimeout(() => {
+      console.log("Auto-proceeding to AMOUNT step");
+      setStep(BASE_STEPS.AMOUNT);
+    }, 500);
+  }
+}, [route.params?.resendOrder]); // Remove step dependency
+
+// Add this useEffect to reset the flow when resend order is detected
+useEffect(() => {
+  const resendOrder = route.params?.resendOrder;
+  if (resendOrder) {
+    console.log("Resend order detected - resetting flow");
+    
+    // Reset to initial state to ensure clean flow
+    setStep(BASE_STEPS.COUNTRY);
+    setProduct(null);
+    setCustomAfn("");
+    
+    // Small delay to allow state reset, then set the values
+    setTimeout(() => {
+      // Pre-fill the phone number
+      if (resendOrder.receiver) {
+        const cleanNumber = resendOrder.receiver.replace(/\D/g, "");
+        console.log("Setting local number to:", cleanNumber);
+        setLocalNumber(cleanNumber);
+      }
+      
+      // Pre-fill the custom amount
+      if (resendOrder.amount) {
+        const amount = parseFloat(resendOrder.amount);
+        if (!isNaN(amount) && amount > 0) {
+          console.log("Setting custom AFN to:", amount);
+          setCustomAfn(amount.toString());
+          setProduct(null);
+        }
+      }
+      
+      // Then proceed to AMOUNT step
+      setTimeout(() => {
+        console.log("Auto-proceeding to AMOUNT step after reset");
+        setStep(BASE_STEPS.AMOUNT);
+      }, 300);
+    }, 100);
+  }
+}, [route.params?.resendOrder]);
   // Clean up polling on unmount
   useEffect(() => {
     return () => {
@@ -96,45 +240,27 @@ export default function TopupFlowScreen({ navigation }) {
     };
   }, []);
 
-  // Play Lottie animation when status changes
   useEffect(() => {
     if (lottieRef.current && (orderStatus === ORDER_STATUS.SUCCEEDED || orderStatus === ORDER_STATUS.FAILED)) {
       lottieRef.current.play();
     }
   }, [orderStatus]);
 
-  const calculateUsdAmount = (afnAmount) => {
-    if (!exchangeRate || !afnAmount) return 0;
-    const baseAmount = parseFloat(afnAmount) * exchangeRate;
-    const feeAmount = baseAmount * (slabPercentage / 100);
-    const totalAmount = baseAmount + feeAmount;
-    return totalAmount.toFixed(2);
+  const handleBundleActivated = () => {
+    setBundleActivated(true);
+    setTimeout(() => {
+      setBundleActivated(false);
+    }, 2000);
   };
 
-  const calculateFeeAmount = (afnAmount) => {
-    if (!exchangeRate || !afnAmount) return 0;
-    const baseAmount = parseFloat(afnAmount) * exchangeRate;
-    const feeAmount = baseAmount * (slabPercentage / 100);
-    return feeAmount.toFixed(2);
-  };
-
-  const calculateBaseAmount = (afnAmount) => {
-    if (!exchangeRate || !afnAmount) return 0;
-    const baseAmount = parseFloat(afnAmount) * exchangeRate;
-    return baseAmount.toFixed(2);
-  };
-
-  const afn = (product && typeof product.afn === "number" ? product.afn : null) ?? (customAfn ? Number(customAfn) : 0);
-  const usd = calculateUsdAmount(afn);
-
-  // Polling function to check order status - same as merchant
+  // Polling function to check order status
   const startPollingOrderStatus = async (orderId) => {
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
     }
 
     let pollCount = 0;
-    const maxPolls = 60; 
+    const maxPolls = 60;
 
     pollingRef.current = setInterval(async () => {
       try {
@@ -150,7 +276,6 @@ export default function TopupFlowScreen({ navigation }) {
           ...statusResponse.data
         }));
 
-        // Stop polling if we reach a final state or max polls
         if (currentStatus === ORDER_STATUS.SUCCEEDED || 
             currentStatus === ORDER_STATUS.FAILED || 
             pollCount >= maxPolls) {
@@ -164,14 +289,13 @@ export default function TopupFlowScreen({ navigation }) {
         }
       } catch (error) {
         console.error("Error polling order status:", error);
-        // Continue polling even if there's an error, but stop after max attempts
         if (pollCount >= maxPolls) {
           clearInterval(pollingRef.current);
           pollingRef.current = null;
           setOrderStatus(ORDER_STATUS.FAILED);
         }
       }
-    }, 3000); // Poll every 3 seconds
+    }, 3000);
   };
 
   useEffect(() => {
@@ -254,10 +378,57 @@ export default function TopupFlowScreen({ navigation }) {
           toValue: 0,
           duration: 300,
           easing: Easing.out(Easing.ease),
+          useNativeDriver: true, 
         }).start(() => setShowContinueButton(false));
       }
     }
   }, [customAfn]);
+
+  const validateMobileNumber = (number, dialCode = "+93") => {
+    const cleanNumber = number.replace(/\D/g, "");
+    
+    let processedNumber = cleanNumber;
+    if (cleanNumber.startsWith('93')) {
+      processedNumber = cleanNumber.substring(2);
+    }
+    
+    if (processedNumber.length > 0 && !processedNumber.startsWith('7')) {
+      return {
+        isValid: false,
+        message: "mobileNumberStartWith7"
+      };
+    }
+
+    if (processedNumber.startsWith('75')) {
+      return {
+        isValid: false,
+        message: "invalidPrefix75"
+      };
+    }
+
+    if (processedNumber.length >= 2) {
+      const prefix = processedNumber.substring(0, 2);
+      const VALID_PREFIXES = ['70','71', '72', '73', '74', '76', '77', '78', '79'];
+      if (!VALID_PREFIXES.includes(prefix)) {
+        return {
+          isValid: false,
+          message: `invalidPrefix ${prefix}`
+        };
+      }
+    }
+    
+    if (processedNumber.length > 0 && processedNumber.length !== 9) {
+      return {
+        isValid: false,
+        message: "mobileNumberMustBe9Digits"
+      };
+    }
+    
+    return {
+      isValid: true,
+      message: ""
+    };
+  };
 
   useEffect(() => {
     const fetchRateAndSlab = async () => {
@@ -348,17 +519,26 @@ export default function TopupFlowScreen({ navigation }) {
     )
     : countries;
 
-  const canNext =
+   const canNext =
     (step === BASE_STEPS.COUNTRY && !!country) ||
-    (step === BASE_STEPS.NUMBER && localNumber.replace(/\D/g, "").length >= 7) ||
+    (step === BASE_STEPS.NUMBER && localNumber.replace(/\D/g, "").length === 9 && validateMobileNumber(localNumber).isValid) ||
     (step === BASE_STEPS.AMOUNT && serviceType === 'recharge' && afn > 0) ||
-    (step === BASE_STEPS.AMOUNT && serviceType === 'bundle') ||
+    (step === BASE_STEPS.AMOUNT && serviceType === 'bundle' && product) ||
     (step === BASE_STEPS.PAY && cardDetailsComplete);
 
   const goBack = () => (step > 0 ? setStep(step - 1) : navigation.goBack());
 
   const goNext = () => {
-    if (!canNext) return;
+    if (!canNext) {
+      console.log("Cannot proceed - conditions not met:", {
+        step,
+        serviceType,
+        product,
+        afn,
+        canNext
+      });
+      return;
+    }
     if (step === BASE_STEPS.AMOUNT && serviceType === 'bundle') {
       Alert.alert(t('comingSoon'), t('bundleComingSoon'));
       return;
@@ -372,16 +552,185 @@ export default function TopupFlowScreen({ navigation }) {
     setLocalNumber("");
   }, [country?.countryCode]);
 
-  const handleSelectPopularAmount = (amount) => {
-    setCustomAfn(String(amount.afn));
-    setProduct(null);
+  // FIXED: Handle popular amount selection
+  const handleSelectPopularAmount = (selectedAmount) => {
+    console.log("Popular amount selected:", selectedAmount);
+    
+    // Set the product immediately
+    if (selectedAmount.product) {
+      setProduct(selectedAmount.product);
+    }
+    
+    // Clear any custom amount
+    setCustomAfn("");
+    
+    // Auto-proceed to payment
     setTimeout(() => {
-      if (canNext) {
-        goNext();
-      }
-    }, 300);
+      console.log("Auto-proceeding to payment...");
+      setStep(BASE_STEPS.PAY);
+    }, 100);
   };
 
+  // FIXED: Recharge function with proper amount handling
+  const recharge = async () => {
+    if (!paymentMethodId) {
+      Alert.alert(t('error'), t('pleaseEnterCardDetails'));
+      return;
+    }
+
+    setLoading(true);
+    
+    try {
+      const operatorId = getSetaraganMnoId(localNumber);
+
+      if (!operatorId) {
+        Alert.alert("Invalid Number", "The number you have added is not matching with any mobile network in Afghanistan");
+        setLoading(false);
+        return;
+      }
+
+      // Validate amount
+      if (afn <= 0) {
+        Alert.alert("Invalid Amount", "Please enter a valid amount greater than 0");
+        setLoading(false);
+        return;
+      }
+
+      const payload = {
+        amount: afn,
+        companyId: "",
+        countryId: country?.id,
+        currency: "AFN",
+        operator: operatorId,
+        productId: product?.id || 1,
+        receiver: localNumber.replace(/\D/g, ""),
+        source: "stripe_card",
+        cardCurrency: "USD",
+        cardAmount: usd,
+        confirmNow: true,
+        paymentMethodId: paymentMethodId,
+        customAmount: customAfn || afn,
+      };
+
+      console.log("Sending recharge payload:", payload);
+
+      const response = await makeRecharge(payload);
+      
+      if (response.status === "queued" || response.status === "processing" || response.success) {
+        setOrderStatus(ORDER_STATUS.QUEUED);
+        setOrderDetails({
+          orderId: response.orderId,
+          txnNumber: response.txnNumber,
+          mobile: `${dial} ${formatLocal(localNumber)}`,
+          amountAfn: afn,
+          usdAmount: usd,
+          date: new Date().toISOString(),
+          operator: operator?.name || "Unknown",
+        });
+        
+        await startPollingOrderStatus(response.orderId);
+      } else if (response.status === "requires_action") {
+        const { error } = await confirmPayment(response.nextAction.clientSecret);
+        if (error) {
+          throw new Error(error.message);
+        } else {
+          setOrderStatus(ORDER_STATUS.QUEUED);
+          setOrderDetails({
+            orderId: response.orderId,
+            txnNumber: response.txnNumber,
+            mobile: `${dial} ${formatLocal(localNumber)}`,
+            amountAfn: afn,
+            usdAmount: usd,
+            date: new Date().toISOString(),
+            operator: operator?.name || "Unknown",
+          });
+          
+          await startPollingOrderStatus(response.orderId);
+        }
+      } else {
+        throw new Error(response.error || 'Payment failed');
+      }
+
+    } catch (error) {
+      console.log("Payment error: ", error);
+      const message = error.response?.data?.error || error.message || t('paymentFailedGeneric');
+      
+      setOrderStatus(ORDER_STATUS.FAILED);
+      setOrderDetails({
+        mobile: `${dial} ${formatLocal(localNumber)}`,
+        amountAfn: afn,
+        usdAmount: usd,
+        date: new Date().toISOString(),
+        operator: operator?.name || "Unknown",
+        error: message
+      });
+    }
+    setLoading(false);
+  };
+
+  // FIXED: Payment summary with correct calculations
+  const getPaymentSummary = () => {
+    const baseAmount = calculateBaseAmount(afn);
+    const feeAmount = calculateFeeAmount(afn);
+    const totalUsd = calculateUsdAmount(afn);
+    
+    // Get slab breakdown for display
+    const slabPercent = product?.slabDetails?.percentage || 0;
+    const serviceSlabPercent = product?.serviceSlabDetails?.percentage || 0;
+    
+    return {
+      mobile: `${dial} ${formatLocal(localNumber)}`,
+      usd: totalUsd,
+      afn: afn,
+      totalAfn: totalAfn,
+      exchangeRate,
+      slabPercentage: slabPercent,
+      serviceSlabPercentage: serviceSlabPercent,
+      calculateBaseAmount: () => baseAmount,
+      calculateFeeAmount: () => feeAmount,
+      baseAmount: baseAmount,
+      feeAmount: feeAmount,
+      totalAmount: totalUsd,
+      product: product
+    };
+  };
+
+  const resetFlow = () => {
+    setOrderStatus(null);
+    setOrderDetails(null);
+    setStep(0);
+    setProduct(null);
+    setCustomAfn("");
+    setLocalNumber("");
+    setCardDetailsComplete(false);
+    setPaymentMethodId(null);
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+
+    if (lottieRef.current) {
+      lottieRef.current.reset();
+    }
+  };
+
+  const handleContactSelect = (phoneNumber) => {
+    if (!phoneNumber) {
+      Alert.alert(t('error'), t('invalidPhoneNumber'));
+      return;
+    }
+
+    let number = phoneNumber.replace(/\D/g, "");
+
+    const countryDialCode = country?.dialCode?.replace('+', '') || DIAL_CODES[country?.countryCode]?.replace('+', '') || '';
+    if (countryDialCode && number.startsWith(countryDialCode)) {
+      number = number.substring(countryDialCode.length);
+    }
+    number = number.replace(/^0+/, '');
+    setLocalNumber(number);
+    setContactsModalVisible(false);
+    setSearchQuery('');
+  };
 
   const getStatusMessage = () => {
     switch (orderStatus) {
@@ -473,142 +822,6 @@ export default function TopupFlowScreen({ navigation }) {
       default:
         return "#6C757D";
     }
-  };
-
-  const resetFlow = () => {
-    setOrderStatus(null);
-    setOrderDetails(null);
-    setStep(0);
-    setProduct(null);
-    setCustomAfn("");
-    setLocalNumber("");
-    setCardDetailsComplete(false);
-    setPaymentMethodId(null);
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current);
-      pollingRef.current = null;
-    }
-
-    if (lottieRef.current) {
-      lottieRef.current.reset();
-    }
-  };
-
-  const recharge = async () => {
-    if (!paymentMethodId) {
-      Alert.alert(t('error'), t('pleaseEnterCardDetails'));
-      return;
-    }
-
-    setLoading(true);
-    
-    try {
-      const operatorId = getSetaraganMnoId(localNumber);
-
-      if (!operatorId) {
-        Alert.alert("Invalid Number", "The number you have added is not matching with any mobile network in Afghanistan");
-        setLoading(false);
-        return;
-      }
-
-      // Validate amount
-      const amountValue = parseFloat(afn);
-      if (isNaN(amountValue) || amountValue <= 0) {
-        Alert.alert("Invalid Amount", "Please enter a valid amount greater than 0");
-        setLoading(false);
-        return;
-      }
-
-      const payload = {
-        amount: afn,
-        companyId: "",
-        countryId: country?.id,
-        currency: "AFN",
-        operator: operatorId,
-        productId: 1,
-        receiver: localNumber.replace(/\D/g, ""),
-        source: "stripe_card",
-        cardCurrency: "USD",
-        cardAmount: usd,
-        confirmNow: true,
-        paymentMethodId: paymentMethodId,
-        customAmount: afn,
-      };
-
-      console.log("Sending recharge payload:", payload);
-
-      const response = await makeRecharge(payload);
-      
-      if (response.status === "queued" || response.status === "processing" || response.success) {
-        setOrderStatus(ORDER_STATUS.QUEUED);
-        setOrderDetails({
-          orderId: response.orderId,
-          txnNumber: response.txnNumber,
-          mobile: `${dial} ${formatLocal(localNumber)}`,
-          amountAfn: afn,
-          usdAmount: usd,
-          date: new Date().toISOString(),
-          operator: operator?.name || "Unknown",
-        });
-        
-        // Start polling for status updates
-        await startPollingOrderStatus(response.orderId);
-      } else if (response.status === "requires_action") {
-        const { error } = await confirmPayment(response.nextAction.clientSecret);
-        if (error) {
-          throw new Error(error.message);
-        } else {
-          setOrderStatus(ORDER_STATUS.QUEUED);
-          setOrderDetails({
-            orderId: response.orderId,
-            txnNumber: response.txnNumber,
-            mobile: `${dial} ${formatLocal(localNumber)}`,
-            amountAfn: afn,
-            usdAmount: usd,
-            date: new Date().toISOString(),
-            operator: operator?.name || "Unknown",
-          });
-          
-          // Start polling for status updates
-          await startPollingOrderStatus(response.orderId);
-        }
-      } else {
-        throw new Error(response.error || 'Payment failed');
-      }
-
-    } catch (error) {
-      console.log("Payment error: ", error);
-      const message = error.response?.data?.error || error.message || t('paymentFailedGeneric');
-      
-      setOrderStatus(ORDER_STATUS.FAILED);
-      setOrderDetails({
-        mobile: `${dial} ${formatLocal(localNumber)}`,
-        amountAfn: afn,
-        usdAmount: usd,
-        date: new Date().toISOString(),
-        operator: operator?.name || "Unknown",
-        error: message
-      });
-    }
-    setLoading(false);
-  };
-
-  const handleContactSelect = (phoneNumber) => {
-    if (!phoneNumber) {
-      Alert.alert(t('error'), t('invalidPhoneNumber'));
-      return;
-    }
-
-    let number = phoneNumber.replace(/\D/g, "");
-
-    const countryDialCode = country?.dialCode?.replace('+', '') || DIAL_CODES[country?.countryCode]?.replace('+', '') || '';
-    if (countryDialCode && number.startsWith(countryDialCode)) {
-      number = number.substring(countryDialCode.length);
-    }
-    number = number.replace(/^0+/, '');
-    setLocalNumber(number);
-    setContactsModalVisible(false);
-    setSearchQuery('');
   };
 
   const ContactsModal = () => {
@@ -780,7 +993,6 @@ export default function TopupFlowScreen({ navigation }) {
     );
   };
 
-
   const OrderStatusScreen = () => (
     <View style={{ flex: 1, paddingBottom: 100, }}>
       <ScrollView
@@ -916,19 +1128,18 @@ export default function TopupFlowScreen({ navigation }) {
                 product={product}
                 setProduct={setProduct}
                 customAfn={customAfn}
-                setCustomAfn={(v) => {
-                  setCustomAfn(v);
-                  if (product && !product.custom) setProduct(null);
-                }}
+                setCustomAfn={setCustomAfn}
                 usd={usd}
                 afn={afn}
+                totalAfn={totalAfn}
                 onEditNumber={() => jumpTo(BASE_STEPS.NUMBER)}
                 exchangeRate={exchangeRate}
                 slabPercentage={slabPercentage}
                 calculateBaseAmount={calculateBaseAmount}
                 calculateFeeAmount={calculateFeeAmount}
-                loadingData={loadingData}
+                calculateTotalAfnAmount={calculateTotalAfnAmount}
                 calculateUsdAmount={calculateUsdAmount}
+                loadingData={loadingData}
                 serviceType={serviceType}
                 setServiceType={setServiceType}
                 showPopularAmounts={showPopularAmounts}
@@ -937,20 +1148,16 @@ export default function TopupFlowScreen({ navigation }) {
                 continueButtonAnim={continueButtonAnim}
                 onContinue={goNext}
                 canContinue={canNext}
+                country={country}
+                localNumber={localNumber}
+                dial={dial}
+                onBundleActivated={handleBundleActivated}
               />
             )}
 
             {step === BASE_STEPS.PAY && (
               <StepPay
-                summary={{
-                  mobile: `${dial} ${formatLocal(localNumber)}`,
-                  usd,
-                  afn,
-                  exchangeRate,
-                  slabPercentage,
-                  calculateBaseAmount: () => calculateBaseAmount(afn),
-                  calculateFeeAmount: () => calculateFeeAmount(afn),
-                }}
+                summary={getPaymentSummary()}
                 onEditAmount={() => jumpTo(BASE_STEPS.AMOUNT)}
                 onCardDetailsChange={(complete, methodId) => {
                   setCardDetailsComplete(complete);

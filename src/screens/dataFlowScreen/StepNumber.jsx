@@ -31,7 +31,7 @@ const getOperatorLogo = (operatorName) => {
   return OPERATOR_LOGOS.default;
 };
 
-const VALID_PREFIXES = ['71', '72', '73', '74', '76', '77', '78', '79'];
+const VALID_PREFIXES = ['70','71', '72', '73', '74', '76', '77', '78', '79'];
 const validateMobileNumber = (number) => {
   const cleanNumber = number.replace(/\D/g, "");
   
@@ -214,9 +214,34 @@ function StepNumber({
         <View style={{ marginTop: 10, minHeight: 24 }}>
         </View>
       )}
+       <View style={styles.watermarkContainer}>
+              <Image 
+                source={require('../../../assets/logo4.png')} 
+                style={styles.watermarkLogo}
+                resizeMode="contain"
+              />
+            </View>
     </View>
   );
 }
+
+const styles = {
+  watermarkContainer: {
+    position: 'absolute',
+    top: 300,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: -1,
+  },
+  watermarkLogo: {
+    width: 270,
+    height: 270,
+    opacity: 0.1, 
+  }
+};
 
 function hexFade(hex, op) {
   const n = hex.replace("#", "");

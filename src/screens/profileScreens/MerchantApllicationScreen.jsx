@@ -12,12 +12,17 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Animated,
+  Easing,
+  Dimensions,
+  RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import { Colors } from "../../theme/colors";
 import AuthHeader from "../../components/AuthHeader";
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import InputField from "../../components/InputField";
 import PrimaryButton from "../../components/PrimaryButton";
 import { COUNTRIES } from "../../constants/countries";
@@ -26,31 +31,67 @@ import {
   getCountries, 
   getDistricts, 
   getProvinces, 
-  merchantSignup 
+  applyForMerchant,
+  getMyMerchantApplication
 } from "../../services/merchantApi";
 import { useAuth } from "../../auth/AuthProvider";
 import { useTranslation } from "react-i18next";
 import { useModal } from "../../hooks/useModal";
 import ValidationModal from "../../components/ValidationModal";
+import SuccessModal from "../../components/modals/SuccessModal";
+import ErrorModal from "../../components/modals/ErrorModal";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const LANGS = ["english", "dari", "pashto"];
 const GAP = 1;
+const { height: screenHeight } = Dimensions.get('window');
+
+const STATUS_CONFIG = {
+  pending: {
+    color: "#FFA500",
+    bgColor: "#FFF3E0",
+    icon: "time-outline",
+    title: "Application Pending",
+    message: "Your application is under review. We'll get back to you soon."
+  },
+  accepted: {
+    color: "#4CAF50",
+    bgColor: "#E8F5E8",
+    icon: "checkmark-circle-outline",
+    title: "Application Accepted",
+    message: "Congratulations! Your merchant application has been approved."
+  },
+  rejected: {
+    color: "#F44336",
+    bgColor: "#FFEBEE",
+    icon: "close-circle-outline",
+    title: "Application Rejected",
+    message: "Your application has been rejected."
+  },
+  abandoned: {
+    color: "#9E9E9E",
+    bgColor: "#F5F5F5",
+    icon: "alert-circle-outline",
+    title: "Application Abandoned",
+    message: "This application was abandoned and cannot be resubmitted."
+  }
+};
 
 export default function MerchantApplicationScreen({ navigation }) {
   const { user } = useAuth();
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const { modal, showModal, hideModal } = useModal();
+  
+  // Form states
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [mobileNumber, setMobileNumber] = useState("");
   const [alternativeContact, setAlternativeContact] = useState("");
-  const [businessName, setBusinessName] = useState("");
-  const [businessType, setBusinessType] = useState("");
-  const [taxId, setTaxId] = useState("");
-  const {t} = useTranslation();
+  const { t } = useTranslation();
   const [countries, setCountries] = useState([]);
   const [provinces, setProvinces] = useState([]);
   const [districts, setDistricts] = useState([]);
@@ -59,12 +100,26 @@ export default function MerchantApplicationScreen({ navigation }) {
   const [district, setDistrict] = useState(null);
   const [address, setAddress] = useState("");
   const [messageLanguage, setMessageLanguage] = useState("");
-
-
   const [photoUri, setPhotoUri] = useState(null);
 
+  // Modal states
   const [picker, setPicker] = useState({ open: false, type: null });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [modalSlideAnim] = useState(new Animated.Value(screenHeight));
+  const insets = useSafeAreaInsets();
 
+  // Image picker states
+  const [showImagePicker, setShowImagePicker] = useState(false);
+  const [imagePickerSlideAnim] = useState(new Animated.Value(screenHeight));
+
+  // Success/Error modals
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  // Application status state
+  const [existingApplication, setExistingApplication] = useState(null);
+  const [applicationLoading, setApplicationLoading] = useState(true);
 
   useEffect(() => {
     if (user) {
@@ -78,6 +133,39 @@ export default function MerchantApplicationScreen({ navigation }) {
     }
   }, [user]);
 
+  // Check for existing application on mount
+  useEffect(() => {
+    checkExistingApplication();
+  }, []);
+
+  const checkExistingApplication = async () => {
+    try {
+      setApplicationLoading(true);
+      const response = await getMyMerchantApplication();
+      if (response.success && response.data) {
+        setExistingApplication(response.data);
+        
+        // If application exists and is not rejected, prevent new application
+        if (response.data.status !== "rejected") {
+          showModal(
+            "Existing Application",
+            `You already have a ${response.data.status} application.`
+          );
+        }
+      }
+    } catch (error) {
+      console.error("Error checking existing application:", error);
+      // It's okay if no application exists
+    } finally {
+      setApplicationLoading(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await checkExistingApplication();
+    setRefreshing(false);
+  };
 
   useEffect(() => {
     const getAllCountries = async () => {
@@ -86,7 +174,7 @@ export default function MerchantApplicationScreen({ navigation }) {
         setCountries(res?.data || []);
       } catch (error) {
         console.error("Error fetching countries:", error);
-        Alert.alert("Error", "Failed to load countries");
+        showModal("Error", "Failed to load countries");
       }
     };
     getAllCountries();
@@ -108,7 +196,6 @@ export default function MerchantApplicationScreen({ navigation }) {
     }
   }, [country?.id]);
 
- 
   useEffect(() => {
     if (province?.id) {
       const getAllDistricts = async () => {
@@ -123,6 +210,79 @@ export default function MerchantApplicationScreen({ navigation }) {
       getAllDistricts();
     }
   }, [province?.id]);
+
+  // Bottom sheet animations
+  useEffect(() => {
+    if (picker.open) {
+      Animated.timing(modalSlideAnim, {
+        toValue: 0,
+        duration: 350,
+        easing: Easing.out(Easing.back(1)),
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(modalSlideAnim, {
+        toValue: screenHeight,
+        duration: 250,
+        easing: Easing.in(Easing.ease),
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [picker.open]);
+
+  // Image picker modal animations
+  useEffect(() => {
+    if (showImagePicker) {
+      Animated.timing(imagePickerSlideAnim, {
+        toValue: 0,
+        duration: 350,
+        easing: Easing.out(Easing.back(1)),
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(imagePickerSlideAnim, {
+        toValue: screenHeight,
+        duration: 250,
+        easing: Easing.in(Easing.ease),
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [showImagePicker]);
+
+  const filteredData = useMemo(() => {
+    if (!searchQuery) {
+      switch (picker.type) {
+        case 'country': return countries;
+        case 'province': return provinces;
+        case 'district': return districts;
+        case 'lang': return LANGS;
+        default: return [];
+      }
+    }
+
+    const query = searchQuery.toLowerCase();
+    switch (picker.type) {
+      case 'country':
+        return countries.filter(item => 
+          item.countryName?.toLowerCase().includes(query) ||
+          item.countryCode?.toLowerCase().includes(query)
+        );
+      case 'province':
+        return provinces.filter(item => 
+          item.provinceName?.toLowerCase().includes(query)
+        );
+      case 'district':
+        return districts.filter(item => 
+          item.districtName?.toLowerCase().includes(query)
+        );
+      case 'lang':
+        return LANGS.filter(item => 
+          item.toLowerCase().includes(query)
+        );
+      default:
+        return [];
+    }
+  }, [searchQuery, picker.type, countries, provinces, districts]);
 
   const next = () => {
     if (validateStep(step)) {
@@ -141,107 +301,403 @@ export default function MerchantApplicationScreen({ navigation }) {
         }
         if (!/\S+@\S+\.\S+/.test(email)) {
           showModal("Validation Error", "Please enter a valid email address");
-          Alert.alert("Validation Error", "Please enter a valid email address");
           return false;
         }
         return true;
-     
-       
+      case 1:
+        if (!country?.id || !province?.id || !district?.id || !address.trim()) {
+          showModal("Validation Error", "Please fill all required address fields");
+          return false;
+        }
+        return true;
+      case 2:
+        if (!photoUri) {
+          showModal("Validation Error", "Please take a profile photo");
+          return false;
+        }
+        return true;
       default:
         return true;
     }
   };
 
-
-  const takePhoto = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== "granted") {
-      alert("Camera permission is required.");
-      return;
-    }
-    const res = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      quality: 0.7,
-    });
-    if (!res.canceled) {
-      const uri = res.assets?.[0]?.uri;
-      if (uri) setPhotoUri(uri);
-    }
-  };
-
-  const pickIdFile = async () => {
-    const res = await DocumentPicker.getDocumentAsync({
-      type: ["image/*", "application/pdf"],
-      copyToCacheDirectory: true,
-      multiple: false,
-    });
-    if (res.canceled) return;
-    const file = res.assets ? res.assets[0] : res;
-    setIdFile({
-      uri: file.uri,
-      name: file.name || "id_document",
-      mimeType: file.mimeType,
-    });
-  };
-
-  const pickBusinessDoc = async () => {
-    const res = await DocumentPicker.getDocumentAsync({
-      type: ["image/*", "application/pdf"],
-      copyToCacheDirectory: true,
-      multiple: false,
-    });
-    if (res.canceled) return;
-    const file = res.assets ? res.assets[0] : res;
-    setBusinessDoc({
-      uri: file.uri,
-      name: file.name || "business_document",
-      mimeType: file.mimeType,
-    });
-  };
-
   const submitApplication = async () => {
     if (!validateStep(2)) return;
+
+    // Check if user has an existing application that's not rejected
+    if (existingApplication && existingApplication.status !== "rejected") {
+      showModal(
+        "Existing Application", 
+        `You already have a ${existingApplication.status} application. You cannot submit a new one.`
+      );
+      return;
+    }
 
     setSubmitting(true);
     try {
       const payload = {
-        username: `${firstName} ${lastName}`,
-        email: email,
-        mobileNumber: mobileNumber,
-        user_type: "agent",
-        status: "active",
-        profile_picture: null, 
+        alternativeContact,
         country: country?.id,
         province: province?.id,
         district: district?.id,
-        address: address,
-        alternativeContact: alternativeContact,
-        messageLanguage: messageLanguage,
-        accountType: "merchant",
-        registrationType: "indirect",
-        parentAgentId: null,
+        address,
+        messageLanguage,
       };
 
-      const response = await merchantSignup(payload);
+      const response = await applyForMerchant(payload);
       
       if (response.success) {
-        navigation.replace("ApplicationResult", {
-          type: "merchant",
-          title: "Application Submitted",
-          message: "Your merchant application has been submitted successfully. We'll review your application and contact you within 3-5 business days.",
-          cta: "Back to Profile",
-        });
+        setExistingApplication(response.data);
+        setShowSuccessModal(true);
       } else {
-        Alert.alert("Application Failed", response.message || "Failed to submit application");
+        setErrorMessage(response.message || "Failed to submit application");
+        setShowErrorModal(true);
       }
     } catch (error) {
       console.error("Application error:", error);
-      Alert.alert("Error", "Failed to submit application. Please try again.");
+      let errorMsg = "Failed to submit application. Please try again.";
+      
+      if (error.response) {
+        errorMsg = error.response.data?.error || error.response.data?.message || errorMsg;
+        if (error.response.data.existingApplication) {
+          setExistingApplication(error.response.data.existingApplication);
+        }
+      } else if (error.request) {
+        errorMsg = "Network error. Please check your connection and try again.";
+      } else if (error.message) {
+        errorMsg = error.message;
+      } else if (typeof error === 'string') {
+        errorMsg = error;
+      } else if (error.error) {
+        errorMsg = error.error;
+      }
+      
+      setErrorMessage(errorMsg);
+      setShowErrorModal(true);
     } finally {
       setSubmitting(false);
     }
   };
 
+  const takePhoto = async () => {
+    setShowImagePicker(false);
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== "granted") {
+        setErrorMessage("Camera permission is required.");
+        setShowErrorModal(true);
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setPhotoUri(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error taking photo:', error);
+      setErrorMessage("Failed to open camera. Please try again.");
+      setShowErrorModal(true);
+    }
+  };
+
+  const pickFromGallery = async () => {
+    setShowImagePicker(false);
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        setErrorMessage("Photo library permission is required.");
+        setShowErrorModal(true);
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setPhotoUri(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      setErrorMessage("Failed to open image gallery. Please try again.");
+      setShowErrorModal(true);
+    }
+  };
+
+  const removePhoto = () => {
+    setShowImagePicker(false);
+    setPhotoUri(null);
+  };
+
+  const handleSuccessClose = () => {
+    setShowSuccessModal(false);
+    navigation.goBack();
+  };
+
+  const handleErrorClose = () => {
+    setShowErrorModal(false);
+    setErrorMessage("");
+  };
+
+  const PickerModal = () => (
+    <Modal
+      visible={picker.open}
+      transparent={true}
+      animationType="none"
+      statusBarTranslucent={true}
+      onRequestClose={() => setPicker({ open: false })}
+    >
+      <View style={styles.modalOverlay}>
+        <TouchableOpacity 
+          style={styles.modalBackdrop}
+          activeOpacity={1}
+          onPress={() => setPicker({ open: false })}
+        />
+        <Animated.View 
+          style={[
+            styles.modalCard,
+            { 
+              transform: [{ translateY: modalSlideAnim }],
+              height: '70%',
+              marginBottom: -insets.bottom
+            }
+          ]}
+        >
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>
+              {picker.type === 'country' && 'Select Country'}
+              {picker.type === 'province' && 'Select Province'}
+              {picker.type === 'district' && 'Select District'}
+              {picker.type === 'lang' && 'Select Language'}
+            </Text>
+            <TouchableOpacity 
+              onPress={() => setPicker({ open: false })}
+              style={styles.closeButton}
+            >
+              <Ionicons name="close" size={24} color="#666" />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.searchContainer}>
+            <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
+            <TextInput
+              placeholder={`Search ${picker.type}...`}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              style={styles.searchInput}
+              placeholderTextColor="#999"
+            />
+          </View>
+
+          <FlatList
+            data={filteredData}
+            keyExtractor={(item, index) => 
+              picker.type === 'country' ? item.countryCode : 
+              picker.type === 'province' ? item.id :
+              picker.type === 'district' ? item.id : 
+              item + index
+            }
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.modalRow}
+                onPress={() => {
+                  switch (picker.type) {
+                    case 'country': setCountry(item); break;
+                    case 'province': setProvince(item); break;
+                    case 'district': setDistrict(item); break;
+                    case 'lang': setMessageLanguage(item); break;
+                  }
+                  setPicker({ open: false });
+                  setSearchQuery('');
+                }}
+              >
+                {picker.type === 'country' && (
+                  <Text style={{ fontSize: 24, marginRight: 12 }}>
+                    {codeToFlag(item.countryCode)}
+                  </Text>
+                )}
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: Colors.textPrimary, fontSize: 16, fontWeight: '500' }}>
+                    {picker.type === 'country' ? item.countryName :
+                     picker.type === 'province' ? item.provinceName :
+                     picker.type === 'district' ? item.districtName : item}
+                  </Text>
+                  {picker.type === 'country' && (
+                    <Text style={{ color: Colors.textSecondary, fontSize: 14 }}>
+                      +{item.dialCode}
+                    </Text>
+                  )}
+                </View>
+                {(picker.type === 'country' && item.countryCode === country?.countryCode) ||
+                 (picker.type === 'province' && item.id === province?.id) ||
+                 (picker.type === 'district' && item.id === district?.id) ||
+                 (picker.type === 'lang' && item === messageLanguage) ? (
+                  <Ionicons name="checkmark-circle" size={24} color={Colors.primary} />
+                ) : null}
+              </TouchableOpacity>
+            )}
+            ItemSeparatorComponent={() => <View style={styles.separator} />}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Ionicons name="search-outline" size={48} color="#999" />
+                <Text style={styles.emptyText}>No results found</Text>
+              </View>
+            }
+          />
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+
+  const ImagePickerModal = () => (
+    <Modal
+      visible={showImagePicker}
+      transparent={true}
+      animationType="none"
+      statusBarTranslucent={true}
+      onRequestClose={() => setShowImagePicker(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <TouchableOpacity 
+          style={styles.modalBackdrop}
+          activeOpacity={1}
+          onPress={() => setShowImagePicker(false)}
+        />
+        <Animated.View 
+          style={[
+            styles.imagePickerContainer,
+            { transform: [{ translateY: imagePickerSlideAnim }] }
+          ]}
+        >
+          <View style={styles.pickerHeader}>
+            <Text style={styles.pickerTitle}>Choose Profile Photo</Text>
+            <TouchableOpacity 
+              onPress={() => setShowImagePicker(false)}
+              style={styles.closeButton}
+            >
+              <Ionicons name="close" size={24} color="#666" />
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.pickerOptions}>
+            <TouchableOpacity 
+              style={styles.optionButton}
+              onPress={takePhoto}
+            >
+              <View style={[styles.optionIcon, { backgroundColor: '#007AFF' }]}>
+                <Ionicons name="camera" size={24} color="#fff" />
+              </View>
+              <Text style={styles.optionText}>Take Photo</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.optionButton}
+              onPress={pickFromGallery}
+            >
+              <View style={[styles.optionIcon, { backgroundColor: '#34C759' }]}>
+                <Ionicons name="images" size={24} color="#fff" />
+              </View>
+              <Text style={styles.optionText}>Choose from Gallery</Text>
+            </TouchableOpacity>
+            
+            {photoUri && (
+              <TouchableOpacity 
+                style={styles.optionButton}
+                onPress={removePhoto}
+              >
+                <View style={[styles.optionIcon, { backgroundColor: '#FF3B30' }]}>
+                  <Ionicons name="trash" size={24} color="#fff" />
+                </View>
+                <Text style={styles.optionText}>Remove Photo</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+
+  // Render application status if exists
+  if (applicationLoading) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
+        <AuthHeader
+          title="Apply for Merchant Account"
+          onBack={() => navigation.goBack()}
+        />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={styles.loadingText}>Checking application status...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (existingApplication && existingApplication.status !== "rejected") {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
+        <AuthHeader
+          title="Application Status"
+          onBack={() => navigation.goBack()}
+        />
+        <ScrollView
+          contentContainerStyle={styles.container}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
+          <ApplicationStatusCard application={existingApplication} />
+          
+          {existingApplication.status === "pending" && (
+            <View style={styles.pendingActions}>
+              <Text style={styles.pendingInfo}>
+                Your application is being reviewed. We'll notify you once a decision is made.
+              </Text>
+            
+            </View>
+          )}
+
+          {existingApplication.status === "accepted" && (
+            <View style={styles.acceptedActions}>
+              <Text style={styles.acceptedInfo}>
+                Congratulations! Your merchant account has been approved. You can now access merchant features.
+              </Text>
+              <PrimaryButton
+                label="Go to Merchant Dashboard"
+                onPress={() => navigation.replace("MerchantDashboard")}
+                style={styles.fullButton}
+              />
+            </View>
+          )}
+
+          {existingApplication.status === "abandoned" && (
+            <View style={styles.abandonedActions}>
+              <Text style={styles.abandonedInfo}>
+                This application was abandoned and cannot be resubmitted. Please contact support for assistance.
+              </Text>
+              <TouchableOpacity 
+                style={styles.contactSupportBtn}
+                onPress={() => navigation.navigate("Support")}
+              >
+                <Ionicons name="chatbubble-outline" size={18} color={Colors.primary} />
+                <Text style={styles.contactSupportText}>Contact Support</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  // Render application form
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
       <AuthHeader
@@ -249,256 +705,274 @@ export default function MerchantApplicationScreen({ navigation }) {
         onBack={() => (step === 0 ? navigation.goBack() : back())}
       />
 
-    
-      <ScrollView
-        contentContainerStyle={styles.container}
+      {existingApplication?.status === "rejected" && (
+        <View style={styles.rejectedBanner}>
+          <Ionicons name="information-circle" size={20} color="#FFF" />
+          <Text style={styles.rejectedBannerText}>
+            Your previous application was rejected. You can submit a new application.
+          </Text>
+        </View>
+      )}
+
+      <KeyboardAwareScrollView
+        contentContainerStyle={{ flexGrow: 1 }}
+        enableOnAndroid
+        extraScrollHeight={20}
         keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
       >
-        <ValidationModal
-        visible={modal.visible}
-        title={modal.title}
-        message={modal.message}
-        onClose={hideModal}
-      />
+        <ScrollView
+          contentContainerStyle={styles.container}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <ValidationModal
+            visible={modal.visible}
+            title={modal.title}
+            message={modal.message}
+            onClose={hideModal}
+          />
 
-        {step === 0 && (
-          <>
-            <Text style={styles.sectionTitle}>{t('personalInformation')}</Text>
+          {step === 0 && (
+            <>
+              <Text style={styles.sectionTitle}>{t('personalInformation')}</Text>
 
-            <LabeledInput
-              label={t("firstName")}
-              value={firstName}
-              onChangeText={setFirstName}
-              placeholder={t("enterFirstName")}
-              required
-            />
-            <LabeledInput
-              label={t("lastName")}
-              value={lastName}
-              onChangeText={setLastName}
-              placeholder={t("enterLastName")}
-              required
-            />
-            <LabeledInput
-              label={t("email")}
-              value={email}
-              onChangeText={setEmail}
-              placeholder={t("enterYourEmailAddress")}
-              keyboardType="email-address"
-              required
-            />
-            <LabeledInput
-              label={t("mobileNumber")}
-              value={mobileNumber}
-              onChangeText={setMobileNumber}
-              placeholder={t("enterMobileNumber")}
-              keyboardType="phone-pad"
-              required
-            />
-            <LabeledInput
-              label={t("alternativeContact")}
-              value={alternativeContact}
-              onChangeText={setAlternativeContact}
-              placeholder={t("enterAlternativeContact")}
-              keyboardType="phone-pad"
-            />
-
-            <PrimaryButton
-              label={t("continue")}
-              onPress={next}
-              style={styles.fullButton}
-            />
-          </>
-        )}
-
-        {step === 1 && (
-          <>
-
-
-            <DropField
-              label={t("country")}
-              value={country?.countryName || "Select Country"}
-              onPress={() => setPicker({ open: true, type: "country" })}
-              leftIcon={
-                country ? <Text style={{ fontSize: 18 }}>{codeToFlag(country.countryCode)}</Text> : null
-              }
-              required
-            />
-            <DropField
-              label={t("province")}
-              value={province?.provinceName || "Select Province"}
-              onPress={() => setPicker({ open: true, type: "province" })}
-              required
-            />
-            <DropField
-              label={t("district")}
-              value={district?.districtName || "Select District"}
-              onPress={() => setPicker({ open: true, type: "district" })}
-              required
-            />
-            <LabeledInput
-              label={t("fulladdress")}
-              value={address}
-              onChangeText={setAddress}
-              placeholder={t("enterFulladdress")}
-              required
-            />
-            <DropField
-              label={t("preferredCommunicationLanguage")}
-              value={messageLanguage || "Select Language"}
-              onPress={() => setPicker({ open: true, type: "lang" })}
-            />
-
-            <View style={styles.rowButtons}>
-              <DarkButton
-                label={t("back")}
-                onPress={back}
-                style={styles.halfButton}
+              <LabeledInput
+                label={t("firstName")}
+                value={firstName}
+                onChangeText={setFirstName}
+                placeholder={t("enterFirstName")}
+                required
               />
+              <LabeledInput
+                label={t("lastName")}
+                value={lastName}
+                onChangeText={setLastName}
+                placeholder={t("enterLastName")}
+                required
+              />
+              <LabeledInput
+                label={t("email")}
+                value={email}
+                onChangeText={setEmail}
+                placeholder={t("enterYourEmailAddress")}
+                keyboardType="email-address"
+                required
+              />
+              <LabeledInput
+                label={t("mobileNumber")}
+                value={mobileNumber}
+                onChangeText={setMobileNumber}
+                placeholder={t("enterMobileNumber")}
+                keyboardType="phone-pad"
+                required
+              />
+              <LabeledInput
+                label={t("alternativeContact")}
+                value={alternativeContact}
+                onChangeText={setAlternativeContact}
+                placeholder={t("enterAlternativeContact")}
+                keyboardType="phone-pad"
+              />
+
               <PrimaryButton
                 label={t("continue")}
                 onPress={next}
-                style={styles.halfButton}
+                style={styles.fullButton}
               />
-            </View>
-          </>
-        )}
+            </>
+          )}
 
-        {step === 2 && (
-          <>
-            <Text style={styles.sectionTitle}>{t('documentUpload')}</Text>
-            <Text style={styles.subtitle}>{t('pleaseUploadRequiredDocsForVerification')}</Text>
+          {step === 1 && (
+            <>
+              <Text style={styles.sectionTitle}>{t('addressInformation')}</Text>
 
-        
-            <View style={styles.uploadSection}>
-              <Text style={styles.uploadLabel}>{t('profilePhoto')}</Text>
-              <View style={styles.photoBox}>
-                {photoUri ? (
-                  <Image
-                    source={{ uri: photoUri }}
-                    style={{ width: "100%", height: "100%" }}
-                  />
-                ) : (
-                  <View style={styles.photoPlaceholder}>
-                    <Ionicons name="person" size={40} color="#9E9E9E" />
-                  </View>
-                )}
+              <DropField
+                label={t("country")}
+                value={country?.countryName || "Select Country"}
+                onPress={() => setPicker({ open: true, type: "country" })}
+                leftIcon={
+                  country ? <Text style={{ fontSize: 18 }}>{codeToFlag(country.countryCode)}</Text> : null
+                }
+                required
+              />
+              <DropField
+                label={t("province")}
+                value={province?.provinceName || "Select Province"}
+                onPress={() => setPicker({ open: true, type: "province" })}
+                required
+              />
+              <DropField
+                label={t("district")}
+                value={district?.districtName || "Select District"}
+                onPress={() => setPicker({ open: true, type: "district" })}
+                required
+              />
+              <LabeledInput
+                label={t("fulladdress")}
+                value={address}
+                onChangeText={setAddress}
+                placeholder={t("enterFulladdress")}
+                required
+              />
+              <DropField
+                label={t("preferredCommunicationLanguage")}
+                value={messageLanguage || "Select Language"}
+                onPress={() => setPicker({ open: true, type: "lang" })}
+              />
+
+              <View style={styles.rowButtons}>
+                <DarkButton
+                  label={t("back")}
+                  onPress={back}
+                  style={styles.halfButton}
+                />
+                <PrimaryButton
+                  label={t("continue")}
+                  onPress={next}
+                  style={styles.halfButton}
+                />
               </View>
-              <TouchableOpacity
-                style={styles.uploadButton}
-                onPress={takePhoto}
-              >
-                <Ionicons name="camera-outline" size={18} color="#fff" />
-                <Text style={styles.uploadButtonText}>
-                  {photoUri ? "Change Photo" : "Take Photo"}
-                </Text>
-              </TouchableOpacity>
-            </View>
+            </>
+          )}
 
-     
+          {step === 2 && (
+            <>
+              <Text style={styles.sectionTitle}>{t('kycInformation')}</Text>
+              <Text style={styles.subtitle}>{t('pleaseUploadRequiredDocsForVerification')}</Text>
 
-            <View style={styles.rowButtons}>
-              <DarkButton
-                label={t("back")}
-                onPress={back}
-                style={styles.halfButton}
-              />
-              <TouchableOpacity
-                style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
-                onPress={submitApplication}
-                disabled={submitting}
-              >
-                {submitting ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <>
-                    <Ionicons name="send-outline" size={18} color="#fff" />
-                    <Text style={styles.submitButtonText}>{t('submitApplication')}</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
-          </>
-        )}
-      </ScrollView>
-
-
-      <Modal
-        transparent
-        visible={picker.open}
-        animationType="fade"
-        statusBarTranslucent
-        presentationStyle="overFullScreen"
-        onRequestClose={() => setPicker({ open: false })}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {picker.type === "country" ? "Select Country" :
-                 picker.type === "province" ? "Select Province" :
-                 picker.type === "district" ? "Select District" : "Select Language"}
-              </Text>
-              <TouchableOpacity
-                onPress={() => setPicker({ open: false })}
-                style={{ padding: 6 }}
-              >
-                <Ionicons name="close" size={20} color="#333" />
-              </TouchableOpacity>
-            </View>
-
-            <FlatList
-              data={
-                picker.type === "country" ? countries :
-                picker.type === "province" ? provinces :
-                picker.type === "district" ? districts : LANGS
-              }
-              keyExtractor={(item, index) => 
-                picker.type === "country" ? item.countryCode :
-                picker.type === "province" ? item.id.toString() :
-                picker.type === "district" ? item.id.toString() : item + index
-              }
-              ItemSeparatorComponent={() => <View style={{ height: GAP }} />}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.modalRow}
-                  onPress={() => {
-                    if (picker.type === "country") setCountry(item);
-                    if (picker.type === "province") setProvince(item);
-                    if (picker.type === "district") setDistrict(item);
-                    if (picker.type === "lang") setMessageLanguage(item);
-                    setPicker({ open: false });
-                  }}
-                  activeOpacity={0.85}
+              <View style={styles.uploadSection}>
+                <Text style={styles.uploadLabel}>{t('profilePhoto')} *</Text>
+                <TouchableOpacity 
+                  style={styles.photoBox}
+                  onPress={() => setShowImagePicker(true)}
                 >
-                  {picker.type === "country" && (
-                    <Text style={{ fontSize: 18, marginRight: 8 }}>
-                      {codeToFlag(item.countryCode)}
-                    </Text>
+                  {photoUri ? (
+                    <Image
+                      source={{ uri: photoUri }}
+                      style={{ width: "100%", height: "100%" }}
+                    />
+                  ) : (
+                    <View style={styles.photoPlaceholder}>
+                      <Ionicons name="camera-outline" size={40} color="#9E9E9E" />
+                      <Text style={styles.photoPlaceholderText}>Tap to add photo</Text>
+                    </View>
                   )}
-                  <Text style={{ flex: 1, fontSize: 15, color: Colors.textPrimary }}>
-                    {picker.type === "country" ? item.countryName :
-                     picker.type === "province" ? item.provinceName :
-                     picker.type === "district" ? item.districtName : item}
-                  </Text>
-                  {(picker.type === "country" && item.countryCode === country?.countryCode) ||
-                   (picker.type === "province" && item.id === province?.id) ||
-                   (picker.type === "district" && item.id === district?.id) ||
-                   (picker.type === "lang" && item === messageLanguage) ? (
-                    <Ionicons name="checkmark-circle" color={Colors.primary} size={18} />
-                  ) : null}
                 </TouchableOpacity>
-              )}
-            />
-          </View>
-        </View>
-      </Modal>
+                <Text style={styles.photoHint}>
+                  {photoUri ? "Tap the photo to change" : "Tap to take or select a profile photo"}
+                </Text>
+              </View>
+
+              <View style={styles.rowButtons}>
+                <DarkButton
+                  label={t("back")}
+                  onPress={back}
+                  style={styles.halfButton}
+                />
+                <TouchableOpacity
+                  style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
+                  onPress={submitApplication}
+                  disabled={submitting}
+                >
+                  {submitting ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <>
+                      <Ionicons name="send-outline" size={18} color="#fff" />
+                      <Text style={styles.submitButtonText}>{t('submitApplication')}</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+        </ScrollView>
+      </KeyboardAwareScrollView>
+
+      <PickerModal />
+      <ImagePickerModal />
+
+      <SuccessModal
+        visible={showSuccessModal}
+        onClose={handleSuccessClose}
+        title="Application Submitted Successfully!"
+        message="Your merchant application has been submitted. We'll review your application and contact you soon."
+        buttonText="Continue"
+        autoHideDuration={0}
+      />
+
+      <ErrorModal
+        visible={showErrorModal}
+        onClose={handleErrorClose}
+        title="Application Failed"
+        message={errorMessage}
+        buttonText="Try Again"
+        showRetryButton={true}
+      />
     </SafeAreaView>
   );
 }
 
+// Application Status Card Component
+const ApplicationStatusCard = ({ application }) => {
+  const statusConfig = STATUS_CONFIG[application.status] || STATUS_CONFIG.pending;
+  
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
 
+  return (
+    <View style={[styles.statusCard, { backgroundColor: statusConfig.bgColor }]}>
+      <View style={styles.statusHeader}>
+        <View style={[styles.statusIcon, { backgroundColor: statusConfig.color }]}>
+          <Ionicons name={statusConfig.icon} size={24} color="#FFF" />
+        </View>
+        <View style={styles.statusTextContainer}>
+          <Text style={[styles.statusTitle, { color: statusConfig.color }]}>
+            {statusConfig.title}
+          </Text>
+          <Text style={styles.statusMessage}>
+            {statusConfig.message}
+          </Text>
+        </View>
+      </View>
+      
+      <View style={styles.statusDetails}>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Application ID:</Text>
+          <Text style={styles.detailValue}>#{application.id}</Text>
+        </View>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Submitted:</Text>
+          <Text style={styles.detailValue}>{formatDate(application.appliedAt)}</Text>
+        </View>
+        {application.reviewedAt && (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Reviewed:</Text>
+            <Text style={styles.detailValue}>{formatDate(application.reviewedAt)}</Text>
+          </View>
+        )}
+        {application.rejectionReason && (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Reason:</Text>
+            <Text style={[styles.detailValue, styles.rejectionReason]}>
+              {application.rejectionReason}
+            </Text>
+          </View>
+        )}
+      </View>
+    </View>
+  );
+};
+
+// Keep the existing helper components (LabeledInput, DropField, DarkButton) the same
 function LabeledInput({ label, value, onChangeText, placeholder, keyboardType, required }) {
   return (
     <View style={{ marginBottom: 13 }}>
@@ -553,41 +1027,6 @@ function DarkButton({ label, onPress, style, disabled }) {
   );
 }
 
-function StepDot({ index, current, label }) {
-  const active = current === index;
-  const done = current > index;
-  return (
-    <View style={styles.stepItem}>
-      <View
-        style={[
-          styles.stepDot,
-          active && { backgroundColor: Colors.primary, borderColor: Colors.primary },
-          done && { backgroundColor: Colors.primary },
-        ]}
-      >
-        {done ? (
-          <Ionicons name="checkmark" size={12} color="#fff" />
-        ) : (
-          <Text style={[styles.stepNum, active && { color: "#fff" }]}>
-            {index + 1}
-          </Text>
-        )}
-      </View>
-      <Text style={styles.stepLabel} numberOfLines={1}>
-        {label}
-      </Text>
-    </View>
-  );
-}
-
-function StepLine({ active }) {
-  return (
-    <View
-      style={[styles.stepLine, active && { backgroundColor: Colors.primary }]}
-    />
-  );
-}
-
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 24,
@@ -596,74 +1035,257 @@ const styles = StyleSheet.create({
     gap: GAP,
     backgroundColor: Colors.white,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: Colors.textSecondary,
+  },
+  rejectedBanner: {
+    backgroundColor: "#FF6B35",
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    marginHorizontal: 16,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  rejectedBannerText: {
+    color: "#FFF",
+    marginLeft: 8,
+    flex: 1,
+    fontSize: 14,
+  },
+  // Status Card Styles
+  statusCard: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.primary,
+  },
+  statusHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 12,
+  },
+  statusIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  statusTextContainer: {
+    flex: 1,
+  },
+  statusTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  statusMessage: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    lineHeight: 20,
+  },
+  statusDetails: {
+    borderTopWidth: 1,
+    borderTopColor: "rgba(0,0,0,0.1)",
+    paddingTop: 12,
+  },
+  detailRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 8,
+  },
+  detailLabel: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    fontWeight: "500",
+  },
+  detailValue: {
+    fontSize: 14,
+    color: Colors.textPrimary,
+    fontWeight: "600",
+    textAlign: "right",
+    flex: 1,
+    marginLeft: 8,
+  },
+  rejectionReason: {
+    color: "#F44336",
+    fontStyle: "italic",
+  },
+  // Action Styles
+  pendingActions: {
+    alignItems: "center",
+    padding: 16,
+  },
+  pendingInfo: {
+    textAlign: "center",
+    color: Colors.textSecondary,
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  acceptedActions: {
+    alignItems: "center",
+    padding: 16,
+  },
+  acceptedInfo: {
+    textAlign: "center",
+    color: Colors.textSecondary,
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  abandonedActions: {
+    alignItems: "center",
+    padding: 16,
+  },
+  abandonedInfo: {
+    textAlign: "center",
+    color: Colors.textSecondary,
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  contactSupportBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    borderRadius: 8,
+  },
+  contactSupportText: {
+    color: Colors.primary,
+    fontWeight: "600",
+    marginLeft: 8,
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.25)",
-    justifyContent: "center",
-    padding: 24,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
   },
   modalCard: {
-    width: "100%",
-    backgroundColor: "#fff",
-    borderRadius: 14,
-    padding: 14,
-    maxHeight: "70%",
-    elevation: 6,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
+    padding: 16,
+    elevation: 5,
     shadowColor: "#000",
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 8 },
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
   },
   modalHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 8,
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
   },
-  modalTitle: { fontSize: 16, fontWeight: "700", color: Colors.textPrimary },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: Colors.textPrimary,
+  },
+  closeButton: {
+    padding: 4,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    marginBottom: 16,
+    height: 44,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: Colors.textPrimary,
+  },
   modalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+  },
+  separator: {
+    height: 1,
+    backgroundColor: '#F0F0F0',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#999',
+    marginTop: 12,
+  },
+  // Image Picker Styles
+  imagePickerContainer: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
+    padding: 16,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  pickerHeader: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 10,
-    paddingHorizontal: 6,
-    borderRadius: 8,
-    backgroundColor: "#fff",
+    justifyContent: "space-between",
+    marginBottom: 20,
   },
-
-  // Stepper
-  stepperWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 24,
-    paddingTop: 10,
-    backgroundColor: Colors.white,
+  pickerTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: Colors.textPrimary,
   },
-  stepItem: { alignItems: "center" },
-  stepDot: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: "#E5E7EB",
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
+  pickerOptions: {
+    gap: 16,
   },
-  stepNum: { fontSize: 12, color: Colors.textPrimary, fontWeight: "700" },
-  stepLabel: {
-    fontSize: 10,
-    marginTop: 4,
-    color: Colors.textSecondary,
-    width: 72,
-    textAlign: "center",
+  optionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
   },
-  stepLine: {
-    height: 2,
-    width: 28,
-    backgroundColor: "#E5E7EB",
-    marginHorizontal: 8,
+  optionIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
   },
-
+  optionText: {
+    fontSize: 16,
+    color: Colors.textPrimary,
+    fontWeight: '500',
+  },
+  // Form Styles
   sectionTitle: {
     fontSize: 16,
     color: Colors.textPrimary,
@@ -681,7 +1303,6 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     fontWeight: "500",
   },
-
   dropField: {
     height: 46,
     borderRadius: 8,
@@ -692,10 +1313,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-
-  // Upload Sections
+  // Upload Section Styles
   uploadSection: {
     marginBottom: 20,
+    alignItems: 'center'
   },
   uploadLabel: {
     fontSize: 14,
@@ -704,7 +1325,8 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   photoBox: {
-    height: 120,
+    height: 140,
+    width: 140,
     borderRadius: 8,
     backgroundColor: "#F5F5F5",
     overflow: "hidden",
@@ -716,45 +1338,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#E0E0E0",
   },
-  uploadButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: Colors.primary,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 6,
-    alignSelf: "flex-start",
-  },
-  uploadButtonText: {
-    color: "#fff",
-    fontWeight: "600",
-    marginLeft: 8,
-  },
-  uploadBox: {
-    height: 100,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#D7D7D7",
-    borderStyle: "dashed",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#F9F9F9",
-    padding: 16,
-  },
-  uploadBoxText: {
+  photoPlaceholderText: {
+    fontSize: 14,
     color: "#9E9E9E",
     marginTop: 8,
-    textAlign: "center",
   },
-  uploadHint: {
-    color: "#BDBDBD",
+  photoHint: {
     fontSize: 12,
-    marginTop: 4,
+    color: "#666",
     textAlign: "center",
   },
-
-  // Buttons
+  // Button Styles
   fullButton: { marginTop: 12 },
   rowButtons: {
     flexDirection: "row",

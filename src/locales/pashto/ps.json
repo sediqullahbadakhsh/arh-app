@@ -391,5 +391,78 @@
       "validUrl": "لطفاً یو باوري URL ولیکئ"
     }
   },
-  "promoCodes": "د تخفیف کوډونه"
+  "promoCodes": "د تخفیف کوډونه",
+   "onboarding": {
+    "slide1": {
+      "title": "هر وخت، هر ځای چارج کړی",
+      "subtitle": "اعتبار او انټرنټ په هر موبایل شمیره کې په هر هیواد کې — فوراً ولېږی."
+    },
+    "slide2": {
+      "title": "ټول شبکې. ټول پانګې.",
+      "subtitle": "په ټولو شبکو کې چارج کړی، د خپلې غوره پانګې سره او په سیمه ایز اسعارو کې تادیه کړی."
+    },
+    "slide3": {
+      "title": "ستاسې امنیت، زمونږ لومړیتوب",
+      "subtitle": "د بانک درجې انکرپشن، OTP ها او ریښتینی مونیتورینګ، ستاسې معاملې ساتي."
+    },
+    "skip": "تیرول", 
+    "next": "بل",
+    "getStarted": "پیل کړی"
+  },
+   "otpVerification": {
+    "title": "د OTP تایید",
+    "infoEmail": "مونږ یو {{length}} رقمي کوډ {{target}} ته لیږلې.",
+    "infoPhone": "مونږ یو {{length}} رقمي کوډ {{target}} ته لیږلې.",
+    "resendText": "کوډ بیا لیږل په ",
+    "resend": "بیا لیږل",
+    "didNotReceive": "OTP نه دی ترلاسه کړی؟",
+    "verify": "تایید",
+    "enterCode": "لطفاً {{length}} رقمي کوډ دننه کړی.",
+    "success": "بریالیتوب",
+    "verificationFailed": "تایید ناشونی",
+    "otpResent": "OTP په بریالیتوب سره بیا لیږل شو",
+    "resendFailed": "د OTP بیا لیږل ناشونی. بیا هڅه وکړی.",
+    "emailVerified": "ستاسې بریښنالیک تایید شو. اوس نو کولی شئ ننوځی.",
+    "unsupportedMode": "نابریالی حالت",
+    
+    "helpModal": {
+      "title": "OTP نه دی ترلاسه کړی؟",
+      "subtitle": "لطفاً لاندې څیزونه وګورئ:",
+      "checkEmail": "تأیید کړی چې تاسې سم بریښنالیک پته دننه کړې",
+      "checkJunk": "خپل کثافات/جونک فولډر وګورئ",
+      "checkMailbox": "تأیید کړی چې ستاسې بریښنالیک صندوق ډک نه دی",
+      "checkDomain": "تأیید کړی چې ستاسې بریښنالیک ډومین سم او عملیاتی دی \"د خپل ډومین ارائه کوونکي سره اړیکه ونیسئ\"",
+      "edit": "سمون",
+      "resendOtp": "OTP بیا لیږل",
+      "close": "تړل"
+    }
+  },
+    "receipt": {
+    "title": "رسید",
+    "transactionReceipt": "د معاملې رسید",
+    "topupSuccessful": "چارج بریالی شو!",
+    "topupFailed": "چارج نابریالی شو",
+    "processingTopup": "چارج په جریان کې دی",
+    "transactionDetails": "د معاملې جزئیات",
+    "totalAmount": "ټوله اندازه",
+    "thankYou": "د yes Charge د کارولو لپاره مننه",
+    "transactionId": "د معاملې پېژند",
+    "dateTime": "نېټه او وخت",
+    "receiver": "ترلاسه کوونکی",
+    "service": "خدمت",
+    "status": "حالت",
+    "processing": "په جریان کې...",
+    "done": "ترسره شو",
+    "shareReceipt": "رسید شریک کړئ",
+    "downloadReceipt": "رسید ډاونلوډ کړئ",
+    "permissionRequired": "اجازه ضروري ده",
+    "grantPermission": "د رسیدونو د ډاونلوډ لپاره د میډیا کتابخونې اجازې ورکړئ.",
+    "downloadSuccess": "بریالیتوب",
+    "downloadSuccessMessage": "رسید ستاسې گالري ته ډاونلوډ شو!",
+    "downloadError": "تېروتنه",
+    "downloadErrorMessage": "د رسید ډاونلوډ ناشونی. بیا هڅه وکړئ.",
+    "pleaseWait": "لطفاً انتظار وکړئ",
+    "preparingReceipt": "رسید چمتو کېږي..."
+  },
+  "receipt1": "رسید"
 }
