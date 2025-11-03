@@ -72,12 +72,14 @@ export default function TabNavigator() {
       component: OrdersScreen,
       show: can(() => access?.can?.(ACTIONS.SEE_CONTACTS) && canUse(SCREENS?.CONTACTS)),
     },
+    
     {
       name: "TopupTab",
       label: t('tabs.topup'),
       icon: "zap",
       component: TopupFlowScreen,
       show: true,
+      initialParams: {}
     },
     {
       name: "Notifications",

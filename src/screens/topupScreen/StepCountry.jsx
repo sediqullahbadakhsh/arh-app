@@ -1,4 +1,4 @@
-import { Text, TouchableOpacity, View } from "react-native";
+import { Text, TouchableOpacity, View, Image } from "react-native";
 import TopUpStyles from "./TopupStyle";
 import { useState } from "react";
 import { Colors } from "../../theme/colors";
@@ -12,7 +12,7 @@ function StepCountry({ country, onOpen }) {
   const [isFocused, setIsFocused] = useState(false);
 
   return (
-    <View style={{ marginTop: 16 }}>
+    <View style={{ marginTop: 16, flex: 1 }}>
       <Text style={TopUpStyles.sectionTitle}>{t('selectCountry')}</Text>
       <TouchableOpacity
         style={[
@@ -47,8 +47,35 @@ function StepCountry({ country, onOpen }) {
         </View>
         <Ionicons name="chevron-down" size={20} color="#7A7A7A" />
       </TouchableOpacity>
+
+
+      <View style={styles.watermarkContainer}>
+        <Image 
+          source={require('../../../assets/logo4.png')} 
+          style={styles.watermarkLogo}
+          resizeMode="contain"
+        />
+      </View>
     </View>
   );
 }
+
+const styles = {
+  watermarkContainer: {
+    position: 'absolute',
+    top: 300,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: -1,
+  },
+  watermarkLogo: {
+    width: 270,
+    height: 270,
+    opacity: 0.1, 
+  }
+};
 
 export default StepCountry;

@@ -25,13 +25,14 @@ import {
   getCustomerPromoCodeUsage,
   applyForPromoCode 
 } from "../../services/promoCodeApi";
+import ServiceHeader from "../../components/ServiceHeader";
 
 export default function PromoCodesScreen({ navigation }) {
   const { user } = useAuth();
   const { t } = useTranslation();
   const { showModal, modal, hideModal } = useModal();
   
-  const [activeTab, setActiveTab] = useState("apply"); // "apply" or "usage"
+  const [activeTab, setActiveTab] = useState("apply"); 
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [statusData, setStatusData] = useState(null);
@@ -110,30 +111,17 @@ export default function PromoCodesScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+              <ServiceHeader 
+                title={t('promoCodes')}
+                onBack={() => navigation.goBack()} 
+              />
       <ValidationModal
         visible={modal.visible}
         title={modal.title}
         message={modal.message}
         onClose={hideModal}
       />
-
-
-      <LinearGradient
-        colors={["#9F0901", "#E20E02"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.header}
-      >
-        <View style={styles.headerContent}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Ionicons name="arrow-back" size={24} color="#fff" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>{t('promoCode.title')}</Text>
-          <View style={styles.headerRight} />
-        </View>
+    
 
 
         {statusData && (
@@ -162,7 +150,7 @@ export default function PromoCodesScreen({ navigation }) {
             )}
           </View>
         )}
-      </LinearGradient>
+  
 
  
       <View style={styles.tabContainer}>
@@ -212,18 +200,19 @@ export default function PromoCodesScreen({ navigation }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+    paddingBottom: 100,
     backgroundColor: Colors.white,
   },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 20,
-  },
+  // header: {
+  //   paddingHorizontal: 20,
+  //   paddingTop: 20,
+  //   paddingBottom: 20,
+  // },
   headerContent: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 15,
+    // marginBottom: 15,
   },
   backButton: {
     padding: 5,

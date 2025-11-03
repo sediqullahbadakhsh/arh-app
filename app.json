@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "arh",
-    "slug": "arh",
+    "name": "yes charge",
+    "slug": "yes-charge",
     "version": "1.0.0",
     "orientation": "portrait",
-    "owner": "khanzada123",
+    "owner": "ahmad2028",
     "icon": "./assets/icon.png",
     "assetBundlePatterns": [
       "**/*"
@@ -33,7 +33,9 @@
       },
       "permissions": [
         "INTERNET",
-        "ACCESS_NETWORK_STATE"
+        "ACCESS_NETWORK_STATE",
+        "CAMERA",
+        "WRITE_EXTERNAL_STORAGE"
       ],
       "usesCleartextTraffic": true
     },
@@ -42,7 +44,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "9b8473e8-2b17-4675-8f26-eba1bef60ae3"
+        "projectId": "b5d11eff-12f9-41d0-90cc-24f02bcce686"
       }
     },
     "plugins": [
@@ -55,29 +57,16 @@
             "compileSdkVersion": 35,
             "targetSdkVersion": 35,
             "buildToolsVersion": "34.0.0",
-            "enableProguardInReleaseBuilds": false,
-            "enableShrinkResourcesInReleaseBuilds": false,
-            "enableMinifyInReleaseBuilds": false,
-            "extraGradleProperties": {
-              "newArchEnabled": "true"
-            },
-            "packagingOptions": {
-              "pickFirst": [
-                "**/libc++_shared.so",
-                "**/libfbjni.so"
-              ],
-              "exclude": [
-                "META-INF/DEPENDENCIES",
-                "META-INF/LICENSE",
-                "META-INF/LICENSE.txt",
-                "META-INF/license.txt",
-                "META-INF/NOTICE",
-                "META-INF/NOTICE.txt",
-                "META-INF/notice.txt",
-                "META-INF/ASL2.0"
+            "usesCleartextTraffic": true,
+            "networkSecurityConfig": {
+              "cleartextTrafficPermitted": true,
+              "domains": [
+                "3.67.144.22",
+                "localhost",
+                "10.0.2.2",
+                "127.0.0.1"
               ]
-            },
-            "networkSecurityConfig": "./network-security-config.xml"
+            }
           },
           "ios": {
             "deploymentTarget": "15.1"

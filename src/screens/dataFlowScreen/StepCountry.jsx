@@ -1,6 +1,6 @@
 import { useState } from "react";
 import DataStyles from "./DataStyles";
-import { Text, TouchableOpacity, View } from "react-native";
+import { Image, Text, TouchableOpacity, View } from "react-native";
 import { codeToFlag } from "../../utils/flag";
 import { DIAL_CODES } from "../../constants/dialing";
 import { Ionicons } from "@expo/vector-icons";
@@ -44,8 +44,34 @@ function StepCountry({ country, onOpen }) {
         </View>
         <Ionicons name="chevron-down" size={20} color="#7A7A7A" />
       </TouchableOpacity>
+        <View style={styles.watermarkContainer}>
+              <Image 
+                source={require('../../../assets/logo4.png')} 
+                style={styles.watermarkLogo}
+                resizeMode="contain"
+              />
+            </View>
     </View>
   );
 }
+
+const styles = {
+  watermarkContainer: {
+    position: 'absolute',
+    top: 300,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: -1,
+  },
+  watermarkLogo: {
+    width: 270,
+    height: 270,
+    opacity: 0.1, 
+  }
+};
+
 
 export default StepCountry;

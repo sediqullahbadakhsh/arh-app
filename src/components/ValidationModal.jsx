@@ -5,7 +5,7 @@ import Modal from 'react-native-modal';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
 const ValidationModal = ({ visible, title, message, onClose }) => (
-  <Modal isVisible={visible} transparent={true} animationIn="zoomIn" animationOut="fadeOut">
+  <Modal isVisible={visible} transparent={true}    statusBarTranslucent={true} animationIn="zoomIn" animationOut="fadeOut" >
 
     <View style={styles.container}>
       <Icon name="error-outline" size={70} color="#e74c3c" />

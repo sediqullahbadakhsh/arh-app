@@ -30,27 +30,27 @@ const PromoCodeForm = ({ onSubmit, loading, existingData }) => {
   const validateForm = () => {
     const newErrors = {};
 
-    if (!formData.WhatsApp_number.trim()) {
-      newErrors.WhatsApp_number = t('promoCode.errors.whatsappRequired');
-    }
+    // if (!formData.WhatsApp_number.trim()) {
+    //   newErrors.WhatsApp_number = t('promoCode.errors.whatsappRequired');
+    // }
 
-    if (!formData.facebook_link.trim()) {
-      newErrors.facebook_link = t('promoCode.errors.facebookRequired');
-    } else if (!isValidUrl(formData.facebook_link)) {
-      newErrors.facebook_link = t('promoCode.errors.validUrl');
-    }
+    // if (!formData.facebook_link.trim()) {
+    //   newErrors.facebook_link = t('promoCode.errors.facebookRequired');
+    // } else if (!isValidUrl(formData.facebook_link)) {
+    //   newErrors.facebook_link = t('promoCode.errors.validUrl');
+    // }
 
-    if (!formData.tiktok_link.trim()) {
-      newErrors.tiktok_link = t('promoCode.errors.tiktokRequired');
-    } else if (!isValidUrl(formData.tiktok_link)) {
-      newErrors.tiktok_link = t('promoCode.errors.validUrl');
-    }
+    // if (!formData.tiktok_link.trim()) {
+    //   newErrors.tiktok_link = t('promoCode.errors.tiktokRequired');
+    // } else if (!isValidUrl(formData.tiktok_link)) {
+    //   newErrors.tiktok_link = t('promoCode.errors.validUrl');
+    // }
 
-    if (!formData.instagram_link.trim()) {
-      newErrors.instagram_link = t('promoCode.errors.instagramRequired');
-    } else if (!isValidUrl(formData.instagram_link)) {
-      newErrors.instagram_link = t('promoCode.errors.validUrl');
-    }
+    // if (!formData.instagram_link.trim()) {
+    //   newErrors.instagram_link = t('promoCode.errors.instagramRequired');
+    // } else if (!isValidUrl(formData.instagram_link)) {
+    //   newErrors.instagram_link = t('promoCode.errors.validUrl');
+    // }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;

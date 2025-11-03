@@ -275,7 +275,6 @@
   "retryOrder": "تلاش مجدد سفارش",
   "retry": "تلاش مجدد",
   "resend": "ارسال مجدد",
-  "receipt": "رسید",
   "noOrdersFound": "هیچ سفارشی یافت نشد",
   "tryAdjustingSearchOrFilters": "سعی کنید جستجو یا فیلترهای خود را تنظیم کنید",
   "yourOrdersWillAppearHere": "سفارشات شما اینجا ظاهر خواهد شد.",
@@ -391,5 +390,78 @@
       "validUrl": "لطفاً یک آدرس معتبر وارد کنید"
     }
   },
-  "promoCodes": "کدهای تخفیف"
+  "promoCodes": "کدهای تخفیف",
+   "onboarding": {
+    "slide1": {
+      "title": "هر زمان، هر مکان شارژ کنید",
+      "subtitle": "اعتبار و اینترنت را به هر شماره موبایل در هر کشوری — فوراً ارسال کنید."
+    },
+    "slide2": {
+      "title": "همه شبکه ها. همه کیف پول ها.",
+      "subtitle": "شارژ در تمام شبکه ها، با کیف پول مورد علاقه خود و به ارز محلی پرداخت کنید."
+    },
+    "slide3": {
+      "title": "امنیت شما، اولویت ما",
+      "subtitle": "رمزگذاری درجه بانکی، OTP ها و نظارت بلادرنگ، تراکنش های شما را ایمن نگه می دارد."
+    },
+    "skip": "رد کردن", 
+    "next": "بعدی",
+    "getStarted": "شروع کنید"
+  },
+   "otpVerification": {
+    "title": "تاییدیه OTP",
+    "infoEmail": "ما یک کد {{length}} رقمی به {{target}} ارسال کردیم.",
+    "infoPhone": "ما یک کد {{length}} رقمی به {{target}} ارسال کردیم.",
+    "resendText": "ارسال مجدد کد در ",
+    "resend": "ارسال مجدد",
+    "didNotReceive": "OTP دریافت نکردید؟",
+    "verify": "تایید",
+    "enterCode": "لطفاً کد {{length}} رقمی را وارد کنید.",
+    "success": "موفقیت",
+    "verificationFailed": "تاییدیه ناموفق بود",
+    "otpResent": "OTP با موفقیت مجدداً ارسال شد",
+    "resendFailed": "ارسال مجدد OTP ناموفق بود. لطفاً دوباره تلاش کنید.",
+    "emailVerified": "ایمیل شما تایید شد. اکنون می‌توانید وارد شوید.",
+    "unsupportedMode": "حالت پشتیبانی نشده",
+    
+    "helpModal": {
+      "title": "OTP دریافت نکردید؟",
+      "subtitle": "لطفاً موارد زیر را بررسی کنید:",
+      "checkEmail": "تأیید کنید که آدرس ایمیل صحیح را وارد کرده‌اید",
+      "checkJunk": "پوشه زباله/اسپم خود را بررسی کنید",
+      "checkMailbox": "تأیید کنید که صندوق ایمیل شما پر نیست",
+      "checkDomain": "تأیید کنید که دامنه ایمیل شما صحیح و فعال است \"با ارائه‌دهنده دامنه خود تماس بگیرید\"",
+      "edit": "ویرایش",
+      "resendOtp": "ارسال مجدد OTP",
+      "close": "بستن"
+    }
+  },
+  "receipt": {
+    "title": "رسید",
+    "transactionReceipt": "رسید معامله",
+    "topupSuccessful": "شارژ موفقانه بود!",
+    "topupFailed": "شارژ ناموفق بود",
+    "processingTopup": "در حال پردازش شارژ",
+    "transactionDetails": "جزئیات معامله",
+    "totalAmount": "مبلغ کل",
+    "thankYou": "بابت استفاده از yes Charge تشکر می‌کنیم",
+    "transactionId": "شناسه معامله",
+    "dateTime": "تاریخ و زمان",
+    "receiver": "گیرنده",
+    "service": "سرویس",
+    "status": "وضعیت",
+    "processing": "در حال پردازش...",
+    "done": "تکمیل",
+    "shareReceipt": "اشتراک گذاری رسید",
+    "downloadReceipt": "دانلود رسید",
+    "permissionRequired": "مجوز مورد نیاز",
+    "grantPermission": "لطفاً مجوزهای کتابخانه رسانه را برای دانلود رسیدها اعطا کنید.",
+    "downloadSuccess": "موفقیت",
+    "downloadSuccessMessage": "رسید به گالری شما دانلود شد!",
+    "downloadError": "خطا",
+    "downloadErrorMessage": "دانلود رسید ناموفق بود. لطفاً دوباره تلاش کنید.",
+    "pleaseWait": "لطفاً صبر کنید",
+    "preparingReceipt": "رسید در حال آماده سازی است..."
+  },
+  "receipt1": "رسید"
 }

@@ -8,7 +8,7 @@ export const loginWithPassword = ({ identifier, password }) =>
   api.post("/login", { identifier, password }).then((r) => r.data);
 
 export const loginOtpGenerate = (identifier) =>
-  api.post("/login/otp/generate", { identifier }).then((r) => r.data);
+  api.post("/login/otp/generate", { identifier }).then((r) => r.data); // ← Change endpoint and parameter
 
 export const loginOtpVerify = ({ identifier, otp }) =>
   api.post("/login/otp/verify", { identifier, otp }).then((r) => r.data);

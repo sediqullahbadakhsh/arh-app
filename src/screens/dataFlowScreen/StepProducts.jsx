@@ -1,13 +1,12 @@
+import React, { useState, useEffect, useMemo } from "react";
 import { Image, Text, TouchableOpacity, View, ScrollView, FlatList, TextInput } from "react-native";
 import { getMnoLogo } from "../../utils/getMnoLogo";
 import DataStyles from "./DataStyles";
 import { Ionicons } from "@expo/vector-icons";
-import { codeToFlag } from "../../utils/flag";
 import { Colors } from "../../theme/colors";
 import { getSetaraganMnoId } from "../../utils/getCompanyIdForSetaragan";
 import formatLocal from "../../utils/formatLocal";
-
-
+import { getDataProductsCustomer } from "../../services/merchantApi";
 
 function StepProducts({
   country,
@@ -20,8 +19,61 @@ function StepProducts({
   setProduct,
   onEditNumber,
   summary,
+  productCategories,
 }) {
-  const categories = ["Data", "Voice", "SMS", "Combo"];
+  const [productTypes, setProductTypes] = useState([]);
+  const [selectedProductType, setSelectedProductType] = useState(null);
+  const [filteredProducts, setFilteredProducts] = useState([]);
+
+  // Extract unique product types from products
+  useEffect(() => {
+    if (products && products.length > 0) {
+      const uniqueTypes = [];
+      const seenTypes = new Set();
+      
+      products.forEach(product => {
+        if (product.productTypeDetails && product.productTypeDetails.id && !seenTypes.has(product.productTypeDetails.id)) {
+          seenTypes.add(product.productTypeDetails.id);
+          uniqueTypes.push({
+            id: product.productTypeDetails.id,
+            productType: product.productTypeDetails.productType || "Unknown Type",
+            description: product.productTypeDetails.description || ""
+          });
+        }
+      });
+      
+      console.log("Extracted product types:", uniqueTypes);
+      setProductTypes(uniqueTypes);
+      
+      if (uniqueTypes.length > 0) {
+        setSelectedProductType(uniqueTypes[0]);
+      }
+    }
+  }, [products]);
+
+  // Filter products based on selected product type and search
+  useEffect(() => {
+    let filtered = products;
+    
+    // Filter by product type
+    if (selectedProductType?.id) {
+      filtered = filtered.filter(product => 
+        product.productTypeId === selectedProductType.id
+      );
+    }
+    
+    // Filter by search
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      filtered = filtered.filter((p) =>
+        p.productName?.toLowerCase().includes(q) ||
+        p.description?.toLowerCase().includes(q) ||
+        p.price?.toString().includes(q)
+      );
+    }
+    
+    setFilteredProducts(filtered);
+  }, [products, selectedProductType, search]);
 
   const renderItem = ({ item }) => {
     const active = product?.id === item.id;
@@ -44,6 +96,11 @@ function StepProducts({
             <Text style={[DataStyles.bundleDesc, active && { color: Colors.primary }]}>
               {item.description || "High-speed internet bundle"}
             </Text>
+            {item.productTypeDetails && (
+              <Text style={{ fontSize: 12, color: Colors.textSecondary, marginTop: 4 }}>
+                Type: {getProductTypeName(item.productTypeDetails)}
+              </Text>
+            )}
           </View>
         </View>
         <View style={DataStyles.bundleFooter}>
@@ -58,41 +115,61 @@ function StepProducts({
     );
   };
 
+  const getCategoryName = (categoryItem) => {
+    if (!categoryItem) return "";
+    
+    if (typeof categoryItem.category_name === 'string') {
+      return categoryItem.category_name;
+    } else if (categoryItem.category_name?.en) {
+      return categoryItem.category_name.en;
+    } else if (categoryItem.category_name) {
+      const firstKey = Object.keys(categoryItem.category_name)[0];
+      return categoryItem.category_name[firstKey];
+    }
+    
+    return categoryItem.name || "Unnamed Category";
+  };
+
+  const getProductTypeName = (typeItem) => {
+    if (!typeItem) return "";
+    
+    if (typeof typeItem.productType === 'string') {
+      return typeItem.productType;
+    } else if (typeItem.productType?.en) {
+      return typeItem.productType.en;
+    } else if (typeItem.productType) {
+      const firstKey = Object.keys(typeItem.productType)[0];
+      return typeItem.productType[firstKey];
+    }
+    
+    return typeItem.name || "Unknown Type";
+  };
+
   return (
-    <View style={{ marginTop: 12 }}>
-      {/* <View style={DataStyles.editHeader}>
-        <Text style={DataStyles.sectionTitle}>Choose a Bundle</Text>
-        <TouchableOpacity onPress={onEditNumber}>
-          <Text style={DataStyles.editLink}>Change number</Text>
-        </TouchableOpacity>
-      </View>
+    <View>
 
-      <Text style={DataStyles.smallLabel}>Country</Text>
-      <View style={DataStyles.countryBadge}>
-        <Text style={{ fontSize: 20, marginRight: 8 }}>
-          {codeToFlag(country?.countryCode)}
-        </Text>
-        <Text style={{ fontWeight: "600", color: Colors.textPrimary }}>
-          {country?.countryName}
-        </Text>
-      </View> */}
 
-      <Text style={DataStyles.smallLabel}>Bundle Category</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={DataStyles.categoriesScroll}>
-        <View style={DataStyles.categoriesContainer}>
-          {categories.map((cat) => (
-            <TouchableOpacity
-              key={cat}
-              style={[DataStyles.categoryChip, category === cat && DataStyles.categoryChipActive]}
-              onPress={() => setCategory(cat)}
-            >
-              <Text style={[DataStyles.categoryText, category === cat && DataStyles.categoryTextActive]}>
-                {cat}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </ScrollView>
+ 
+      {productTypes.length > 0 && (
+        <>
+  
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={DataStyles.categoriesScroll}>
+            <View style={DataStyles.categoriesContainer}>
+              {productTypes.map((type) => (
+                <TouchableOpacity
+                  key={type.id}
+                  style={[DataStyles.categoryChip, selectedProductType?.id === type.id && DataStyles.categoryChipActive]}
+                  onPress={() => setSelectedProductType(type)}
+                >
+                  <Text style={[DataStyles.categoryText, selectedProductType?.id === type.id && DataStyles.categoryTextActive]}>
+                    {getProductTypeName(type)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+        </>
+      )}
 
       <Text style={DataStyles.smallLabel}>Search Bundles</Text>
       <View style={DataStyles.searchContainer}>
@@ -107,7 +184,7 @@ function StepProducts({
       </View>
 
       <FlatList
-        data={products}
+        data={filteredProducts}
         keyExtractor={(item) => item.id?.toString()}
         renderItem={renderItem}
         ItemSeparatorComponent={() => <View style={DataStyles.bundleSeparator} />}
@@ -116,7 +193,9 @@ function StepProducts({
         ListEmptyComponent={
           <View style={DataStyles.emptyProducts}>
             <Ionicons name="wifi-outline" size={48} color="#999" />
-            <Text style={DataStyles.emptyProductsText}>No bundles available</Text>
+            <Text style={DataStyles.emptyProductsText}>
+              {productTypes.length > 0 ? "No bundles available for this type" : "No bundles available"}
+            </Text>
           </View>
         }
       />
@@ -125,9 +204,11 @@ function StepProducts({
         <View style={DataStyles.summaryCard}>
           <View style={DataStyles.summaryRow}>
             <Text style={DataStyles.summaryKey}>Mobile Number</Text>
-            <Text style={DataStyles.summaryValue}>
-              {summary.dial} {formatLocal(summary.localNumber)}
-            </Text>
+            <TouchableOpacity onPress={onEditNumber}>
+              <Text style={[DataStyles.summaryValue, { color: Colors.primary }]}>
+                {summary.dial} {formatLocal(summary.localNumber)}
+              </Text>
+            </TouchableOpacity>
           </View>
           <View style={DataStyles.summaryRow}>
             <Text style={DataStyles.summaryKey}>Selected Plan</Text>
@@ -146,7 +227,5 @@ function StepProducts({
     </View>
   );
 }
-
-
 
 export default StepProducts;
