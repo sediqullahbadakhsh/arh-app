@@ -10,6 +10,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../theme/colors";
 import PrimaryButton from "../../components/PrimaryButton";
 import { useTranslation } from "react-i18next";
+import { scale } from "../../utils/normalizeSize";
 
 export default function SuccessScreen({ success, onDone, onTopupMore }) {
   const { t } = useTranslation();
@@ -57,60 +58,60 @@ export default function SuccessScreen({ success, onDone, onTopupMore }) {
 
 const styles = StyleSheet.create({
   container: {
-    padding: 24,
+    padding: scale.hp(3.1),
     alignItems: "center",
   },
   successCircle: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
+    width: scale.wp(23.4),
+    height: scale.wp(23.4),
+    borderRadius: scale.wp(11.7),
     backgroundColor: "rgba(76,175,80,0.1)",
     borderWidth: 2,
     borderColor: "rgba(76,175,80,0.35)",
     justifyContent: "center",
     alignItems: "center",
-    marginVertical: 12,
+    marginVertical: scale.hp(1.55),
   },
   successTitle: {
-    fontSize: 20,
+    fontSize: scale.hp(2.6),
     fontWeight: "700",
     color: Colors.textPrimary,
-    marginBottom: 16,
+    marginBottom: scale.hp(2.1),
   },
   kv: {
     width: "100%",
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: 6,
+    paddingVertical: scale.hp(0.8),
   },
   k: {
     color: Colors.textSecondary,
-    fontSize: 13,
+    fontSize: scale.hp(1.7),
   },
   v: {
     color: Colors.textPrimary,
-    fontSize: 13,
+    fontSize: scale.hp(1.7),
   },
   totalBox: {
     width: "100%",
     backgroundColor: "#F5F5F7",
-    borderRadius: 12,
-    paddingVertical: 14,
+    borderRadius: scale.hp(1.55),
+    paddingVertical: scale.hp(1.8),
     alignItems: "center",
-    marginVertical: 18,
+    marginVertical: scale.hp(2.35),
   },
   totalLabel: {
     color: Colors.textSecondary,
-    fontSize: 12,
+    fontSize: scale.hp(1.55),
   },
   totalValue: {
     color: Colors.textPrimary,
-    fontSize: 20,
+    fontSize: scale.hp(2.6),
     fontWeight: "700",
   },
   topupMoreText: {
     color: Colors.primary,
-    marginTop: 14,
+    marginTop: scale.hp(1.8),
     fontWeight: "600",
   },
 });

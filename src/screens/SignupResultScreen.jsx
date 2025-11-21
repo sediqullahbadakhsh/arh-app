@@ -9,6 +9,7 @@ import {
 import { Colors } from "../theme/colors";
 import AuthHeader from "../components/AuthHeader";
 import { Ionicons } from "@expo/vector-icons";
+import { scale } from "../utils/normalizeSize";
 
 export default function SignupResultScreen({ navigation, route }) {
   const { type = "customer", title, message, cta } = route.params || {};
@@ -57,46 +58,50 @@ const styles = StyleSheet.create({
   wrap: {
     flex: 1,
     alignItems: "center",
-    paddingHorizontal: 24,
-    paddingTop: 28,
+    paddingHorizontal: scale.wp(6.2),
+    paddingTop: scale.hp(3.6),
   },
   circleOuter: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
+    width: scale.wp(23),
+    height: scale.wp(23),
+    borderRadius: scale.wp(11.5),
     backgroundColor: "#ECFDF5",
     alignItems: "center",
     justifyContent: "center",
   },
   circleInner: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: scale.wp(14.5),
+    height: scale.wp(14.5),
+    borderRadius: scale.wp(7.25),
     backgroundColor: "#E8FFF1",
     alignItems: "center",
     justifyContent: "center",
   },
   h1: {
-    marginTop: 16,
-    fontSize: 18,
+    marginTop: scale.hp(2.1),
+    fontSize: scale.hp(2.35),
     fontWeight: "700",
     color: Colors.textPrimary,
   },
   p: {
-    marginTop: 8,
-    fontSize: 13,
+    marginTop: scale.hp(1.05),
+    fontSize: scale.hp(1.8),
     color: Colors.textSecondary,
     textAlign: "center",
-    lineHeight: 18,
+    lineHeight: scale.hp(2.35),
   },
   btn: {
-    marginTop: 20,
-    height: 50,
-    paddingHorizontal: 20,
+    marginTop: scale.hp(2.6),
+    height: scale.hp(6.5),
+    paddingHorizontal: scale.wp(5.2),
     backgroundColor: Colors.primary,
-    borderRadius: 12,
+    borderRadius: scale.hp(1.55),
     alignItems: "center",
     justifyContent: "center",
   },
-  btnText: { color: "#fff", fontSize: 15, fontWeight: "600" },
+  btnText: {
+    color: "#fff",
+    fontSize: scale.hp(2),
+    fontWeight: "600",
+  },
 });

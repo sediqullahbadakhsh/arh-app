@@ -33,6 +33,7 @@ import ProfileStyles from "./Styles/ProfileStyle";
 import { useTranslation } from "react-i18next";
 import SuccessModal from "../../components/modals/SuccessModal";
 import ErrorModal from "../../components/modals/ErrorModal";
+import { scale } from "../../utils/normalizeSize";
 
 const { height: screenHeight } = Dimensions.get('window');
 
@@ -1029,7 +1030,7 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
         </ScrollView>
       </View>
 
-      {/* Success Modal */}
+   
       <SuccessModal
         visible={showSuccessModal}
         onClose={handleSuccessClose}
@@ -1039,7 +1040,7 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
         autoHideDuration={0}
       />
 
-      {/* Error Modal */}
+ 
       <ErrorModal
         visible={showErrorModal}
         onClose={handleErrorClose}
@@ -1070,7 +1071,7 @@ const styles = {
     zIndex: 999,
   },
   loadingText: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     color: Colors.textPrimary,
     fontWeight: "600",
   },

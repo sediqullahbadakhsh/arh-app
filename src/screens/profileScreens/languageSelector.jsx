@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../theme/colors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { t } from "i18next";
+import { scale } from "../../utils/normalizeSize";
 
 const { height: screenHeight } = Dimensions.get('window');
 
@@ -182,18 +183,18 @@ export default function LanguageSelector({ selectedLang, onChange, langs, loadin
 }
 
 const styles = {
-  label: { 
-    fontSize: 14, 
-    marginBottom: 8,
+  label: {
+    fontSize: scale.hp(1.8),
+    marginBottom: scale.hp(1.05),
     fontWeight: '600',
-    color: Colors.textPrimary
+    color: Colors.textPrimary,
   },
   dropField: {
-    height: 65,
-    borderRadius: 40,
+    height: scale.hp(8.45),
+    borderRadius: scale.hp(5.2),
     borderWidth: 1,
     borderColor: "#E5E7EB",
-    paddingHorizontal: 16,
+    paddingHorizontal: scale.wp(4.2),
     backgroundColor: "#fff",
     flexDirection: "row",
     alignItems: "center",
@@ -202,13 +203,12 @@ const styles = {
   disabled: {
     opacity: 0.6,
   },
-  selected: { 
-    flexDirection: "row", 
+  selected: {
+    flexDirection: "row",
     alignItems: "center",
-    flex: 1
+    flex: 1,
   },
-  
-  // Modal styles matching the country modal
+
   modalOverlay: {
     flex: 1,
     backgroundColor: 'transparent',
@@ -224,57 +224,57 @@ const styles = {
     left: 0,
     right: 0,
     backgroundColor: '#fff',
-    borderTopLeftRadius: 25,
-    borderTopRightRadius: 25,
-    padding: 16,
+    borderTopLeftRadius: scale.hp(3.2),
+    borderTopRightRadius: scale.hp(3.2),
+    padding: scale.hp(2.1),
     elevation: 5,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
+    shadowOffset: { width: 0, height: -scale.hp(0.25) },
     shadowOpacity: 0.25,
-    shadowRadius: 4,
+    shadowRadius: scale.hp(0.5),
   },
   modalHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 16,
-    paddingBottom: 12,
+    marginBottom: scale.hp(2.1),
+    paddingBottom: scale.hp(1.55),
     borderBottomWidth: 1,
     borderBottomColor: "#F0F0F0",
   },
-  modalTitle: { 
-    fontSize: 18, 
-    fontWeight: "700", 
-    color: Colors.textPrimary 
+  modalTitle: {
+    fontSize: scale.hp(2.35),
+    fontWeight: "700",
+    color: Colors.textPrimary,
   },
   closeButton: {
-    padding: 4,
+    padding: scale.hp(0.5),
   },
   modalRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 8,
+    paddingVertical: scale.hp(1.55),
+    paddingHorizontal: scale.wp(2.1),
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F5F5F5',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    marginBottom: 16,
-    height: 44,
+    borderRadius: scale.hp(1.3),
+    paddingHorizontal: scale.wp(3.1),
+    marginBottom: scale.hp(2.1),
+    height: scale.hp(5.7),
   },
   searchIcon: {
-    marginRight: 8,
+    marginRight: scale.wp(2),
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     color: Colors.textPrimary,
   },
   contactSeparator: {
-    height: 1,
+    height: scale.hp(0.13),
     backgroundColor: '#F0F0F0',
   },
 };

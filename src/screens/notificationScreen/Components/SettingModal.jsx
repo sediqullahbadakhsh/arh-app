@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../../theme/colors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
+import { scale } from "../../../utils/normalizeSize";
 
 const { height: screenHeight } = Dimensions.get('window');
 
@@ -165,48 +166,48 @@ const styles = {
     left: 0,
     right: 0,
     backgroundColor: '#fff',
-    borderTopLeftRadius: 25,
-    borderTopRightRadius: 25,
-    padding: 16,
+    borderTopLeftRadius: scale.hp(3.2),
+    borderTopRightRadius: scale.hp(3.2),
+    padding: scale.hp(2.1),
     elevation: 5,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
+    shadowOffset: { width: 0, height: -scale.hp(0.25) },
     shadowOpacity: 0.25,
-    shadowRadius: 4,
-    paddingBottom: 100, 
+    shadowRadius: scale.hp(0.5),
+    paddingBottom: scale.hp(12.9),
   },
   modalHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 16,
-    paddingBottom: 12,
+    marginBottom: scale.hp(2.1),
+    paddingBottom: scale.hp(1.55),
     borderBottomWidth: 1,
     borderBottomColor: "#F0F0F0",
   },
-  modalTitle: { 
-    fontSize: 18, 
-    fontWeight: "700", 
-    color: Colors.textPrimary 
+  modalTitle: {
+    fontSize: scale.hp(2.35),
+    fontWeight: "700",
+    color: Colors.textPrimary,
   },
   closeButton: {
-    padding: 4,
+    padding: scale.hp(0.5),
   },
   modalScrollContent: {
     flex: 1,
   },
   settingsSectionTitle: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     fontWeight: '600',
     color: Colors.textPrimary,
-    marginTop: 16,
-    marginBottom: 12,
+    marginTop: scale.hp(2.1),
+    marginBottom: scale.hp(1.55),
   },
   settingItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: scale.hp(1.55),
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
@@ -216,36 +217,35 @@ const styles = {
     flex: 1,
   },
   settingText: {
-    marginLeft: 12,
+    marginLeft: scale.wp(2.9),
     flex: 1,
   },
   settingTitle: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     color: Colors.textPrimary,
-    marginBottom: 2,
+    marginBottom: scale.hp(0.25),
   },
   settingDescription: {
-    fontSize: 12,
+    fontSize: scale.hp(1.55),
     color: Colors.textSecondary,
-    lineHeight: 16,
+    lineHeight: scale.hp(2.1),
   },
   modalActions: {
-    marginTop: 16,
-    paddingTop: 16,
+    marginTop: scale.hp(2.1),
+    paddingTop: scale.hp(2.1),
     borderTopWidth: 1,
     borderTopColor: '#f0f0f0',
   },
   saveButton: {
     backgroundColor: Colors.primary,
-    padding: 16,
-    borderRadius: 12,
+    padding: scale.hp(2.1),
+    borderRadius: scale.hp(1.55),
     alignItems: 'center',
   },
   saveButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     fontWeight: '600',
   },
 };
-
 export default SettingModal;

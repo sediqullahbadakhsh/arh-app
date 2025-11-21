@@ -3,14 +3,17 @@ import {
   View,
   Text,
   StyleSheet,
-   SafeAreaView,
+  SafeAreaView,
   TouchableOpacity,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../theme/colors";
 import PrimaryButton from "../../components/PrimaryButton";
+import { scale } from "../../utils/normalizeSize";
+import { useTranslation } from "react-i18next";
 
 export default function ApplicationResultScreen({ navigation, route }) {
+  const { t } = useTranslation();
   const { title, message, cta } = route.params;
 
   return (
@@ -24,7 +27,7 @@ export default function ApplicationResultScreen({ navigation, route }) {
         <Text style={styles.message}>{message}</Text>
         
         <PrimaryButton
-          label={cta || "Done"}
+          label={cta || t('done')}
           onPress={() => navigation.navigate("Profile")}
           style={styles.button}
         />
@@ -33,7 +36,7 @@ export default function ApplicationResultScreen({ navigation, route }) {
           style={styles.secondaryButton}
           onPress={() => navigation.navigate("Home")}
         >
-          <Text style={styles.secondaryButtonText}>Go to Home</Text>
+          <Text style={styles.secondaryButtonText}>{t('goToHome')}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -49,35 +52,35 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 24,
+    paddingHorizontal: scale.wp(6.2),
   },
   iconContainer: {
-    marginBottom: 24,
+    marginBottom: scale.hp(3.1),
   },
   title: {
-    fontSize: 24,
+    fontSize: scale.hp(3.1),
     fontWeight: "700",
     color: Colors.textPrimary,
-    marginBottom: 16,
+    marginBottom: scale.hp(2.1),
     textAlign: "center",
   },
   message: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     color: Colors.textSecondary,
     textAlign: "center",
-    marginBottom: 32,
-    lineHeight: 24,
+    marginBottom: scale.hp(4.2),
+    lineHeight: scale.hp(3.1),
   },
   button: {
     width: "100%",
-    marginBottom: 16,
+    marginBottom: scale.hp(2.1),
   },
   secondaryButton: {
-    padding: 16,
+    padding: scale.hp(2.1),
   },
   secondaryButtonText: {
     color: Colors.primary,
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     fontWeight: "600",
   },
 });

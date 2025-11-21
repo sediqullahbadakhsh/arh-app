@@ -1,5 +1,6 @@
 import { StyleSheet } from "react-native";
 import { Colors } from "../../theme/colors";
+import { scale } from "../../utils/normalizeSize";
 
 
 const gameStyles = StyleSheet.create({
@@ -7,36 +8,41 @@ const gameStyles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: 24,
+    padding: scale.hp(3.1),
   },
   badge: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: scale.wp(17.5),
+    height: scale.wp(17.5),
+    borderRadius: scale.wp(8.75),
     backgroundColor: "#FFF5F5",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: scale.hp(1.55),
   },
   title: {
-    fontSize: 20,
+    fontSize: scale.hp(2.6),
     fontWeight: "700",
     color: Colors.textPrimary,
-    marginBottom: 6,
+    marginBottom: scale.hp(0.8),
   },
-  sub: { color: Colors.textSecondary, marginBottom: 16 },
+  sub: {
+    color: Colors.textSecondary,
+    marginBottom: scale.hp(2.1),
+  },
   btn: {
-    paddingHorizontal: 18,
-    height: 44,
-    borderRadius: 22,
-    marginBottom: 100,
+    paddingHorizontal: scale.wp(4.4),
+    height: scale.hp(5.7),
+    borderRadius: scale.hp(2.85),
+    marginBottom: scale.hp(12.9),
     backgroundColor: Colors.primary,
     alignItems: "center",
     justifyContent: "center",
   },
-  btnText: { color: "#fff", fontWeight: "600" },
+  btnText: {
+    color: "#fff",
+    fontWeight: "600",
+  },
 });
-
 
 
 export default gameStyles;

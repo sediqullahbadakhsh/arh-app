@@ -20,11 +20,12 @@ import onboardImage from '../../../assets/onboard.png';
 import securePay1 from '../../../assets/lotties/SecurePay1.json';
 import securep1 from '../../../assets/lotties/Securep1.json';
 import mobile from '../../../assets/lotties/mobile.json';
+import { scale } from "../../utils/normalizeSize";
 
 const { width } = Dimensions.get("window");
 const ILLUSTRATION = onboardImage;
 
-// Updated SLIDES to use translation keys
+
 const getSlides = (t) => [
   {
     key: 's1',
@@ -56,7 +57,7 @@ export default function OnboardingScreen({ navigation }) {
   const lastIndex = SLIDES.length - 1;
   const isLast = index === lastIndex;
 
-  // RTL-aware index calculation
+
   const getAdjustedIndex = useCallback((rawIndex) => {
     return I18nManager.isRTL ? SLIDES.length - 1 - rawIndex : rawIndex;
   }, [SLIDES.length]);
@@ -188,87 +189,86 @@ export default function OnboardingScreen({ navigation }) {
 const HERO_HEIGHT = 240;
 
 const styles = StyleSheet.create({
-  root: { 
-    flex: 1, 
-    paddingBottom: "10%",
+  root: {
+    flex: 1,
+    paddingBottom: '10%', 
     direction: I18nManager.isRTL ? 'rtl' : 'ltr',
   },
   slideInner: {
     flex: 1,
-    paddingHorizontal: 24,
-    alignItems: "center",
+    paddingHorizontal: scale.wp(6), 
+    alignItems: 'center',
   },
   lottie: {
-    width: 400,
-    height: 400,
+    width: scale.wp(100), 
+    height: scale.hp(50), 
   },
   heroArea: {
     height: HERO_HEIGHT,
-    width: "100%",
-    alignItems: "center",
-    justifyContent: "center",
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   heroImage: {
-    width: 230,
-    height: 180,
+    width: scale.wp(57.5), 
+    height: scale.hp(22.5),
   },
   title: {
-    marginTop: 110,
-    fontSize: 20,
-    fontFamily: "dmsansMedium",
+    marginTop: scale.hp(13.75), 
+    fontSize: scale.hp(2.5), 
+    fontFamily: 'dmsansMedium',
     color: Colors.textTitle,
-    textAlign: "center",
+    textAlign: 'center',
     textAlign: I18nManager.isRTL ? 'right' : 'left',
     writingDirection: I18nManager.isRTL ? 'rtl' : 'ltr',
   },
   subtitle: {
-    marginTop: 15,
-    fontSize: 16,
+    marginTop: scale.hp(1.875), 
+    fontSize: scale.hp(2), 
     color: Colors.textSubtitle,
-    textAlign: "center",
-    fontFamily: "dmsansRegular",
-    lineHeight: 26,
-    paddingHorizontal: 6,
+    textAlign: 'center',
+    fontFamily: 'dmsansRegular',
+    lineHeight: scale.hp(3.25), 
+    paddingHorizontal: scale.wp(1.5), 
     writingDirection: I18nManager.isRTL ? 'rtl' : 'ltr',
   },
-  dots: { 
-    alignItems: "center", 
-    marginTop: 10, 
-    marginBottom: 20 
+  dots: {
+    alignItems: 'center',
+    marginTop: scale.hp(1.25),
+    marginBottom: scale.hp(2.5), 
   },
   bottomBar: {
-    paddingHorizontal: 24,
-    paddingTop: 18,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    paddingHorizontal: scale.wp(6), 
+    paddingTop: scale.hp(2.25), 
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     direction: I18nManager.isRTL ? 'rtl' : 'ltr',
   },
-  textBtn: { 
-    paddingHorizontal: 8, 
-    paddingVertical: 8 
+  textBtn: {
+    paddingHorizontal: scale.wp(2), 
+    paddingVertical: scale.hp(1), 
   },
-  textBtnLabel: { 
-    color: Colors.textDark, 
-    fontSize: 18,
+  textBtnLabel: {
+    color: Colors.textDark,
+    fontSize: scale.hp(2.25), 
     writingDirection: I18nManager.isRTL ? 'rtl' : 'ltr',
   },
   primaryBtn: {
-    height: 50,
-    minWidth: 160,
-    paddingHorizontal: 18,
+    height: scale.hp(6.25), 
+    minWidth: scale.wp(40), 
+    paddingHorizontal: scale.wp(4.5), 
     backgroundColor: Colors.primary,
-    borderRadius: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
+    borderRadius: scale.hp(1.5), 
     flexDirection: I18nManager.isRTL ? 'row-reverse' : 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: scale.wp(2), 
   },
-  primaryBtnLabel: { 
-    color: "#fff", 
-    fontSize: 15, 
-    fontWeight: "600",
+  primaryBtnLabel: {
+    color: '#fff',
+    fontSize: scale.hp(1.875), 
+    fontWeight: '600',
     writingDirection: I18nManager.isRTL ? 'rtl' : 'ltr',
   },
 });

@@ -558,7 +558,7 @@ export default function DataFlowScreenMerchant({ navigation }) {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Success Modal */}
+
       <SuccessModal
         visible={showSuccessModal}
         onClose={handleSuccessClose}
@@ -568,7 +568,7 @@ export default function DataFlowScreenMerchant({ navigation }) {
         autoHideDuration={0}
       />
 
-      {/* Error Modal */}
+
       <ErrorModal
         visible={showErrorModal}
         onClose={handleErrorClose}

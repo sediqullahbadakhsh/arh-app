@@ -18,6 +18,7 @@ import UpdateSlabModal from "./UpdateSlabModal";
 import SuccessModal from "./SuccessModal";
 import ErrorModal from "./ErrorModal";
 import DeleteConfirmationModal from "./DeleteConfirmationModal";
+import { scale } from "../../utils/normalizeSize";
 
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -26,7 +27,7 @@ const SlabListModal = ({ visible, onClose, onUpdate, slabs }) => {
   const [selectedSlab, setSelectedSlab] = useState(null);
   const [updateModalVisible, setUpdateModalVisible] = useState(false);
   
-  // Modal states
+
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -34,7 +35,7 @@ const SlabListModal = ({ visible, onClose, onUpdate, slabs }) => {
   const [errorMessage, setErrorMessage] = useState('');
   const [slabToDelete, setSlabToDelete] = useState(null);
 
-  // Modal handlers
+
   const showCustomSuccessModal = (message) => {
     setSuccessMessage(message);
     setShowSuccessModal(true);
@@ -165,7 +166,6 @@ const SlabListModal = ({ visible, onClose, onUpdate, slabs }) => {
         onRequestClose={onClose}
       >
         <View style={styles.modalOverlay}>
-          {/* Full layout backdrop */}
           <TouchableOpacity 
             style={styles.modalBackdrop}
             activeOpacity={1}
@@ -173,7 +173,6 @@ const SlabListModal = ({ visible, onClose, onUpdate, slabs }) => {
           />
           
           <View style={styles.modalContent}>
-            {/* Header */}
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Commission Slabs</Text>
               <TouchableOpacity onPress={onClose} style={styles.closeButton}>
@@ -181,7 +180,7 @@ const SlabListModal = ({ visible, onClose, onUpdate, slabs }) => {
               </TouchableOpacity>
             </View>
 
-            {/* Slabs List */}
+    
             <FlatList
               data={slabs}
               keyExtractor={(item) => item.id}
@@ -202,7 +201,7 @@ const SlabListModal = ({ visible, onClose, onUpdate, slabs }) => {
         </View>
       </Modal>
 
-      {/* Update Slab Modal */}
+
       <UpdateSlabModal
         visible={updateModalVisible}
         onClose={() => {
@@ -214,7 +213,7 @@ const SlabListModal = ({ visible, onClose, onUpdate, slabs }) => {
         slabData={selectedSlab}
       />
 
-      {/* Success Modal */}
+
       <SuccessModal
         visible={showSuccessModal}
         onClose={handleSuccessClose}
@@ -270,43 +269,43 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: "#fff",
-    borderRadius: 12,
+    borderRadius: scale.hp(1.55),
     width: screenWidth * 0.9,
     height: screenHeight * 0.8,
     overflow: "hidden",
-    margin: 20,
+    margin: scale.hp(2.6),
   },
   modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 16,
+    padding: scale.hp(2.1),
     borderBottomWidth: 1,
     borderBottomColor: "#e5e7eb",
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: scale.hp(2.35),
     fontWeight: "600",
     color: Colors.textPrimary,
   },
   closeButton: {
-    padding: 4,
+    padding: scale.hp(0.5),
   },
   listContent: {
-    padding: 16,
+    padding: scale.hp(2.1),
     flexGrow: 1,
   },
   slabItem: {
     flexDirection: "row",
     backgroundColor: "#fff",
-    borderRadius: 10,
-    padding: 16,
+    borderRadius: scale.hp(1.3),
+    padding: scale.hp(2.1),
     borderWidth: 1,
     borderColor: "#e5e7eb",
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: scale.hp(0.13) },
     shadowOpacity: 0.05,
-    shadowRadius: 2,
+    shadowRadius: scale.hp(0.26),
     elevation: 1,
   },
   slabContent: {
@@ -316,51 +315,51 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: 8,
+    marginBottom: scale.hp(1.05),
   },
   slabTitle: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     fontWeight: "600",
     color: Colors.textPrimary,
     flex: 1,
   },
   slabPercentage: {
     backgroundColor: Colors.primary,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    marginLeft: 8,
-    minWidth: 50,
+    paddingHorizontal: scale.wp(2.1),
+    paddingVertical: scale.hp(0.5),
+    borderRadius: scale.hp(0.8),
+    marginLeft: scale.wp(2.1),
+    minWidth: scale.wp(13),
     alignItems: 'center',
   },
   percentageText: {
     color: "#fff",
-    fontSize: 12,
+    fontSize: scale.hp(1.55),
     fontWeight: "600",
   },
   slabDescription: {
-    fontSize: 12,
+    fontSize: scale.hp(1.55),
     color: Colors.textSecondary,
-    marginBottom: 8,
-    lineHeight: 16,
+    marginBottom: scale.hp(1.05),
+    lineHeight: scale.hp(2.1),
   },
   slabMeta: {
-    gap: 2,
+    gap: scale.hp(0.26),
   },
   metaText: {
-    fontSize: 11,
+    fontSize: scale.hp(1.4),
     color: Colors.textSecondary,
   },
   slabActions: {
     justifyContent: "center",
     alignItems: "center",
-    marginLeft: 12,
-    gap: 8,
+    marginLeft: scale.wp(3.1),
+    gap: scale.hp(1.05),
   },
   actionButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
+    width: scale.wp(9.4),
+    height: scale.wp(9.4),
+    borderRadius: scale.hp(1.05),
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
@@ -374,25 +373,25 @@ const styles = StyleSheet.create({
     backgroundColor: "#dc262615",
   },
   separator: {
-    height: 8,
+    height: scale.hp(1.05),
   },
   emptyContainer: {
     alignItems: "center",
-    padding: 40,
+    padding: scale.hp(5.2),
     justifyContent: 'center',
     flex: 1,
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     color: Colors.textSecondary,
-    marginTop: 12,
+    marginTop: scale.hp(1.55),
     textAlign: "center",
     fontWeight: '500',
   },
   emptySubtext: {
-    fontSize: 12,
+    fontSize: scale.hp(1.55),
     color: Colors.textSecondary,
-    marginTop: 4,
+    marginTop: scale.hp(0.5),
     textAlign: "center",
   },
 });

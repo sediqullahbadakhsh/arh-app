@@ -26,6 +26,7 @@ import StepNumber from "../topupScreen/StepNumber";
 import StepPay from "./StepPay";
 import SuccessScreen from "./SuccessScreen";
 import { useTranslation } from "react-i18next";
+import { scale } from "../../utils/normalizeSize";
 
 const BASE_STEPS = { COUNTRY: 0, NUMBER: 1, PAY: 2 };
 
@@ -60,7 +61,7 @@ export default function MerchantTopupFlow({ navigation }) {
 
   const dial = DIAL_CODES[country?.countryCode] || "";
 
-  // Navigation helpers
+
   const canNext =
     (step === BASE_STEPS.COUNTRY && !!country) ||
     (step === BASE_STEPS.NUMBER && localNumber.replace(/\D/g, "").length >= 7 && amountAfn > 0) ||
@@ -70,7 +71,7 @@ export default function MerchantTopupFlow({ navigation }) {
   const goNext = () => canNext && setStep(step + 1);
   const jumpTo = (i) => setStep(i);
 
-  // Reset number when country changes
+
   useEffect(() => {
     setLocalNumber("");
   }, [country?.countryCode]);
@@ -283,20 +284,31 @@ function formatLocal(s) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.white },
-  flex: { flex: 1 },
-  stepper: { paddingTop: 6, alignItems: "center" },
-  scrollContent: { paddingHorizontal: 24, paddingBottom: 30 },
+  container: {
+    flex: 1,
+    backgroundColor: Colors.white,
+  },
+  flex: {
+    flex: 1,
+  },
+  stepper: {
+    paddingTop: scale.hp(0.8),
+    alignItems: "center",
+  },
+  scrollContent: {
+    paddingHorizontal: scale.wp(5.8),
+    paddingBottom: scale.hp(3.9),
+  },
   modalBackdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.25)",
     justifyContent: "center",
-    padding: 24,
+    padding: scale.hp(3.1),
   },
   modalCard: {
     backgroundColor: "#fff",
-    borderRadius: 14,
-    padding: 14,
+    borderRadius: scale.hp(1.8),
+    padding: scale.hp(1.8),
     maxHeight: "70%",
     elevation: 4,
   },
@@ -304,15 +316,19 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 8,
+    marginBottom: scale.hp(1.05),
   },
-  modalTitle: { fontSize: 16, fontWeight: "700", color: Colors.textPrimary },
+  modalTitle: {
+    fontSize: scale.hp(2.1),
+    fontWeight: "700",
+    color: Colors.textPrimary,
+  },
   modalRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 10,
-    paddingHorizontal: 6,
-    borderRadius: 8,
+    paddingVertical: scale.hp(1.3),
+    paddingHorizontal: scale.wp(1.5),
+    borderRadius: scale.hp(1.05),
     backgroundColor: "#fff",
   },
 });

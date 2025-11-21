@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { Animated, View, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { scale } from '../../utils/normalizeSize';
 
 export default function AnimatedBorderWrapper({ children }) {
   const rotateAnim = useRef(new Animated.Value(0)).current;
@@ -42,24 +43,24 @@ const BORDER_SIZE = 4;
 const styles = StyleSheet.create({
   container: {
     padding: BORDER_SIZE,
-    borderRadius: 20,
+    borderRadius: scale.hp(2.6),
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
   },
   border: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: 20,
+    borderRadius: scale.hp(2.6),
     zIndex: -1,
   },
   gradient: {
     flex: 1,
-    borderRadius: 20,
+    borderRadius: scale.hp(2.6),
   },
   content: {
     backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: scale.hp(2.1),
+    padding: scale.hp(2.1),
     width: '100%',
   },
 });

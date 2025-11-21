@@ -25,10 +25,13 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
 import StatementFilterModal from "./StatementFilterModal";
+import { scale } from "../../utils/normalizeSize";
+import { useTranslation } from "react-i18next";
 
 const { width } = Dimensions.get("window");
 
 export default function StatementReportScreen({ navigation, route }) {
+  const { t } = useTranslation();
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -58,7 +61,6 @@ export default function StatementReportScreen({ navigation, route }) {
   const fetchStatements = async (isRefresh = false) => {
     if (!filter.startDate || !filter.endDate) {
       if (!isRefresh) {
-        // Auto-set to current month if no dates selected
         const now = new Date();
         const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
         const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
@@ -89,7 +91,7 @@ export default function StatementReportScreen({ navigation, route }) {
       });
     } catch (error) {
       console.error("Error fetching statements:", error);
-      Alert.alert("Error", "Failed to load statements. Please try again.");
+      Alert.alert(t('error'), t('failedToLoadStatements'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -123,14 +125,14 @@ export default function StatementReportScreen({ navigation, route }) {
 
   const handleExportMenu = () => {
     if (data.length === 0) {
-      Alert.alert("No Data", "There is no data to export.");
+      Alert.alert(t('noData'), t('noDataToExport'));
       return;
     }
 
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
         {
-          options: ['Cancel', 'Export as Excel (CSV)', 'Export as PDF'],
+          options: [t('cancel'), t('exportAsExcel'), t('exportAsPDF')],
           cancelButtonIndex: 0,
         },
         (buttonIndex) => {
@@ -146,68 +148,64 @@ export default function StatementReportScreen({ navigation, route }) {
     }
   };
 
-const handleExportCSV = async () => {
-  try {
-    setExportLoading(true);
-    setExportMenuVisible(false);
+  const handleExportCSV = async () => {
+    try {
+      setExportLoading(true);
+      setExportMenuVisible(false);
 
-    if (data.length === 0) {
-      Alert.alert("No Data", "There is no data to export.");
-      return;
+      if (data.length === 0) {
+        Alert.alert(t('noData'), t('noDataToExport'));
+        return;
+      }
+
+      const headers = [t('date'), t('transactionId'), t('type'), t('debit'), t('credit'), t('balance'), t('remarks'), t('agent')].join(',') + '\n';
+      
+      const csvRows = data.map(item => {
+        return [
+          `"${new Date(item.createdAt).toLocaleDateString()}"`,
+          `"${item.transactionId || ''}"`,
+          `"${item.transactionType || ''}"`,
+          `"${item.debit ? parseFloat(item.debit).toFixed(2) : '0.00'}"`,
+          `"${item.credit ? parseFloat(item.credit).toFixed(2) : '0.00'}"`,
+          `"${parseFloat(item.walletBalance || 0).toFixed(2)}"`,
+          `"${(item.remarks || t('notAvailable')).replace(/"/g, '""')}"`,
+          `"${(item.agent?.username || t('notAvailable')).replace(/"/g, '""')}"`
+        ].join(',');
+      });
+
+      const csvContent = headers + csvRows.join('\n');
+      const fileName = `statement-report-${Date.now()}.csv`;
+      const fileUri = FileSystem.documentDirectory + fileName;
+
+      await FileSystem.writeAsStringAsync(fileUri, csvContent);
+
+      if (!(await Sharing.isAvailableAsync())) {
+        Alert.alert(t('sharingNotAvailable'), t('sharingNotAvailableMessage'));
+        return;
+      }
+
+      await Sharing.shareAsync(fileUri, {
+        mimeType: 'text/csv',
+        dialogTitle: t('shareStatementReport'),
+        UTI: 'public.comma-separated-values-text'
+      });
+
+    } catch (error) {
+      console.error("CSV Export failed:", error);
+      Alert.alert(
+        t('exportFailed'), 
+        t('exportFailedMessage') + error.message
+      );
+    } finally {
+      setExportLoading(false);
     }
+  };
 
-    // Create CSV content
-    const headers = ["Date", "Transaction ID", "Type", "Debit", "Credit", "Balance", "Remarks", "Agent"].join(',') + '\n';
-    
-    const csvRows = data.map(item => {
-      return [
-        `"${new Date(item.createdAt).toLocaleDateString()}"`,
-        `"${item.transactionId || ''}"`,
-        `"${item.transactionType || ''}"`,
-        `"${item.debit ? parseFloat(item.debit).toFixed(2) : '0.00'}"`,
-        `"${item.credit ? parseFloat(item.credit).toFixed(2) : '0.00'}"`,
-        `"${parseFloat(item.walletBalance || 0).toFixed(2)}"`,
-        `"${(item.remarks || 'N/A').replace(/"/g, '""')}"`,
-        `"${(item.agent?.username || 'N/A').replace(/"/g, '""')}"`
-      ].join(',');
-    });
-
-    const csvContent = headers + csvRows.join('\n');
-    const fileName = `statement-report-${Date.now()}.csv`;
-    const fileUri = FileSystem.documentDirectory + fileName;
-
-    // Use the legacy API (this should work)
-    await FileSystem.writeAsStringAsync(fileUri, csvContent);
-
-    // Check if sharing is available
-    if (!(await Sharing.isAvailableAsync())) {
-      Alert.alert("Sharing not available", "Sharing is not available on this device.");
-      return;
-    }
-
-    // Share the file
-    await Sharing.shareAsync(fileUri, {
-      mimeType: 'text/csv',
-      dialogTitle: 'Share Statement Report',
-      UTI: 'public.comma-separated-values-text'
-    });
-
-  } catch (error) {
-    console.error("CSV Export failed:", error);
-    Alert.alert(
-      "Export Failed", 
-      "Could not export the report. Please try again.\nError: " + error.message
-    );
-  } finally {
-    setExportLoading(false);
-  }
-};
   const handleExportPDF = async () => {
     try {
       setExportLoading(true);
       setExportMenuVisible(false);
 
-      // Create HTML content for PDF
       const htmlContent = `
         <html>
           <head>
@@ -229,30 +227,30 @@ const handleExportCSV = async () => {
           </head>
           <body>
             <div class="header">
-              <div class="title">Statement Report</div>
+              <div class="title">${t('statementReport')}</div>
               <div class="date-range">
                 ${filter.startDate && filter.endDate 
-                  ? `From ${formatDate(filter.startDate)} to ${formatDate(filter.endDate)}`
-                  : 'All Transactions'
+                  ? `${t('from')} ${formatDate(filter.startDate)} ${t('to')} ${formatDate(filter.endDate)}`
+                  : t('allTransactions')
                 }
               </div>
             </div>
 
             <div class="summary">
               <div class="summary-row">
-                <strong>Total Records:</strong>
+                <strong>${t('totalRecords')}:</strong>
                 <span>${data.length}</span>
               </div>
               <div class="summary-row">
-                <strong>Total Debit:</strong>
+                <strong>${t('totalDebit')}:</strong>
                 <span>AFN ${calculateTotalDebit().toFixed(2)}</span>
               </div>
               <div class="summary-row">
-                <strong>Total Credit:</strong>
+                <strong>${t('totalCredit')}:</strong>
                 <span>AFN ${calculateTotalCredit().toFixed(2)}</span>
               </div>
               <div class="summary-row">
-                <strong>Net Amount:</strong>
+                <strong>${t('netAmount')}:</strong>
                 <span>AFN ${(calculateTotalCredit() - calculateTotalDebit()).toFixed(2)}</span>
               </div>
             </div>
@@ -260,14 +258,14 @@ const handleExportCSV = async () => {
             <table class="table">
               <thead>
                 <tr>
-                  <th>Date</th>
-                  <th>Transaction ID</th>
-                  <th>Type</th>
-                  <th>Debit</th>
-                  <th>Credit</th>
-                  <th>Balance</th>
-                  <th>Remarks</th>
-                  <th>Agent</th>
+                  <th>${t('date')}</th>
+                  <th>${t('transactionId')}</th>
+                  <th>${t('type')}</th>
+                  <th>${t('debit')}</th>
+                  <th>${t('credit')}</th>
+                  <th>${t('balance')}</th>
+                  <th>${t('remarks')}</th>
+                  <th>${t('agent')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -279,35 +277,33 @@ const handleExportCSV = async () => {
                     <td class="${item.debit ? 'debit' : ''}">${item.debit ? `AFN ${parseFloat(item.debit).toFixed(2)}` : '-'}</td>
                     <td class="${item.credit ? 'credit' : ''}">${item.credit ? `AFN ${parseFloat(item.credit).toFixed(2)}` : '-'}</td>
                     <td>AFN ${parseFloat(item.walletBalance).toFixed(2)}</td>
-                    <td>${item.remarks || 'N/A'}</td>
-                    <td>${item.agent?.username || 'N/A'}</td>
+                    <td>${item.remarks || t('notAvailable')}</td>
+                    <td>${item.agent?.username || t('notAvailable')}</td>
                   </tr>
                 `).join('')}
               </tbody>
             </table>
 
             <div class="footer">
-              Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}
+              ${t('generatedOn')} ${new Date().toLocaleDateString()} ${t('at')} ${new Date().toLocaleTimeString()}
             </div>
           </body>
         </html>
       `;
 
-      // Generate PDF
       const { uri } = await Print.printToFileAsync({
         html: htmlContent,
         base64: false
       });
 
-      // Share the PDF file
       await Sharing.shareAsync(uri, {
         mimeType: 'application/pdf',
-        dialogTitle: 'Share Statement Report as PDF',
+        dialogTitle: t('shareStatementReportPDF'),
       });
 
     } catch (error) {
       console.error("PDF Export failed:", error);
-      Alert.alert("Export Failed", "Could not generate PDF. Please try again.");
+      Alert.alert(t('exportFailed'), t('pdfExportFailed'));
     } finally {
       setExportLoading(false);
     }
@@ -344,7 +340,6 @@ const handleExportCSV = async () => {
     });
   };
 
-  // Skeleton for Transaction Item
   const renderSkeletonTransaction = ({ item, index }) => (
     <View style={styles.txRow}>
       <View style={styles.txLeft}>
@@ -391,7 +386,7 @@ const handleExportCSV = async () => {
           )}
           {item.agent?.username && (
             <Text style={styles.txAgent}>
-              Agent: {item.agent.username}
+              {t('agent')}: {item.agent.username}
             </Text>
           )}
         </View>
@@ -407,7 +402,7 @@ const handleExportCSV = async () => {
           {formatCurrency(item.debit || item.credit)}
         </Text>
         <Text style={styles.txBalance}>
-          Bal: {formatCurrency(item.walletBalance)}
+          {t('balance')}: {formatCurrency(item.walletBalance)}
         </Text>
       </View>
     </TouchableOpacity>
@@ -416,42 +411,32 @@ const handleExportCSV = async () => {
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
       <Ionicons name="document-text-outline" size={48} color="#CCCCCC" />
-      <Text style={styles.emptyStateText}>No statements found</Text>
+      <Text style={styles.emptyStateText}>{t('noStatementsFound')}</Text>
       <Text style={styles.emptyStateSubText}>
         {filter.startDate && filter.endDate 
-          ? "No statements match your current filters."
-          : "Generate a statement report by selecting a date range."
+          ? t('noStatementsMatchFilters')
+          : t('generateStatementByDateRange')
         }
       </Text>
       <TouchableOpacity 
         style={styles.generateButton}
         onPress={() => setIsFilterModalOpen(true)}
       >
-        <Text style={styles.generateButtonText}>Generate Report</Text>
+        <Text style={styles.generateButtonText}>{t('generateReport')}</Text>
       </TouchableOpacity>
     </View>
   );
 
-  const renderHeader = () => (
-    <View style={styles.header}>
-      {/* <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color={Colors.textSecondary} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search transactions..."
-          placeholderTextColor={Colors.textSecondary}
-          value={filter.search}
-          onChangeText={handleSearch}
-        />
-      </View> */}
-
+  // Fixed header component with filter controls
+  const FixedHeader = () => (
+    <View style={styles.fixedHeader}>
       <View style={styles.actionButtons}>
         <TouchableOpacity 
           style={styles.filterButton}
           onPress={() => setIsFilterModalOpen(true)}
         >
           <Ionicons name="filter" size={20} color={Colors.white} />
-          <Text style={styles.filterButtonText}>Filter</Text>
+          <Text style={styles.filterButtonText}>{t('filter')}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity 
@@ -468,7 +453,7 @@ const handleExportCSV = async () => {
             <Ionicons name="download-outline" size={20} color={Colors.white} />
           )}
           <Text style={styles.exportButtonText}>
-            {exportLoading ? "Exporting..." : "Export"}
+            {exportLoading ? t('exporting') : t('export')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -476,13 +461,13 @@ const handleExportCSV = async () => {
       {filter.startDate && filter.endDate && (
         <View style={styles.dateInfo}>
           <Text style={styles.dateInfoText}>
-            Showing statements from {formatDate(filter.startDate)} to {formatDate(filter.endDate)}
+            {t('showingStatementsFrom')} {formatDate(filter.startDate)} {t('to')} {formatDate(filter.endDate)}
           </Text>
           {meta.total > 0 && (
             <View style={styles.summaryRow}>
-              <Text style={styles.recordCount}>{meta.total} records found</Text>
+              <Text style={styles.recordCount}>{meta.total} {t('recordsFound')}</Text>
               <Text style={styles.summaryText}>
-                Debit: {formatCurrency(calculateTotalDebit())} • Credit: {formatCurrency(calculateTotalCredit())}
+                {t('debit')}: {formatCurrency(calculateTotalDebit())} • {t('credit')}: {formatCurrency(calculateTotalCredit())}
               </Text>
             </View>
           )}
@@ -494,36 +479,43 @@ const handleExportCSV = async () => {
   return (
     <SafeAreaView style={styles.container}>
       <ServiceHeader 
-        title="Statement Report" 
+        title={t('statementReport')} 
         onBack={() => navigation.goBack()} 
       />
       
-      <FlatList
-        data={loading ? [...Array(5)] : filteredData}
-        renderItem={loading ? renderSkeletonTransaction : renderStatementItem}
-        keyExtractor={(item, index) => item?.id || `skeleton-${index}`}
-        ListHeaderComponent={renderHeader}
-        ListEmptyComponent={!loading && renderEmptyState}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => fetchStatements(true)}
-            colors={[Colors.primary]}
-          />
-        }
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-      />
+      {/* Fixed Header Section */}
+      <FixedHeader />
+
+      {/* Scrollable Transactions Section */}
+      <View style={styles.scrollableSection}>
+        <FlatList
+          data={loading ? [...Array(5)] : filteredData}
+          renderItem={loading ? renderSkeletonTransaction : renderStatementItem}
+          keyExtractor={(item, index) => item?.id || `skeleton-${index}`}
+          ListEmptyComponent={!loading && renderEmptyState}
+          contentContainerStyle={[
+            styles.listContainer,
+            filteredData.length === 0 && styles.emptyListContainer
+          ]}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => fetchStatements(true)}
+              colors={[Colors.primary]}
+            />
+          }
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+        />
+      </View>
 
       {loading && !refreshing && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={styles.loadingText}>Loading statements...</Text>
+          <Text style={styles.loadingText}>{t('loadingStatements')}</Text>
         </View>
       )}
 
-      {/* Export Options Modal for Android */}
       <Modal
         visible={exportMenuVisible}
         transparent
@@ -536,7 +528,7 @@ const handleExportCSV = async () => {
           onPress={() => setExportMenuVisible(false)}
         >
           <View style={styles.exportMenu}>
-            <Text style={styles.exportMenuTitle}>Export As</Text>
+            <Text style={styles.exportMenuTitle}>{t('exportAs')}</Text>
             
             <TouchableOpacity 
               style={styles.exportOption}
@@ -544,8 +536,8 @@ const handleExportCSV = async () => {
             >
               <Ionicons name="document-text-outline" size={24} color="#10B981" />
               <View style={styles.exportOptionInfo}>
-                <Text style={styles.exportOptionTitle}>Excel (CSV)</Text>
-                <Text style={styles.exportOptionDesc}>Export as spreadsheet</Text>
+                <Text style={styles.exportOptionTitle}>{t('excelCSV')}</Text>
+                <Text style={styles.exportOptionDesc}>{t('exportAsSpreadsheet')}</Text>
               </View>
             </TouchableOpacity>
 
@@ -555,8 +547,8 @@ const handleExportCSV = async () => {
             >
               <Ionicons name="document-attach-outline" size={24} color="#EF4444" />
               <View style={styles.exportOptionInfo}>
-                <Text style={styles.exportOptionTitle}>PDF Document</Text>
-                <Text style={styles.exportOptionDesc}>Export as printable document</Text>
+                <Text style={styles.exportOptionTitle}>{t('pdfDocument')}</Text>
+                <Text style={styles.exportOptionDesc}>{t('exportAsPrintable')}</Text>
               </View>
             </TouchableOpacity>
 
@@ -564,7 +556,7 @@ const handleExportCSV = async () => {
               style={styles.cancelButton}
               onPress={() => setExportMenuVisible(false)}
             >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
+              <Text style={styles.cancelButtonText}>{t('cancel')}</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -583,37 +575,31 @@ const handleExportCSV = async () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    marginBottom: 100,
     backgroundColor: Colors.white,
   },
-  listContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 20,
-    flexGrow: 1,
+  fixedHeader: {
+    paddingHorizontal: scale.wp(5),
+    paddingTop: scale.hp(2.1),
+    paddingBottom: scale.hp(1),
+    backgroundColor: Colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
-  header: {
-    marginBottom: 16,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginBottom: 16,
-  },
-  searchInput: {
+  scrollableSection: {
     flex: 1,
-    marginLeft: 12,
-    fontSize: 16,
-    color: Colors.textPrimary,
+  },
+  listContainer: {
+    flexGrow: 1,
+    paddingHorizontal: scale.wp(5),
+  },
+  emptyListContainer: {
+    flexGrow: 1,
+    justifyContent: 'center',
   },
   actionButtons: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
+    gap: scale.wp(3.1),
+    marginBottom: scale.hp(2.1),
   },
   filterButton: {
     flex: 1,
@@ -621,13 +607,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.primary,
-    borderRadius: 12,
-    paddingVertical: 12,
-    gap: 8,
+    borderRadius: scale.hp(1.55),
+    paddingVertical: scale.hp(1.55),
+    gap: scale.wp(2),
   },
   filterButtonText: {
     color: Colors.white,
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     fontWeight: '600',
   },
   exportButton: {
@@ -636,30 +622,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#10B981',
-    borderRadius: 12,
-    paddingVertical: 12,
-    gap: 8,
+    borderRadius: scale.hp(1.55),
+    paddingVertical: scale.hp(1.55),
+    gap: scale.wp(2),
   },
   exportButtonDisabled: {
     backgroundColor: '#CBD5E1',
   },
   exportButtonText: {
     color: Colors.white,
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     fontWeight: '600',
   },
   dateInfo: {
     backgroundColor: '#F0F9FF',
-    borderRadius: 8,
-    padding: 12,
-    borderLeftWidth: 4,
+    borderRadius: scale.hp(1),
+    padding: scale.hp(1.55),
+    borderLeftWidth: scale.wp(1),
     borderLeftColor: '#3B82F6',
   },
   dateInfoText: {
-    fontSize: 14,
+    fontSize: scale.hp(1.8),
     color: Colors.textPrimary,
     fontWeight: '500',
-    marginBottom: 4,
+    marginBottom: scale.hp(0.5),
   },
   summaryRow: {
     flexDirection: 'row',
@@ -667,11 +653,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   recordCount: {
-    fontSize: 12,
+    fontSize: scale.hp(1.55),
     color: Colors.textSecondary,
   },
   summaryText: {
-    fontSize: 12,
+    fontSize: scale.hp(1.55),
     color: Colors.textSecondary,
     fontWeight: '500',
   },
@@ -679,7 +665,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: scale.hp(1.55),
     borderBottomWidth: 1,
     borderBottomColor: '#F8F8F8',
   },
@@ -689,12 +675,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   txIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: scale.wp(10.4),
+    height: scale.wp(10.4),
+    borderRadius: scale.wp(5.2),
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: scale.wp(3.1),
   },
   txInIcon: {
     backgroundColor: 'rgba(11, 163, 96, 0.1)',
@@ -707,70 +693,70 @@ const styles = StyleSheet.create({
   },
   txTitle: {
     color: Colors.textPrimary,
-    fontSize: 15,
+    fontSize: scale.hp(2),
     fontWeight: '600',
-    marginBottom: 2,
+    marginBottom: scale.hp(0.25),
   },
   txSub: {
     color: '#9E9E9E',
-    fontSize: 12,
-    marginBottom: 2,
+    fontSize: scale.hp(1.55),
+    marginBottom: scale.hp(0.25),
   },
   txRemarks: {
     color: '#9E9E9E',
-    fontSize: 12,
-    marginBottom: 2,
+    fontSize: scale.hp(1.55),
+    marginBottom: scale.hp(0.25),
     fontStyle: 'italic',
   },
   txAgent: {
     color: '#9E9E9E',
-    fontSize: 11,
+    fontSize: scale.hp(1.4),
   },
   txRight: {
     alignItems: 'flex-end',
-    marginLeft: 8,
+    marginLeft: scale.wp(2),
   },
   txAmount: {
-    fontSize: 15,
+    fontSize: scale.hp(2),
     fontWeight: '700',
-    marginBottom: 4,
+    marginBottom: scale.hp(0.5),
   },
   txBalance: {
     color: '#9E9E9E',
-    fontSize: 11,
+    fontSize: scale.hp(1.4),
     fontWeight: '500',
   },
   separator: {
-    height: 1,
+    height: scale.hp(0.13),
     backgroundColor: '#F8F8F8',
   },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 40,
+    paddingVertical: scale.hp(5.2),
   },
   emptyStateText: {
     color: '#666',
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     fontWeight: '600',
-    marginTop: 12,
-    marginBottom: 4,
+    marginTop: scale.hp(1.55),
+    marginBottom: scale.hp(0.5),
   },
   emptyStateSubText: {
     color: '#999',
-    fontSize: 14,
+    fontSize: scale.hp(1.8),
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: scale.hp(2.1),
   },
   generateButton: {
     backgroundColor: Colors.primary,
-    borderRadius: 12,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+    borderRadius: scale.hp(1.55),
+    paddingHorizontal: scale.wp(6.2),
+    paddingVertical: scale.hp(1.55),
   },
   generateButtonText: {
     color: Colors.white,
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     fontWeight: '600',
   },
   loadingOverlay: {
@@ -780,34 +766,34 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    marginTop: 12,
-    fontSize: 16,
+    marginTop: scale.hp(1.55),
+    fontSize: scale.hp(2.1),
     color: Colors.textSecondary,
   },
   skeletonTxIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 12,
+    width: scale.wp(10.4),
+    height: scale.wp(10.4),
+    borderRadius: scale.wp(5.2),
+    marginRight: scale.wp(3.1),
     backgroundColor: '#E0E0E0',
   },
   skeletonTxTitle: {
-    width: 180,
-    height: 15,
-    marginBottom: 6,
-    borderRadius: 4,
+    width: scale.wp(46.8),
+    height: scale.hp(2),
+    marginBottom: scale.hp(0.8),
+    borderRadius: scale.hp(0.5),
     backgroundColor: '#E0E0E0',
   },
   skeletonTxSub: {
-    width: 140,
-    height: 12,
-    borderRadius: 4,
+    width: scale.wp(36.4),
+    height: scale.hp(1.55),
+    borderRadius: scale.hp(0.5),
     backgroundColor: '#E0E0E0',
   },
   skeletonTxAmount: {
-    width: 80,
-    height: 15,
-    borderRadius: 4,
+    width: scale.wp(20.8),
+    height: scale.hp(2),
+    borderRadius: scale.hp(0.5),
     backgroundColor: '#E0E0E0',
   },
   modalOverlay: {
@@ -815,53 +801,53 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: scale.wp(5),
   },
   exportMenu: {
     backgroundColor: Colors.white,
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: scale.hp(2.1),
+    padding: scale.hp(2.6),
     width: '100%',
-    maxWidth: 400,
+    maxWidth: scale.wp(104),
   },
   exportMenuTitle: {
-    fontSize: 18,
+    fontSize: scale.hp(2.35),
     fontWeight: '600',
     color: Colors.textPrimary,
-    marginBottom: 16,
+    marginBottom: scale.hp(2.1),
     textAlign: 'center',
   },
   exportOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
+    padding: scale.hp(2.1),
+    borderRadius: scale.hp(1.55),
     backgroundColor: '#F8FAFC',
-    marginBottom: 12,
+    marginBottom: scale.hp(1.55),
   },
   exportOptionInfo: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: scale.wp(3.1),
   },
   exportOptionTitle: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     fontWeight: '600',
     color: Colors.textPrimary,
-    marginBottom: 2,
+    marginBottom: scale.hp(0.25),
   },
   exportOptionDesc: {
-    fontSize: 14,
+    fontSize: scale.hp(1.8),
     color: Colors.textSecondary,
   },
   cancelButton: {
-    padding: 16,
-    borderRadius: 12,
+    padding: scale.hp(2.1),
+    borderRadius: scale.hp(1.55),
     backgroundColor: '#F1F5F9',
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: scale.hp(1),
   },
   cancelButtonText: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     fontWeight: '600',
     color: Colors.textPrimary,
   },

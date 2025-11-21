@@ -1,12 +1,31 @@
 import api from "./apiClient";
 import { buildQueryString } from "./queryBuilder";
 
-export const merchantSignup = (payload) =>
-  api.post("/merchant/sign-up?lang=en", payload).then((r) => r.data);
+export const merchantSignup = (formData) =>
+  api.post("/merchant/sign-up?lang=en", formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  }).then((r) => r.data);
+export const generateOtpForMerchantSignup = (email) =>
+  api.post("/merchant/signup/otp/generate", { email })
+    .then((r) => r.data);
 
+export const verifyOtpForMerchantSignup = (email, otp, signupData = null) =>
+  api.post("/merchant/signup/otp/verify", { email, otp, signupData })
+    .then((r) => r.data);
+
+export const completeMerchantSignup = (formData) =>
+  api.post("/merchant/signup/complete", formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  }).then((r) => r.data);
 export const applyForMerchant = (payload) =>
   api.post("/apply/create?lang=en", payload).then((r) => r.data);
-
+export const activateBundleByAgent = (payload = {}) => {
+  return api.post(`/bundle-activation/agent?lang=en`, payload).then((r) => r?.data);
+};
 export const getMyMerchantApplication = () =>
   api.get("/apply/my-application?lang=en").then((r) => r.data);
 
@@ -51,22 +70,60 @@ export const makeRechargeAgent = (payload = {})=>{
   return api.post(`/orders?lang=en`,payload).then((r)=>r.data)
 }
 
-export const getDataProducts = (filters = {})=>{
-  // const query = buildQueryString({
-  //   lang: "en",
-  //   ...filters,
-  // });
-  
-  // return api.get(`/product/admin?lang=en&countryId=${filters?.countryId}&productCategoryId=${filters?.productCategoryId}&search=${filters?.search}`).then((r)=>r.data)
-  return api.get(`/product/admin?lang=en`).then((r)=>r?.data)
-}
-// In merchantApi.js
-// In merchantApi.js - enhance the products endpoint
-export const getDataProductsCustomer = (filters = {}, options = {}) => {
+
+
+export const getBundleCategories = (filters = {}) => {
   const params = new URLSearchParams();
   params.append('lang', 'en');
   
-  // FORCE FRESH DATA - Always add cache busters
+  if (filters.search) {
+    params.append('search', filters.search);
+  }
+  
+  return api.get(`/productCategory/bundles/all?${params.toString()}`).then((r) => r.data);
+};
+
+export const getBundleTypes = (filters = {}) => {
+  const params = new URLSearchParams();
+  params.append('lang', 'en');
+  
+  if (filters.search) {
+    params.append('search', filters.search);
+  }
+  
+  return api.get(`/productTypes/bundles/all?${params.toString()}`).then((r) => r.data);
+};
+
+
+export const getDataProducts = (filters = {}) => {
+  const params = new URLSearchParams();
+  params.append('lang', 'en');
+  
+
+  if (filters.countryId) {
+    params.append('countryId', filters.countryId);
+  }
+  if (filters.productCategoryId) {
+    params.append('productCategoryId', filters.productCategoryId);
+  }
+  if (filters.productTypeId) {
+    params.append('productTypeId', filters.productTypeId);
+  }
+  if (filters.search) {
+    params.append('search', filters.search);
+  }
+  
+
+  params.append('_t', Date.now());
+  params.append('fresh', 'true');
+  
+  return api.get(`/product/agent/data?${params.toString()}`).then((r) => r?.data);
+};
+
+export const getDataProductsCustomer = (filters = {}, options = {}) => {
+  const params = new URLSearchParams();
+  params.append('lang', 'en');
+
   params.append('_t', Date.now());
   params.append('fresh', 'true');
   params.append('nocache', '1');
@@ -98,11 +155,11 @@ export const getDataProductsCustomer = (filters = {}, options = {}) => {
     return r?.data;
   });
 };
-export const activateDataBundle = (payload = {})=>{
+// merchantApi.js - CORRECTED
+export const activateDataBundle = (payload = {}) => {
+  return api.post(`/bundle-activation/agent/?lang=en`, payload).then((r) => r?.data);
+};
 
-  
-  return api.post(`/product-activation?lang=en`, payload).then((r)=>r?.data)
-}
 export const activateDataBundleCustomer = (payload = {})=>{
 
   

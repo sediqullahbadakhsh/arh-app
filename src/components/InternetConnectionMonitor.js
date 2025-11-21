@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, View, Text, StyleSheet, BackHandler } from 'react-native';
 import NetInfo from '@react-native-community/netinfo'; 
+import { scale } from '../utils/normalizeSize';
 
 const InternetConnectionMonitor = () => {
   const [isConnected, setIsConnected] = useState(true);
@@ -11,7 +12,7 @@ const InternetConnectionMonitor = () => {
       const connected = state.isConnected && state.isInternetReachable;
       setIsConnected(connected);
       
-      // Show modal only when connection is lost
+
       if (!connected) {
         setShowModal(true);
       } else {
@@ -30,7 +31,7 @@ const InternetConnectionMonitor = () => {
     });
   };
 
-  // Function to check connection status (you can export this if needed)
+  
   const checkConnection = () => {
     return isConnected;
   };
@@ -41,7 +42,7 @@ const InternetConnectionMonitor = () => {
       transparent={true}
       animationType="fade"
       statusBarTranslucent={true}
-      onRequestClose={() => {}} // Prevent closing by back button
+      onRequestClose={() => {}} 
     >
       <View style={styles.modalContainer}>
         <View style={styles.modalContent}>
@@ -69,33 +70,33 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 10,
+    padding: scale.hp(2.6),
+    borderRadius: scale.hp(1.3),
     alignItems: 'center',
-    margin: 20,
+    margin: scale.hp(2.6),
   },
   title: {
-    fontSize: 18,
+    fontSize: scale.hp(2.35),
     fontWeight: 'bold',
-    marginBottom: 10,
+    marginBottom: scale.hp(1.3),
     color: '#D70000',
   },
   message: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     textAlign: 'center',
-    marginBottom: 15,
+    marginBottom: scale.hp(2),
     color: '#333',
-    lineHeight: 22,
+    lineHeight: scale.hp(2.9),
   },
   buttonContainer: {
     flexDirection: 'row',
   },
   retryButton: {
     color: '#D70000',
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     fontWeight: 'bold',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingHorizontal: scale.wp(5.2),
+    paddingVertical: scale.hp(1.3),
   },
 });
 

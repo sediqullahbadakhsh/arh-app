@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { View, Text, StyleSheet, Alert, SafeAreaView, TouchableOpacity, FlatList, Modal, Animated, Dimensions, TextInput, ActivityIndicator } from "react-native";
+import { View, SafeAreaView, Text, StyleSheet, Alert, TouchableOpacity, FlatList, Modal, Animated, Dimensions, TextInput, ActivityIndicator, Platform } from "react-native";
+
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../theme/colors";
-import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 import PrimaryButton from "../../components/PrimaryButton";
 import OutlineButton from "../../components/OutlineButton";
 import SocialButton from "../../components/SocialButton";
@@ -10,13 +10,21 @@ import { useAuth } from "../../auth/AuthProvider";
 import RoundedInput from "../../components/RoundedInput";
 import WhiteSpinner from "../../components/Spinner";
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
-import { Platform, ScrollView, Image } from "react-native";
+import { ScrollView, Image } from "react-native";
 import { useTranslation } from "react-i18next";
 import Loader from "../../components/Loader";
 import AuthHeaderSignIn from "../../components/AuthHeaderSignIn";
 import { useLanguage } from "../../context/LanguageContext";
+import { scale } from "../../utils/normalizeSize";
+
+
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
 
 const { height: screenHeight } = Dimensions.get('window');
+
+
+WebBrowser.maybeCompleteAuthSession();
 
 export default function LoginScreen({ navigation }) {
   const { t } = useTranslation();
@@ -34,7 +42,9 @@ export default function LoginScreen({ navigation }) {
   const [emailSuggestions, setEmailSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   
-  // Language modal state
+
+  const [googleLoading, setGoogleLoading] = useState(false);
+
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [changingLanguage, setChangingLanguage] = useState(false);
@@ -43,9 +53,119 @@ export default function LoginScreen({ navigation }) {
   const inputRef = useRef(null);
   const auth = useAuth();
 
-  const commonDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com'];
+  const commonDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'aol.com', 'icloud.com', 'protonmail.com'];
 
-  // Language modal handlers
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    expoClientId: '586500268839-5fvgp3l6s5n4ma3lqk0i2t0n3l6b6l6q.apps.googleusercontent.com', 
+    androidClientId: '586500268839-5fvgp3l6s5n4ma3lqk0i2t0n3l6b6l6q.apps.googleusercontent.com',
+    iosClientId: '586500268839-5fvgp3l6s5n4ma3lqk0i2t0n3l6b6l6q.apps.googleusercontent.com', 
+    webClientId: '586500268839-5fvgp3l6s5n4ma3lqk0i2t0n3l6b6l6q.apps.googleusercontent.com', 
+    scopes: ['openid', 'profile', 'email'],
+  });
+
+
+  useEffect(() => {
+    if (response?.type === 'success') {
+      handleGoogleSignInSuccess(response.authentication);
+    }
+  }, [response]);
+
+  const handleGoogleSignIn = async () => {
+    try {
+      setGoogleLoading(true);
+      const result = await promptAsync();
+      
+      if (result?.type !== 'success') {
+        if (result?.type === 'cancel' || result?.type === 'dismiss') {
+          return;
+        }
+        throw new Error(result?.type || 'Sign-in failed');
+      }
+    } catch (error) {
+      console.error('Google Sign-In Error:', error);
+      if (error.message !== 'User canceled authentication') {
+        Alert.alert(t('error'), t('googleSignInFailed'));
+      }
+      setGoogleLoading(false);
+    }
+  };
+
+  const handleGoogleSignInSuccess = async (authentication) => {
+    try {
+      if (!authentication?.accessToken) {
+        throw new Error('No access token received');
+      }
+
+
+      const userInfoResponse = await fetch('https://www.googleapis.com/userinfo/v2/me', {
+        headers: { Authorization: `Bearer ${authentication.accessToken}` },
+      });
+
+      if (!userInfoResponse.ok) {
+        throw new Error('Failed to fetch user info');
+      }
+
+      const userInfo = await userInfoResponse.json();
+      
+
+      const googleEmail = userInfo.email;
+      
+      if (!googleEmail) {
+        throw new Error('No email received from Google');
+      }
+
+      console.log('Google Sign-In Successful:', { email: googleEmail, userInfo });
+
+   
+      navigation.navigate("OtpVerification", {
+        channel: "email",
+        target: googleEmail,
+        mode: "login",
+        isGoogleAuth: true,
+      });
+
+    } catch (error) {
+      console.error('Google Auth Error:', error);
+      Alert.alert(
+        t('authenticationError'),
+        error.message || t('googleAuthenticationFailed')
+      );
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+
+  const handleMockGoogleSignIn = () => {
+    setGoogleLoading(true);
+    
+
+    setTimeout(() => {
+      const mockEmail = "test.user@gmail.com";
+      setEmail(mockEmail);
+      setGoogleLoading(false);
+      
+      Alert.alert(
+        "Development Mode",
+        "Mock Google authentication successful!\n\nIn production, this would use real Google OAuth.",
+        [
+          {
+            text: "Continue to OTP",
+            onPress: () => {
+              navigation.navigate("OtpVerification", {
+                channel: "email",
+                target: mockEmail,
+                mode: "login",
+                isGoogleAuth: true,
+              });
+            }
+          }
+        ]
+      );
+    }, 1000);
+  };
+
+
   useEffect(() => {
     if (languageModalVisible) {
       Animated.timing(languageModalAnim, {
@@ -198,7 +318,7 @@ export default function LoginScreen({ navigation }) {
     </Modal>
   );
 
-  const isValidGmail = (email) => {
+  const isValidEmail = (email) => {
     const emailValue = email.trim().toLowerCase();
     
     if (!emailValue) {
@@ -208,37 +328,6 @@ export default function LoginScreen({ navigation }) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(emailValue)) {
       return { isValid: false, message: t('invalidEmailFormat') };
-    }
-
-    const domain = emailValue.split('@')[1];
-
-    if (domain !== 'gmail.com') {
-      return { isValid: false, message: t('onlyGmailAllowed') };
-    }
-    
-    const gmailMisspellings = {
-      'gmai.com': 'gmail.com',
-      'gmal.com': 'gmail.com',
-      'gmial.com': 'gmail.com',
-      'gmaill.com': 'gmail.com',
-      'gmail.cm': 'gmail.com',
-      'gmail.con': 'gmail.com',
-      'gmail.om': 'gmail.com',
-      'gmail.cmo': 'gmail.com',
-      'gmil.com': 'gmail.com',
-      'gmeil.com': 'gmail.com',
-      'gmali.com': 'gmail.com'
-    };
-    
-    if (gmailMisspellings[domain]) {
-      return { 
-        isValid: false, 
-        message: t('invalidGmailDidYouMean', { correct: `${emailValue.split('@')[0]}@gmail.com` }) 
-      };
-    }
-
-    if (domain.includes('gmail') && domain !== 'gmail.com') {
-      return { isValid: false, message: t('invalidGmailDomain') };
     }
     
     return { isValid: true, message: "" };
@@ -298,7 +387,7 @@ export default function LoginScreen({ navigation }) {
     setShowSuggestions(false);
     setEmailSuggestions([]);
     
-    const validation = isValidGmail(email.trim());
+    const validation = isValidEmail(email.trim());
     if (!validation.isValid) {
       setEmailError(validation.message);
       setShowEmailError(true);
@@ -310,8 +399,10 @@ export default function LoginScreen({ navigation }) {
   };
 
   const navigatePassword = () => {
-    if (!validateEmailOnSubmit()) return;
-    navigation.navigate("LoginPassword", { target: email.trim() });
+    const trimmedEmail = email.trim();
+    setShowEmailError(false);
+    setEmailError("");
+    navigation.navigate("LoginPassword", { target: trimmedEmail });
   };
 
   const navigateOtp = async () => {
@@ -427,8 +518,18 @@ export default function LoginScreen({ navigation }) {
     </TouchableOpacity>
   );
 
+  // Choose which Google sign-in function to use
+  const handleGoogleSignInPress = () => {
+    // Use mock for development, real for production
+    if (__DEV__) {
+      handleMockGoogleSignIn();
+    } else {
+      handleGoogleSignIn();
+    }
+  };
+
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <KeyboardAwareScrollView
         contentContainerStyle={{ flexGrow: 1 }}
         enableOnAndroid
@@ -455,7 +556,7 @@ export default function LoginScreen({ navigation }) {
                     ref={inputRef}
                     value={email}
                     onChangeText={validateAndSetEmail}
-                    placeholder={t('gmailPlaceholder')}
+                    placeholder={t('emailPlaceholder') || "Enter your email"}
                     keyboardType="email-address"
                     autoCapitalize="none"
                     autoComplete="email"
@@ -547,9 +648,16 @@ export default function LoginScreen({ navigation }) {
 
               <View style={styles.socialRow}>
                 <SocialButton
-                  label={t('google')}
-                  icon={<Ionicons name="logo-google" size={20} color={Colors.primary} />}
-                  onPress={() => { }}
+                  label={googleLoading ? t('signingIn') : t('google')}
+                  icon={
+                    googleLoading ? (
+                      <ActivityIndicator size="small" color={Colors.primary} />
+                    ) : (
+                      <Ionicons name="logo-google" size={20} color={Colors.primary} />
+                    )
+                  }
+                  onPress={handleGoogleSignInPress}
+                  disabled={googleLoading}
                 />
                 <View style={{ width: 16 }} />
                 <SocialButton
@@ -558,6 +666,13 @@ export default function LoginScreen({ navigation }) {
                   onPress={() => { }}
                 />
               </View>
+
+              {/* Development info - remove in production */}
+              {__DEV__ && (
+                <Text style={styles.devInfo}>
+                  Development: Using mock Google authentication
+                </Text>
+              )}
             </View>
           </ScrollView>
         </View>
@@ -568,22 +683,23 @@ export default function LoginScreen({ navigation }) {
   );
 }
 
+
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.white },
   container: {
     flex: 1,
-    paddingHorizontal: wp(10),
-    paddingTop: hp(2.25),
+    paddingHorizontal: scale.wp(10),
+    paddingTop: scale.hp(2.25),
     backgroundColor: Colors.pageBackColor,
   },
   helperText: {
-    marginTop: hp(0.75),
-    fontSize: hp(1.5),
+    marginTop: scale.hp(0.75),
+    fontSize: scale.hp(1.5),
     color: Colors.textSecondary,
   },
   errorText: {
-    marginTop: hp(0.75),
-    fontSize: hp(1.5),
+    marginTop: scale.hp(0.75),
+    fontSize: scale.hp(1.5),
     color: '#E20E02',
     fontFamily: 'dmsansRegular',
   },
@@ -595,40 +711,35 @@ const styles = StyleSheet.create({
   dividerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: hp(2.2),
-    marginBottom: hp(2.2),
+    marginTop: scale.hp(2.2),
+    marginBottom: scale.hp(2.2),
   },
   divider: {
     flex: 1,
-    height: hp(0.125),
+    height: scale.hp(0.125),
     backgroundColor: Colors.divider,
   },
   dividerText: {
-    marginHorizontal: wp(3.2),
+    marginHorizontal: scale.wp(3.2),
     color: '#666666',
-    fontSize: hp(1.6),
+    fontSize: scale.hp(1.6),
     fontFamily: 'dmsansMedium',
   },
   socialRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: hp(2.5),
+    marginBottom: scale.hp(2.5),
   },
   label: {
     fontFamily: 'dmsansRegular',
-    marginBottom: hp(1),
-    fontSize: hp(2),
-    lineHeight: hp(3),
+    marginBottom: scale.hp(1),
+    fontSize: scale.hp(2),
+    lineHeight: scale.hp(3),
     color: Colors.textTitle,
-  },
-  gmailNote: {
-    fontSize: hp(1.6),
-    color: Colors.primary,
-    fontFamily: 'dmsansMedium',
   },
   suggestionsContainer: {
     position: 'absolute',
-    top: hp(6),
+    top: scale.hp(6),
     left: 0,
     right: 0,
     backgroundColor: Colors.white,
@@ -644,23 +755,118 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 3,
     zIndex: 1000,
-    maxHeight: hp(15),
+    maxHeight: scale.hp(15),
   },
   suggestionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: wp(4),
-    paddingVertical: hp(1.2),
+    paddingHorizontal: scale.wp(4),
+    paddingVertical: scale.hp(1.2),
     borderBottomWidth: 1,
     borderBottomColor: Colors.divider,
   },
   suggestionText: {
-    marginLeft: wp(2),
-    fontSize: hp(1.6),
+    marginLeft: scale.wp(2),
+    fontSize: scale.hp(1.6),
     color: Colors.textTitle,
     fontFamily: 'dmsansRegular',
   },
+  devInfo: {
+    textAlign: 'center',
+    fontSize: scale.hp(1.4),
+    color: '#666',
+    marginTop: scale.hp(1),
+    fontStyle: 'italic',
+  },
 });
+// const styles = StyleSheet.create({
+//   safeArea: { flex: 1, backgroundColor: Colors.white },
+//   container: {
+//     flex: 1,
+//     paddingHorizontal: scale.wp(10),
+//     paddingTop: scale.hp(2.25),
+//     backgroundColor: Colors.pageBackColor,
+//   },
+//   helperText: {
+//     marginTop: scale.hp(0.75),
+//     fontSize: scale.hp(1.5),
+//     color: Colors.textSecondary,
+//   },
+//   errorText: {
+//     marginTop: scale.hp(0.75),
+//     fontSize: scale.hp(1.5),
+//     color: '#E20E02',
+//     fontFamily: 'dmsansRegular',
+//   },
+//   helperLink: {
+//     color: Colors.primary,
+//     fontWeight: '600',
+//     textDecorationLine: 'underline',
+//   },
+//   dividerRow: {
+//     flexDirection: 'row',
+//     alignItems: 'center',
+//     marginTop: scale.hp(2.2),
+//     marginBottom: scale.hp(2.2),
+//   },
+//   divider: {
+//     flex: 1,
+//     height: scale.hp(0.125),
+//     backgroundColor: Colors.divider,
+//   },
+//   dividerText: {
+//     marginHorizontal: scale.wp(3.2),
+//     color: '#666666',
+//     fontSize: scale.hp(1.6),
+//     fontFamily: 'dmsansMedium',
+//   },
+//   socialRow: {
+//     flexDirection: 'row',
+//     justifyContent: 'center',
+//     marginBottom: scale.hp(2.5),
+//   },
+//   label: {
+//     fontFamily: 'dmsansRegular',
+//     marginBottom: scale.hp(1),
+//     fontSize: scale.hp(2),
+//     lineHeight: scale.hp(3),
+//     color: Colors.textTitle,
+//   },
+//   suggestionsContainer: {
+//     position: 'absolute',
+//     top: scale.hp(6),
+//     left: 0,
+//     right: 0,
+//     backgroundColor: Colors.white,
+//     borderWidth: 1,
+//     borderColor: Colors.divider,
+//     borderRadius: 8,
+//     shadowColor: '#000',
+//     shadowOffset: {
+//       width: 0,
+//       height: 2,
+//     },
+//     shadowOpacity: 0.1,
+//     shadowRadius: 3,
+//     elevation: 3,
+//     zIndex: 1000,
+//     maxHeight: scale.hp(15),
+//   },
+//   suggestionItem: {
+//     flexDirection: 'row',
+//     alignItems: 'center',
+//     paddingHorizontal: scale.wp(4),
+//     paddingVertical: scale.hp(1.2),
+//     borderBottomWidth: 1,
+//     borderBottomColor: Colors.divider,
+//   },
+//   suggestionText: {
+//     marginLeft: scale.wp(2),
+//     fontSize: scale.hp(1.6),
+//     color: Colors.textTitle,
+//     fontFamily: 'dmsansRegular',
+//   },
+// });
 
 const loginStyles = StyleSheet.create({
   modalOverlay: {
@@ -677,9 +883,9 @@ const loginStyles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: '#fff',
-    borderTopLeftRadius: 25,
-    borderTopRightRadius: 25,
-    padding: 20,
+    borderTopLeftRadius: scale.hp(3),
+    borderTopRightRadius: scale.hp(3),
+    padding: scale.hp(2.5),
     elevation: 5,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: -2 },
@@ -690,93 +896,93 @@ const loginStyles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 16,
-    paddingBottom: 12,
+    marginBottom: scale.hp(2),
+    paddingBottom: scale.hp(1.5),
     borderBottomWidth: 1,
     borderBottomColor: "#F0F0F0",
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: scale.hp(2.5),
     fontWeight: "700",
     color: Colors.textPrimary,
   },
   closeButton: {
-    padding: 4,
+    padding: scale.hp(0.5),
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    marginBottom: 16,
-    height: 48,
+    borderRadius: scale.hp(1.5),
+    paddingHorizontal: scale.wp(4),
+    marginBottom: scale.hp(2),
+    height: scale.hp(6),
   },
   searchIcon: {
-    marginRight: 12,
+    marginRight: scale.wp(3),
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
+    fontSize: scale.hp(2),
     color: Colors.textPrimary,
     fontWeight: '500',
   },
   modalRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 14,
-    paddingHorizontal: 8,
+    paddingVertical: scale.hp(1.75),
+    paddingHorizontal: scale.wp(2),
     backgroundColor: '#fff',
   },
   modalRowFirst: {
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
+    borderTopLeftRadius: scale.hp(1.5),
+    borderTopRightRadius: scale.hp(1.5),
   },
   modalRowLast: {
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
+    borderBottomLeftRadius: scale.hp(1.5),
+    borderBottomRightRadius: scale.hp(1.5),
   },
   modalSeparator: {
     height: 1,
     backgroundColor: '#F0F0F0',
-    marginLeft: 44,
+    marginLeft: scale.wp(11),
   },
   languageFlag: {
-    width: 24,
-    height: 18,
-    marginRight: 12,
-    borderRadius: 3,
+    width: scale.wp(6),
+    height: scale.hp(2.25),
+    marginRight: scale.wp(3),
+    borderRadius: scale.hp(0.5),
   },
   flagPlaceholder: {
-    width: 24,
-    height: 18,
-    marginRight: 12,
+    width: scale.wp(6),
+    height: scale.hp(2.25),
+    marginRight: scale.wp(3),
     backgroundColor: '#F0F0F0',
-    borderRadius: 3,
+    borderRadius: scale.hp(0.5),
   },
   languageInfo: {
     flex: 1,
   },
   languageName: {
-    fontSize: 16,
+    fontSize: scale.hp(2),
     fontWeight: '600',
     color: Colors.textPrimary,
-    marginBottom: 2,
+    marginBottom: scale.hp(0.25),
   },
   languageCode: {
-    fontSize: 14,
+    fontSize: scale.hp(1.75),
     color: Colors.textSecondary,
   },
   loadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    marginBottom: 10,
+    paddingVertical: scale.hp(1.25),
+    marginBottom: scale.hp(1.25),
   },
   loadingText: {
-    marginLeft: 8,
-    fontSize: 14,
+    marginLeft: scale.wp(2),
+    fontSize: scale.hp(1.75),
     color: Colors.textSecondary,
   },
 });

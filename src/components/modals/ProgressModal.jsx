@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../theme/colors";
+import { scale } from '../../utils/normalizeSize';
 
 const { width } = Dimensions.get('window');
 
@@ -100,22 +101,22 @@ const progressStyles = {
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    padding: scale.wp(6.2),
   },
   progressModal: {
     backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 24,
+    borderRadius: scale.hp(2.6),
+    padding: scale.wp(6.2),
     width: '100%',
     maxWidth: 400,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: scale.hp(0.26),
     },
     shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    shadowRadius: scale.hp(0.5),
     elevation: 5,
   },
   progressContent: {
@@ -123,40 +124,40 @@ const progressStyles = {
     width: '100%',
   },
   progressTitle: {
-    fontSize: 20,
+    fontSize: scale.hp(2.6),
     fontWeight: '700',
     color: Colors.textPrimary,
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: scale.hp(2.1),
+    marginBottom: scale.hp(1.05),
   },
   progressText: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     color: Colors.textSecondary,
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: scale.hp(3.1),
   },
   cancelButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    marginTop: 16,
+    paddingVertical: scale.hp(1.55),
+    paddingHorizontal: scale.wp(6.2),
+    marginTop: scale.hp(2.1),
   },
   cancelButtonText: {
     color: Colors.textSecondary,
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     fontWeight: '600',
   },
   container: {
-    height: 8,
+    height: scale.hp(1.05),
     width: '100%',
     backgroundColor: '#E5E7EB',
-    borderRadius: 4,
+    borderRadius: scale.hp(0.5),
     overflow: 'hidden',
-    marginTop: 24,
-    marginBottom: 16,
+    marginTop: scale.hp(3.1),
+    marginBottom: scale.hp(2.1),
   },
   bar: {
     height: '100%',
-    borderRadius: 4,
+    borderRadius: scale.hp(0.5),
   },
 };
 

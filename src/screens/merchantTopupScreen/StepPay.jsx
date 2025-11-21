@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Colors } from "../../theme/colors";
 import { useTranslation } from "react-i18next";
+import { scale } from "../../utils/normalizeSize";
 
 export default function StepPay({ summary, onEditNumber }) {
   const { t } = useTranslation();
@@ -34,61 +35,63 @@ export default function StepPay({ summary, onEditNumber }) {
 }
 
 const styles = StyleSheet.create({
-  container: { marginTop: 12 },
+  container: {
+    marginTop: scale.hp(1.55),
+  },
   editHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 8,
+    marginTop: scale.hp(1.05),
   },
   sectionTitle: {
-    fontSize: 14,
+    fontSize: scale.hp(1.8),
     fontWeight: "400",
     color: Colors.textPrimary,
-    marginBottom: 12,
+    marginBottom: scale.hp(1.55),
   },
   editLink: {
     color: Colors.primary,
-    fontSize: 13,
+    fontSize: scale.hp(1.7),
     fontWeight: "600",
   },
   summaryCard: {
-    marginTop: 18,
+    marginTop: scale.hp(2.35),
     borderWidth: 1,
     borderColor: "#F2DAD7",
     backgroundColor: "#FFF",
-    borderRadius: 12,
-    padding: 12,
+    borderRadius: scale.hp(1.55),
+    padding: scale.hp(1.55),
   },
   summaryRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: 4,
+    paddingVertical: scale.hp(0.5),
   },
   summaryKey: {
     color: Colors.textSecondary,
-    fontSize: 13,
+    fontSize: scale.hp(1.7),
   },
   summaryValue: {
     color: Colors.textPrimary,
-    fontSize: 13,
+    fontSize: scale.hp(1.7),
   },
   totalRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     borderTopWidth: 1,
     borderTopColor: "#F2F2F2",
-    paddingTop: 8,
-    marginTop: 6,
+    paddingTop: scale.hp(1.05),
+    marginTop: scale.hp(0.8),
   },
   totalKey: {
     color: Colors.textSecondary,
-    fontSize: 13,
+    fontSize: scale.hp(1.7),
     fontWeight: "700",
   },
   totalValue: {
     color: Colors.primary,
-    fontSize: 13,
+    fontSize: scale.hp(1.7),
     fontWeight: "700",
   },
 });

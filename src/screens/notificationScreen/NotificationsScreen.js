@@ -132,7 +132,6 @@ const NotificationsScreen = () => {
           text: t('deleteAll'), 
           style: 'destructive',
           onPress: () => {
-            // This would need to be implemented in the SocketProvider
             Alert.alert(t('info'), t('deleteAllFunctionalityComing'));
           }
         }

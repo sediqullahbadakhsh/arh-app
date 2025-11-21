@@ -1,4 +1,3 @@
-// src/screens/WalletScreen.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   SafeAreaView,
@@ -20,11 +19,13 @@ import ServiceHeader from "../components/ServiceHeader";
 import { getStockInOut, getUserWallets } from "../services/merchantApi";
 import { useUser } from "../context/userContext";
 import { formatDateTime } from "../utils/formatDate";
+import ReceiptModal1 from "../components/ReceiptModal";
+import { scale } from "../utils/normalizeSize";
+
 
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = width - 48;
 const CARD_MARGIN = 16;
-
 
 const SkeletonLoader = ({ style }) => (
   <View style={[styles.skeleton, style]}>
@@ -41,6 +42,10 @@ export default function WalletScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [txLoading, setTxLoading] = useState(true);
   const scrollX = useRef(new Animated.Value(0)).current;
+  
+  // Receipt modal state
+  const [receiptModalVisible, setReceiptModalVisible] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState(null);
 
   const onViewableItemsChanged = useRef(({ viewableItems }) => {
     if (viewableItems?.length) setIndex(viewableItems[0].index);
@@ -64,7 +69,7 @@ export default function WalletScreen({ navigation }) {
           getStockInOut()
         ]);
 
-        // Process wallets data
+   
         const commissionWallet = {
           ...walletsRes?.comissionWallet,
           key: "commission",
@@ -78,7 +83,7 @@ export default function WalletScreen({ navigation }) {
         const data = [primaryWallet, commissionWallet];
         setWallets(data);
 
-        // Process transactions data
+
         setTx(stockRes?.data || []);
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -95,7 +100,13 @@ export default function WalletScreen({ navigation }) {
     navigation.goBack();
   };
 
-  // Skeleton for Wallet Card
+ 
+  const handleTransactionPress = (transaction) => {
+    setSelectedTransaction(transaction);
+    setReceiptModalVisible(true);
+  };
+
+
   const renderSkeletonCard = ({ item, index }) => {
     const inputRange = [
       (index - 1) * (CARD_WIDTH + CARD_MARGIN),
@@ -253,7 +264,11 @@ export default function WalletScreen({ navigation }) {
   );
 
   const renderTransactionItem = ({ item }) => (
-    <View style={styles.txRow}>
+    <TouchableOpacity
+      style={styles.txRow}
+      onPress={() => handleTransactionPress(item)}
+      activeOpacity={0.85}
+    >
       <View style={styles.txLeft}>
         <View
           style={[
@@ -268,9 +283,13 @@ export default function WalletScreen({ navigation }) {
           />
         </View>
         <View style={styles.txInfo}>
-          <Text style={styles.txTitle}>From {item.from_wallet_id}</Text>
+          <Text style={styles.txTitle}>
+            {item.type === "IN" ? "Stock In" : "Stock Out"}
+          </Text>
           <Text style={styles.txSub}>
-            {formatDateTime(item.createdAt)} • {item.to_wallet_id || "Activate Bundle"}
+            {formatDateTime(item.createdAt)} • {item.type === "IN" ? 
+              `From ${item.from_wallet_id}` : 
+              `To ${item.to_wallet_id || "Activate Bundle"}`}
           </Text>
         </View>
       </View>
@@ -283,7 +302,7 @@ export default function WalletScreen({ navigation }) {
         {item.type === "OUT" ? "-" : "+"}
         {formatAF(Math.abs(item.amount))} AF
       </Text>
-    </View>
+    </TouchableOpacity>
   );
 
   return (
@@ -328,7 +347,6 @@ export default function WalletScreen({ navigation }) {
         <View style={styles.recentContainer}>
           <View style={styles.recentHeader}>
             <Text style={styles.recentTitle}>Recent Transactions</Text>
-           
           </View>
           
           <FlatList
@@ -350,6 +368,14 @@ export default function WalletScreen({ navigation }) {
           )}
         </View>
       </ScrollView>
+
+  
+      <ReceiptModal1
+        visible={receiptModalVisible}
+        onClose={() => setReceiptModalVisible(false)}
+        transaction={selectedTransaction}
+        transactionType="stock" 
+      />
     </SafeAreaView>
   );
 }
@@ -366,15 +392,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 24,
+    paddingBottom: scale.hp(3.1),
   },
   carouselContainer: {
-    marginTop: 20,
-    marginBottom: 16,
+    marginTop: scale.hp(2.6),
+    marginBottom: scale.hp(2.1),
   },
   carouselContent: {
-    paddingHorizontal: 24,
-    paddingBottom: 8,
+    paddingHorizontal: scale.wp(6.2),
+    paddingBottom: scale.hp(1.05),
   },
   walletCardContainer: {
     width: CARD_WIDTH,
@@ -382,22 +408,22 @@ const styles = StyleSheet.create({
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
-      height: 8,
+      height: scale.hp(1.05),
     },
     shadowOpacity: 0.2,
-    shadowRadius: 16,
+    shadowRadius: scale.hp(2.1),
     elevation: 8,
   },
   walletCard: {
-    height: 200,
-    borderRadius: 24,
-    padding: 20,
+    height: scale.hp(26),
+    borderRadius: scale.hp(3.1),
+    padding: scale.hp(2.6),
     overflow: "hidden",
   },
   skeletonCard: {
-    height: 200,
-    borderRadius: 24,
-    padding: 20,
+    height: scale.hp(26),
+    borderRadius: scale.hp(3.1),
+    padding: scale.hp(2.6),
     overflow: "hidden",
     backgroundColor: "#F0F0F0",
     position: "relative",
@@ -411,20 +437,20 @@ const styles = StyleSheet.create({
   },
   patternCircle1: {
     position: "absolute",
-    top: -20,
-    right: -20,
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    top: scale.hp(-2.6),
+    right: scale.hp(-2.6),
+    width: scale.wp(31.2),
+    height: scale.wp(31.2),
+    borderRadius: scale.wp(15.6),
     backgroundColor: "rgba(255,255,255,0.1)",
   },
   patternCircle2: {
     position: "absolute",
-    bottom: -30,
-    right: 40,
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    bottom: scale.hp(-3.9),
+    right: scale.wp(10.4),
+    width: scale.wp(20.8),
+    height: scale.wp(20.8),
+    borderRadius: scale.wp(10.4),
     backgroundColor: "rgba(255,255,255,0.1)",
   },
   cardHeader: {
@@ -439,39 +465,39 @@ const styles = StyleSheet.create({
   walletLabel: {
     color: "#fff",
     opacity: 0.9,
-    fontSize: 14,
+    fontSize: scale.hp(1.8),
     fontWeight: "500",
-    marginBottom: 4,
+    marginBottom: scale.hp(0.5),
   },
   balanceText: {
     color: "#fff",
-    fontSize: 32,
+    fontSize: scale.hp(4.2),
     fontWeight: "700",
-    marginBottom: 8,
+    marginBottom: scale.hp(1.05),
   },
   walletName: {
     color: "#fff",
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     opacity: 0.95,
     fontWeight: "600",
   },
   walletIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: scale.wp(12.4),
+    height: scale.wp(12.4),
+    borderRadius: scale.wp(6.2),
     backgroundColor: "rgba(255,255,255,0.2)",
     justifyContent: "center",
     alignItems: "center",
-    marginLeft: 12,
+    marginLeft: scale.wp(3.1),
   },
   transferButton: {
-    marginTop: 16,
-    borderRadius: 12,
+    marginTop: scale.hp(2.1),
+    borderRadius: scale.hp(1.55),
     overflow: "hidden",
   },
   transferGradient: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: scale.wp(4.2),
+    paddingVertical: scale.hp(1.55),
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -479,46 +505,45 @@ const styles = StyleSheet.create({
   transferButtonText: {
     color: "#fff",
     fontWeight: "600",
-    fontSize: 14,
+    fontSize: scale.hp(1.8),
   },
   indicatorsContainer: {
     alignItems: "center",
-    marginTop: 16,
+    marginTop: scale.hp(2.1),
   },
   recentContainer: {
     backgroundColor: "#fff",
-    borderRadius: 20,
-    marginBottom: 100,
-    paddingHorizontal: 20,
-    paddingVertical: 20,
+    borderRadius: scale.hp(2.6),
+    marginBottom: scale.hp(13),
+    paddingHorizontal: scale.wp(5.2),
+    paddingVertical: scale.hp(2.6),
     borderLeftWidth: 2,
     borderRightWidth: 2,
     borderTopWidth: 2,
     borderColor: "#F3F3F3",
-
-    minHeight: 200,
+    minHeight: scale.hp(26),
   },
   recentHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: scale.hp(2.1),
   },
   recentTitle: {
     color: Colors.textPrimary,
-    fontSize: 18,
+    fontSize: scale.hp(2.35),
     fontWeight: "700",
   },
   seeAllText: {
     color: Colors.primary,
-    fontSize: 14,
+    fontSize: scale.hp(1.8),
     fontWeight: "600",
   },
   txRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 12,
+    paddingVertical: scale.hp(1.55),
     borderBottomWidth: 1,
     borderBottomColor: "#F8F8F8",
   },
@@ -528,12 +553,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   txIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: scale.wp(10.4),
+    height: scale.wp(10.4),
+    borderRadius: scale.wp(5.2),
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 12,
+    marginRight: scale.wp(3.1),
   },
   txInIcon: {
     backgroundColor: "rgba(11, 163, 96, 0.1)",
@@ -546,23 +571,22 @@ const styles = StyleSheet.create({
   },
   txTitle: {
     color: Colors.textPrimary,
-    fontSize: 15,
+    fontSize: scale.hp(2),
     fontWeight: "600",
-    marginBottom: 2,
+    marginBottom: scale.hp(0.26),
   },
   txSub: {
     color: "#9E9E9E",
-    fontSize: 12,
+    fontSize: scale.hp(1.55),
   },
   txAmount: {
-    fontSize: 15,
+    fontSize: scale.hp(2),
     fontWeight: "700",
-    marginLeft: 8,
+    marginLeft: scale.wp(2.1),
   },
-  // Skeleton Styles
   skeleton: {
     backgroundColor: "#E0E0E0",
-    borderRadius: 4,
+    borderRadius: scale.hp(0.5),
     overflow: "hidden",
     position: "relative",
   },
@@ -575,69 +599,70 @@ const styles = StyleSheet.create({
     backgroundColor: "#F5F5F5",
   },
   skeletonLabel: {
-    width: 120,
-    height: 14,
-    marginBottom: 8,
-    borderRadius: 7,
+    width: scale.wp(31.2),
+    height: scale.hp(1.8),
+    marginBottom: scale.hp(1.05),
+    borderRadius: scale.hp(0.9),
   },
   skeletonBalance: {
-    width: 160,
-    height: 32,
-    marginBottom: 12,
-    borderRadius: 8,
+    width: scale.wp(41.6),
+    height: scale.hp(4.2),
+    marginBottom: scale.hp(1.55),
+    borderRadius: scale.hp(1.05),
   },
   skeletonWalletName: {
-    width: 140,
-    height: 16,
-    borderRadius: 8,
+    width: scale.wp(36.4),
+    height: scale.hp(2.1),
+    borderRadius: scale.hp(1.05),
   },
   skeletonIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: scale.wp(8.3),
+    height: scale.wp(8.3),
+    borderRadius: scale.wp(4.2),
   },
   skeletonButton: {
-    height: 44,
-    borderRadius: 12,
-    marginTop: 16,
+    height: scale.hp(5.7),
+    borderRadius: scale.hp(1.55),
+    marginTop: scale.hp(2.1),
   },
   skeletonTxIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 12,
+    width: scale.wp(10.4),
+    height: scale.wp(10.4),
+    borderRadius: scale.wp(5.2),
+    marginRight: scale.wp(3.1),
   },
   skeletonTxTitle: {
-    width: 180,
-    height: 15,
-    marginBottom: 6,
-    borderRadius: 4,
+    width: scale.wp(46.8),
+    height: scale.hp(2),
+    marginBottom: scale.hp(0.8),
+    borderRadius: scale.hp(0.5),
   },
   skeletonTxSub: {
-    width: 140,
-    height: 12,
-    borderRadius: 4,
+    width: scale.wp(36.4),
+    height: scale.hp(1.55),
+    borderRadius: scale.hp(0.5),
   },
   skeletonTxAmount: {
-    width: 80,
-    height: 15,
-    borderRadius: 4,
+    width: scale.wp(20.8),
+    height: scale.hp(2),
+    borderRadius: scale.hp(0.5),
   },
   emptyState: {
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 40,
+    paddingVertical: scale.hp(5.2),
   },
   emptyStateText: {
     color: "#666",
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     fontWeight: "600",
-    marginTop: 12,
-    marginBottom: 4,
+    marginTop: scale.hp(1.55),
+    marginBottom: scale.hp(0.5),
   },
   emptyStateSubText: {
     color: "#999",
-    fontSize: 14,
+    fontSize: scale.hp(1.8),
     textAlign: "center",
   },
 });
+

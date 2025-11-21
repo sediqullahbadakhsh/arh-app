@@ -16,7 +16,12 @@ import {
   Dimensions,
   Image,
   ActivityIndicator,
+  StyleSheet,
 } from "react-native";
+import { captureRef } from 'react-native-view-shot';
+import * as MediaLibrary from 'expo-media-library';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { Ionicons } from "@expo/vector-icons";
 import LottieView from 'lottie-react-native';
 import { Colors } from "../../theme/colors";
@@ -36,6 +41,7 @@ import TopUpStyles from "./TopupStyle";
 import formatLocal from "../../utils/formatLocal";
 import { useTranslation } from "react-i18next";
 import { useStripe } from "@stripe/stripe-react-native";
+import { scale } from "../../utils/normalizeSize";
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 const BASE_STEPS = { COUNTRY: 0, NUMBER: 1, AMOUNT: 2, PAY: 3 };
@@ -86,7 +92,7 @@ export default function TopupFlowScreen({ navigation, route }) {
   const dial = DIAL_CODES[country?.countryCode] || "";
   const operator = guessOperator(country?.countryCode, localNumber.replace(/\D/g, ""));
 
-  // Calculate amounts with proper slab calculations
+
   const calculateTotalAfnAmount = (baseAfn, productItem = null) => {
     const baseAmount = parseFloat(baseAfn) || 0;
     const targetProduct = productItem || product;
@@ -97,12 +103,12 @@ export default function TopupFlowScreen({ navigation, route }) {
 
     let totalAmount = baseAmount;
     
-    // Apply slab percentage
+
     if (targetProduct.slabDetails?.percentage) {
       totalAmount += baseAmount * (targetProduct.slabDetails.percentage / 100);
     }
     
-    // Apply service slab percentage
+
     if (targetProduct.serviceSlabDetails?.percentage) {
       totalAmount += baseAmount * (targetProduct.serviceSlabDetails.percentage / 100);
     }
@@ -142,7 +148,7 @@ export default function TopupFlowScreen({ navigation, route }) {
     return parseFloat(totalFee.toFixed(2));
   };
 
-  // Get the actual AFN amount
+
   const getActualAfnAmount = () => {
     if (product && product.price) {
       return parseFloat(product.price);
@@ -160,60 +166,58 @@ export default function TopupFlowScreen({ navigation, route }) {
   console.log("Topup1 route params:", route.params);
   console.log("Current step:", step);
   
-  // Check if we have a resend order from navigation params
+
   const resendOrder = route.params?.resendOrder;
   console.log("Resend order detected:", resendOrder);
   
   if (resendOrder) {
     console.log("Processing resend order:", resendOrder);
     
-    // Pre-fill the phone number
+ 
     if (resendOrder.receiver) {
       const cleanNumber = resendOrder.receiver.replace(/\D/g, "");
       console.log("Setting local number to:", cleanNumber);
       setLocalNumber(cleanNumber);
     }
     
-    // Pre-fill the custom amount
+
     if (resendOrder.amount) {
       const amount = parseFloat(resendOrder.amount);
       if (!isNaN(amount) && amount > 0) {
         console.log("Setting custom AFN to:", amount);
         setCustomAfn(amount.toString());
-        setProduct(null); // Clear any selected product
+        setProduct(null);
       }
     }
     
-    // Auto-proceed to AMOUNT step only (not PAY)
-    // Don't check for step condition, just proceed after a delay
+
     setTimeout(() => {
       console.log("Auto-proceeding to AMOUNT step");
       setStep(BASE_STEPS.AMOUNT);
     }, 500);
   }
-}, [route.params?.resendOrder]); // Remove step dependency
+}, [route.params?.resendOrder]); 
 
-// Add this useEffect to reset the flow when resend order is detected
+
 useEffect(() => {
   const resendOrder = route.params?.resendOrder;
   if (resendOrder) {
     console.log("Resend order detected - resetting flow");
     
-    // Reset to initial state to ensure clean flow
+ 
     setStep(BASE_STEPS.COUNTRY);
     setProduct(null);
     setCustomAfn("");
     
-    // Small delay to allow state reset, then set the values
+
     setTimeout(() => {
-      // Pre-fill the phone number
       if (resendOrder.receiver) {
         const cleanNumber = resendOrder.receiver.replace(/\D/g, "");
         console.log("Setting local number to:", cleanNumber);
         setLocalNumber(cleanNumber);
       }
       
-      // Pre-fill the custom amount
+   
       if (resendOrder.amount) {
         const amount = parseFloat(resendOrder.amount);
         if (!isNaN(amount) && amount > 0) {
@@ -222,8 +226,7 @@ useEffect(() => {
           setProduct(null);
         }
       }
-      
-      // Then proceed to AMOUNT step
+
       setTimeout(() => {
         console.log("Auto-proceeding to AMOUNT step after reset");
         setStep(BASE_STEPS.AMOUNT);
@@ -231,7 +234,6 @@ useEffect(() => {
     }, 100);
   }
 }, [route.params?.resendOrder]);
-  // Clean up polling on unmount
   useEffect(() => {
     return () => {
       if (pollingRef.current) {
@@ -253,7 +255,7 @@ useEffect(() => {
     }, 2000);
   };
 
-  // Polling function to check order status
+
   const startPollingOrderStatus = async (orderId) => {
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
@@ -552,26 +554,26 @@ useEffect(() => {
     setLocalNumber("");
   }, [country?.countryCode]);
 
-  // FIXED: Handle popular amount selection
+
   const handleSelectPopularAmount = (selectedAmount) => {
     console.log("Popular amount selected:", selectedAmount);
     
-    // Set the product immediately
+  
     if (selectedAmount.product) {
       setProduct(selectedAmount.product);
     }
     
-    // Clear any custom amount
+
     setCustomAfn("");
     
-    // Auto-proceed to payment
+
     setTimeout(() => {
       console.log("Auto-proceeding to payment...");
       setStep(BASE_STEPS.PAY);
     }, 100);
   };
 
-  // FIXED: Recharge function with proper amount handling
+
   const recharge = async () => {
     if (!paymentMethodId) {
       Alert.alert(t('error'), t('pleaseEnterCardDetails'));
@@ -589,7 +591,7 @@ useEffect(() => {
         return;
       }
 
-      // Validate amount
+ 
       if (afn <= 0) {
         Alert.alert("Invalid Amount", "Please enter a valid amount greater than 0");
         setLoading(false);
@@ -668,13 +670,13 @@ useEffect(() => {
     setLoading(false);
   };
 
-  // FIXED: Payment summary with correct calculations
+
   const getPaymentSummary = () => {
     const baseAmount = calculateBaseAmount(afn);
     const feeAmount = calculateFeeAmount(afn);
     const totalUsd = calculateUsdAmount(afn);
     
-    // Get slab breakdown for display
+
     const slabPercent = product?.slabDetails?.percentage || 0;
     const serviceSlabPercent = product?.serviceSlabDetails?.percentage || 0;
     
@@ -993,8 +995,228 @@ useEffect(() => {
     );
   };
 
-  const OrderStatusScreen = () => (
-    <View style={{ flex: 1, paddingBottom: 100, }}>
+const OrderStatusScreen = () => {
+  const receiptCaptureRef = useRef(null);
+  const [hasMediaPermission, setHasMediaPermission] = useState(false);
+  const [isCapturing, setIsCapturing] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      setHasMediaPermission(status === 'granted');
+    })();
+  }, []);
+
+  const captureReceipt = async () => {
+    try {
+      setIsCapturing(true);
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      if (receiptCaptureRef.current) {
+        console.log('Capturing receipt...');
+        const uri = await captureRef(receiptCaptureRef.current, {
+          format: 'png',
+          quality: 1.0,
+          result: 'tmpfile',
+        });
+        
+        console.log('Receipt captured successfully:', uri);
+        return uri;
+      } else {
+        throw new Error('Receipt capture ref not available');
+      }
+    } catch (error) {
+      console.error('Error capturing receipt:', error);
+      throw error;
+    } finally {
+      setIsCapturing(false);
+    }
+  };
+
+  const shareReceipt = async () => {
+    try {
+      if (isCapturing) {
+        Alert.alert('Please Wait', 'Preparing receipt for sharing...');
+        return;
+      }
+
+      console.log('Starting receipt capture for sharing...');
+      const receiptUri = await captureReceipt();
+      
+      if (receiptUri) {
+        console.log('Sharing receipt URI:', receiptUri);
+        
+        if (await Sharing.isAvailableAsync()) {
+          console.log('Using expo-sharing directly...');
+          await Sharing.shareAsync(receiptUri, {
+            mimeType: 'image/png',
+            dialogTitle: 'Share Receipt',
+            UTI: 'public.png'
+          });
+        } else {
+          let shareUri = receiptUri;
+          if (Platform.OS === 'android') {
+            if (!receiptUri.startsWith('file://') && !receiptUri.startsWith('content://')) {
+              shareUri = `file://${receiptUri}`;
+            }
+          } else {
+            if (!receiptUri.startsWith('file://')) {
+              shareUri = `file://${receiptUri}`;
+            }
+          }
+
+          const shareOptions = {
+            url: shareUri,
+            type: 'image/png',
+            title: 'Share Receipt'
+          };
+
+          await Share.share(shareOptions);
+        }
+        
+      } else {
+        throw new Error('Failed to capture receipt');
+      }
+    } catch (error) {
+      console.error('Error sharing receipt:', error);
+      
+      // Fallback to text sharing
+      const receiptText = `
+🎫 Transaction Receipt
+Total Amount: ${orderDetails?.amountAfn} AFN
+Receiver: ${orderDetails?.mobile}
+Status: ${orderStatus === ORDER_STATUS.SUCCEEDED ? 'Succeeded' : orderStatus === ORDER_STATUS.FAILED ? 'Failed' : 'Processing'}
+Date & Time: ${new Date(orderDetails?.date).toLocaleString()}
+Transaction ID: ${orderDetails?.txnNumber}
+
+Thank you for using our service!
+      `.trim();
+
+      await Share.share({
+        message: receiptText,
+        title: 'Transaction Receipt',
+      });
+    }
+  };
+
+  const downloadReceipt = async () => {
+    try {
+      if (isCapturing) {
+        Alert.alert('Please Wait', 'Preparing receipt for download...');
+        return;
+      }
+
+      if (!hasMediaPermission) {
+        Alert.alert(
+          'Permission Required',
+          'Please grant media library permissions to download receipts',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      console.log('Starting receipt capture for download...');
+      const receiptUri = await captureReceipt();
+      
+      if (receiptUri) {
+        console.log('Downloading receipt:', receiptUri);
+        
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = `Receipt-${orderDetails?.txnNumber}-${timestamp}.png`;
+        
+        const asset = await MediaLibrary.createAssetAsync(receiptUri);
+        const album = await MediaLibrary.getAlbumAsync('Receipts');
+        
+        if (album) {
+          await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+        } else {
+          await MediaLibrary.createAlbumAsync('Receipts', asset, false);
+        }
+        
+        Alert.alert(
+          'Download Successful',
+          'Receipt has been saved to your gallery',
+          [{ text: 'OK' }]
+        );
+      } else {
+        throw new Error('Failed to capture receipt');
+      }
+    } catch (error) {
+      console.error('Error downloading receipt:', error);
+      Alert.alert(
+        'Download Error',
+        'Failed to download receipt. Please try again.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
+  const ReceiptContent = React.forwardRef((props, ref) => (
+    <View ref={ref} style={receiptStyles.receiptCaptureContainer}>
+      <View style={receiptStyles.captureHeader}>
+        <Image
+          source={require('../../../assets/logoV.png')} 
+          style={receiptStyles.captureLogo}
+          resizeMode="contain"
+        />
+        <Text style={receiptStyles.captureTitle}>TRANSACTION RECEIPT</Text>
+      </View>
+
+      <View style={receiptStyles.captureStatusSection}>
+        <Text style={receiptStyles.captureStatusTitle}>
+          {getStatusTitle()}
+        </Text>
+      </View>
+
+      <View style={receiptStyles.captureDetails}>
+        <View style={receiptStyles.captureDetailRow}>
+          <Text style={receiptStyles.captureDetailLabel}>Transaction ID:</Text>
+          <Text style={receiptStyles.captureDetailValue}>{orderDetails?.txnNumber}</Text>
+        </View>
+        
+        <View style={receiptStyles.captureDetailRow}>
+          <Text style={receiptStyles.captureDetailLabel}>Date & Time:</Text>
+          <Text style={receiptStyles.captureDetailValue}>
+            {new Date(orderDetails?.date).toLocaleString()}
+          </Text>
+        </View>
+        
+        <View style={receiptStyles.captureDetailRow}>
+          <Text style={receiptStyles.captureDetailLabel}>Receiver:</Text>
+          <Text style={receiptStyles.captureDetailValue}>{orderDetails?.mobile}</Text>
+        </View>
+
+        <View style={receiptStyles.captureDetailRow}>
+          <Text style={receiptStyles.captureDetailLabel}>Status:</Text>
+          <Text style={[receiptStyles.captureDetailValue, { color: getStatusColor() }]}>
+            {getStatusTitle()}
+          </Text>
+        </View>
+      </View>
+
+      <View style={receiptStyles.captureAmountSection}>
+        <Text style={receiptStyles.captureAmountLabel}>TOTAL AMOUNT</Text>
+        <Text style={receiptStyles.captureAmountValue}>
+          {orderDetails?.amountAfn} AFN
+        </Text>
+        <Text style={receiptStyles.captureAmountSubValue}>
+          ${orderDetails?.usdAmount} USD
+        </Text>
+      </View>
+
+      <View style={receiptStyles.captureFooter}>
+        <Text style={receiptStyles.captureFooterText}>Thank you for using our service!</Text>
+      </View>
+    </View>
+  ));
+
+  return (
+    <View style={{ flex: 1, paddingBottom: 100 }}>
+
+      <View style={{ position: 'absolute', left: -1000 }}>
+        <ReceiptContent ref={receiptCaptureRef} />
+      </View>
+
       <ScrollView
         contentContainerStyle={{ 
           flexGrow: 1,
@@ -1003,6 +1225,41 @@ useEffect(() => {
           justifyContent: 'center'
         }}
       >
+    
+        {/* {(orderStatus === ORDER_STATUS.SUCCEEDED || orderStatus === ORDER_STATUS.FAILED) && (
+          <View style={TopUpStyles.receiptActions}>
+            <TouchableOpacity 
+              style={[
+                TopUpStyles.receiptActionButton,
+                TopUpStyles.shareButton,
+                isCapturing && TopUpStyles.buttonDisabled
+              ]}
+              onPress={shareReceipt}
+              disabled={isCapturing}
+            >
+              <Ionicons name="share-outline" size={20} color="#fff" />
+              <Text style={TopUpStyles.receiptActionButtonText}>
+                {isCapturing ? 'Preparing...' : 'Share Receipt'}
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[
+                TopUpStyles.receiptActionButton,
+                TopUpStyles.downloadButton,
+                isCapturing && TopUpStyles.buttonDisabled
+              ]}
+              onPress={downloadReceipt}
+              disabled={isCapturing}
+            >
+              <Ionicons name="download-outline" size={20} color="#fff" />
+              <Text style={TopUpStyles.receiptActionButtonText}>
+                {isCapturing ? 'Preparing...' : 'Download'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )} */}
+
         <View style={TopUpStyles.statusHeader}>
           {getStatusIcon()}
           <Text style={[TopUpStyles.statusTitle, { color: getStatusColor() }]}>
@@ -1086,6 +1343,7 @@ useEffect(() => {
       </ScrollView>
     </View>
   );
+};
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background }}>
@@ -1198,7 +1456,7 @@ useEffect(() => {
 }
 
 const modalStyles = {
-  modalOverlay: {
+ modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
@@ -1211,98 +1469,204 @@ const modalStyles = {
     left: 0,
     right: 0,
     backgroundColor: 'white',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingTop: 16,
+    borderTopLeftRadius: scale.hp(2.5),
+    borderTopRightRadius: scale.hp(2.5),
+    paddingTop: scale.hp(2),
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 16,
+    paddingHorizontal: scale.wp(5),
+    paddingBottom: scale.hp(2),
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: scale.hp(2.25),
     fontWeight: '600',
     color: '#1F2937',
   },
   closeButton: {
-    padding: 4,
+    padding: scale.hp(0.5),
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F3F4F6',
-    margin: 20,
-    marginTop: 16,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    height: 48,
+    margin: scale.wp(5),
+    marginTop: scale.hp(2),
+    paddingHorizontal: scale.wp(4),
+    borderRadius: scale.hp(1.5),
+    height: scale.hp(6),
   },
   searchIcon: {
-    marginRight: 12,
+    marginRight: scale.wp(3),
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
+    fontSize: scale.hp(2),
     color: '#1F2937',
     height: '100%',
   },
   contactItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingHorizontal: scale.wp(5),
+    paddingVertical: scale.hp(1.5),
   },
   contactAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: scale.wp(10),
+    height: scale.wp(10),
+    borderRadius: scale.wp(5),
     backgroundColor: Colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: scale.wp(3),
   },
   contactAvatarText: {
     color: 'white',
     fontWeight: 'bold',
-    fontSize: 16,
+    fontSize: scale.hp(2),
   },
   contactInfo: {
     flex: 1,
   },
   contactName: {
-    fontSize: 16,
+    fontSize: scale.hp(2),
     fontWeight: '500',
     color: '#1F2937',
-    marginBottom: 2,
+    marginBottom: scale.hp(0.25),
   },
   contactPhone: {
-    fontSize: 14,
+    fontSize: scale.hp(1.75),
     color: '#6B7280',
   },
   contactSeparator: {
     height: 1,
     backgroundColor: '#F3F4F6',
-    marginLeft: 72,
+    marginLeft: scale.wp(18),
   },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 60,
+    paddingVertical: scale.hp(7.5),
   },
   emptyText: {
-    marginTop: 12,
-    fontSize: 16,
+    marginTop: scale.hp(1.5),
+    fontSize: scale.hp(2),
     color: '#6B7280',
   },
   modalRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: scale.wp(5),
+    paddingVertical: scale.hp(2),
   },
+
 };
+
+const receiptStyles = StyleSheet.create({
+  receiptCaptureContainer: {
+    width: scale.wp(90),
+    backgroundColor: '#ffffff',
+    padding: scale.hp(3),
+    borderRadius: scale.hp(1.5),
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale.hp(0.5) },
+    shadowOpacity: 0.1,
+    shadowRadius: scale.hp(1),
+    elevation: 5,
+  },
+  captureHeader: {
+    alignItems: 'center',
+    marginBottom: scale.hp(2.5),
+    borderBottomWidth: 2,
+    borderBottomColor: Colors.primary,
+    paddingBottom: scale.hp(2),
+  },
+  captureLogo: {
+    width: scale.wp(50),
+    height: scale.hp(6.25),
+    marginBottom: scale.hp(1.25),
+  },
+  captureTitle: {
+    fontSize: scale.hp(2.25),
+    fontWeight: 'bold',
+    color: Colors.primary,
+    textAlign: 'center',
+  },
+  captureStatusSection: {
+    alignItems: 'center',
+    marginBottom: scale.hp(2.5),
+  },
+  captureStatusTitle: {
+    fontSize: scale.hp(2.5),
+    fontWeight: 'bold',
+    color: Colors.textPrimary,
+    textAlign: 'center',
+  },
+  captureDetails: {
+    marginBottom: scale.hp(2.5),
+  },
+  captureDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: scale.hp(1.25),
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  captureDetailLabel: {
+    fontSize: scale.hp(1.75),
+    color: '#6B7280',
+    fontWeight: '600',
+    flex: 1,
+  },
+  captureDetailValue: {
+    fontSize: scale.hp(1.75),
+    fontWeight: '600',
+    color: Colors.textPrimary,
+    flex: 1,
+    textAlign: 'right',
+  },
+  captureAmountSection: {
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+    borderRadius: scale.hp(1),
+    padding: scale.hp(2.5),
+    marginBottom: scale.hp(2.5),
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  captureAmountLabel: {
+    fontSize: scale.hp(2),
+    color: '#6B7280',
+    fontWeight: '600',
+    marginBottom: scale.hp(1),
+  },
+  captureAmountValue: {
+    fontSize: scale.hp(3),
+    fontWeight: 'bold',
+    color: Colors.textPrimary,
+  },
+  captureAmountSubValue: {
+    fontSize: scale.hp(2),
+    color: '#6B7280',
+    marginTop: scale.hp(0.5),
+  },
+  captureFooter: {
+    alignItems: 'center',
+    paddingTop: scale.hp(2),
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  captureFooterText: {
+    fontSize: scale.hp(1.75),
+    color: '#6B7280',
+    fontStyle: 'italic',
+    marginBottom: scale.hp(0.625),
+  },
+});

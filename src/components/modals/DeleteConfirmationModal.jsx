@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
+import { scale } from '../../utils/normalizeSize';
 
 const { width, height } = Dimensions.get('window');
 
@@ -31,12 +32,11 @@ export default function DeleteConfirmationModal({
 
   useEffect(() => {
     if (visible) {
-      // Reset animations
       slideAnim.setValue(height);
       fadeAnim.setValue(0);
       scaleAnim.setValue(0.8);
 
-      // Start animations
+
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -57,7 +57,6 @@ export default function DeleteConfirmationModal({
         }),
       ]).start();
     } else {
-      // Hide animations
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 0,
@@ -94,14 +93,13 @@ export default function DeleteConfirmationModal({
     >
       <Animated.View style={[styles.backdrop, backdropStyle]}>
         <Animated.View style={[styles.modalContainer, modalStyle]}>
-          {/* Warning Icon */}
           <View style={styles.iconContainer}>
             <View style={styles.iconCircle}>
               <Ionicons name="warning-outline" size={32} color={Colors.white} />
             </View>
           </View>
 
-          {/* Content */}
+
           <View style={styles.content}>
             <Text style={styles.title}>{title}</Text>
             
@@ -118,7 +116,7 @@ export default function DeleteConfirmationModal({
               </View>
             ) : null}
 
-            {/* Action Buttons */}
+
             <View style={styles.buttonContainer}>
               <TouchableOpacity
                 style={[styles.button, styles.cancelButton]}
@@ -165,101 +163,101 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: scale.wp(5.2),
   },
   modalContainer: {
     width: '100%',
     maxWidth: 400,
     backgroundColor: Colors.white,
-    borderRadius: 20,
+    borderRadius: scale.hp(2.6),
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 10,
+      height: scale.hp(1.3),
     },
     shadowOpacity: 0.3,
-    shadowRadius: 20,
+    shadowRadius: scale.hp(2.6),
     elevation: 10,
   },
   iconContainer: {
     alignItems: 'center',
-    marginTop: 24,
-    marginBottom: 8,
+    marginTop: scale.hp(3.1),
+    marginBottom: scale.hp(1.05),
   },
   iconCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: scale.wp(16.6),
+    height: scale.wp(16.6),
+    borderRadius: scale.wp(8.3),
     backgroundColor: '#DC2626',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#DC2626',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: scale.hp(0.5),
     },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowRadius: scale.hp(1.05),
     elevation: 6,
   },
   content: {
-    padding: 24,
-    paddingTop: 16,
+    padding: scale.wp(6.2),
+    paddingTop: scale.hp(2.1),
   },
   title: {
-    fontSize: 20,
+    fontSize: scale.hp(2.6),
     fontWeight: '700',
     color: Colors.textPrimary,
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: scale.hp(1.55),
   },
   message: {
-    fontSize: 15,
+    fontSize: scale.hp(2),
     color: Colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 16,
+    lineHeight: scale.hp(2.9),
+    marginBottom: scale.hp(2.1),
   },
   itemNameContainer: {
     backgroundColor: '#FEF2F2',
-    padding: 12,
-    borderRadius: 8,
-    borderLeftWidth: 4,
+    padding: scale.hp(1.55),
+    borderRadius: scale.hp(1.05),
+    borderLeftWidth: scale.wp(1),
     borderLeftColor: '#DC2626',
-    marginBottom: 20,
+    marginBottom: scale.hp(2.6),
   },
   itemNameLabel: {
-    fontSize: 12,
+    fontSize: scale.hp(1.55),
     color: Colors.textSecondary,
     fontWeight: '500',
-    marginBottom: 4,
+    marginBottom: scale.hp(0.5),
   },
   itemName: {
-    fontSize: 14,
+    fontSize: scale.hp(1.8),
     color: Colors.textPrimary,
     fontWeight: '600',
   },
   buttonContainer: {
     flexDirection: 'row',
-    gap: 12,
-    marginTop: 8,
+    gap: scale.wp(3.1),
+    marginTop: scale.hp(1.05),
   },
   button: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 12,
+    gap: scale.wp(2.1),
+    paddingVertical: scale.hp(1.8),
+    borderRadius: scale.hp(1.55),
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: scale.hp(0.26),
     },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: scale.hp(0.5),
     elevation: 3,
   },
   cancelButton: {
@@ -271,7 +269,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#DC2626',
   },
   buttonText: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     fontWeight: '600',
   },
   cancelButtonText: {
@@ -283,6 +281,6 @@ const styles = StyleSheet.create({
   loadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: scale.wp(2.1),
   },
 });

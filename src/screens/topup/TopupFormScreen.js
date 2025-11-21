@@ -9,11 +9,13 @@ import ConfirmAmountModal from '../../components/ConfirmAmountModal';
 import SelectedProductBanner from '../../components/SelectedProductBanner';
 import { Ionicons } from '@expo/vector-icons';
 import { USD_TO_AFN } from '../../constants/rates';
+import { scale } from '../../utils/normalizeSize';
+import { useTranslation } from 'react-i18next';
 
 export default function TopupFormScreen({ navigation, route }) {
+    const { t } = useTranslation();
     const { product, selectedMobile } = route.params || {};
 
- 
     const initialAmount = useRef(product?.usd ? String(product.usd) : '');
     const [mobile, setMobile] = useState('');
     const [amount, setAmount] = useState(initialAmount.current);
@@ -50,30 +52,30 @@ export default function TopupFormScreen({ navigation, route }) {
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
-            <ServiceHeader title="Mobile Top-up" onBack={() => navigation.goBack()} />
+            <ServiceHeader title={t('mobileTopup')} onBack={() => navigation.goBack()} />
             <View style={styles.container}>
                 <SelectedProductBanner product={product} usd={usdValue} afn={afnValue} isFixed={isFixed} />
 
-                <Text style={styles.label}>Mobile Number</Text>
+                <Text style={styles.label}>{t('mobileNumber')}</Text>
                 <InputField
                     value={mobile}
                     onChangeText={setMobile}
-                    placeholder="Enter Mobile Number"
+                    placeholder={t('enterMobileNumber')}
                     keyboardType="phone-pad"
                     rightIcon={<Ionicons name="person-circle-outline" size={24} color="#A9A9A9" />}
                     onRightIconPress={openContacts}
                 />
 
-                <Text style={styles.label}>Amount</Text>
+                <Text style={styles.label}>{t('amount')}</Text>
                 <InputField
                     value={amount}
                     onChangeText={setAmount}
-                    placeholder="Enter Amount"
+                    placeholder={t('enterAmount')}
                     keyboardType="decimal-pad"
                     editable={!isFixed}
                 />
 
-                <PrimaryButton label="Continue" onPress={handleContinuePress} style={{ marginTop: 32 }} />
+                <PrimaryButton label={t('continue')} onPress={handleContinuePress} style={{ marginTop: 32 }} />
             </View>
 
             <ConfirmAmountModal
@@ -89,6 +91,15 @@ export default function TopupFormScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, paddingHorizontal: 24, paddingTop: 8 },
-    label: { fontSize: 13, color: Colors.textPrimary, marginBottom: 6, marginTop: 16 },
+  container: {
+    flex: 1,
+    paddingHorizontal: scale.wp(6.2),
+    paddingTop: scale.hp(1.05),
+  },
+  label: {
+    fontSize: scale.hp(1.8),
+    color: Colors.textPrimary,
+    marginBottom: scale.hp(0.8),
+    marginTop: scale.hp(2.1),
+  },
 });

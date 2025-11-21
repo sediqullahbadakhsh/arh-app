@@ -1,6 +1,7 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { Colors } from '../theme/colors';
+import { scale } from '../utils/normalizeSize';
 
 export default function PrimaryButton({ label, onPress, style }) {
     return (
@@ -11,16 +12,15 @@ export default function PrimaryButton({ label, onPress, style }) {
 }
 
 const styles = StyleSheet.create({
-    button: {
-        backgroundColor: Colors.primary,
-        borderRadius: 28,
-        paddingVertical: 14,
-        alignItems: 'center',
-    },
-    label: {
-        color: Colors.white,
-        fontSize: 16,
-      
-        fontFamily: "dmsansRegular"
-    },
+  button: {
+    backgroundColor: Colors.primary,
+    borderRadius: scale.hp(3.5),         
+    paddingVertical: scale.hp(1.75),     
+    alignItems: 'center',
+  },
+  label: {
+    color: Colors.white,
+    fontSize: scale.hp(2),               
+    fontFamily: 'dmsansRegular',
+  },
 });

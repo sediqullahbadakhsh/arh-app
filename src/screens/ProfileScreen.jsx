@@ -20,6 +20,7 @@ import { useTranslation } from "react-i18next";
 import { isRTL } from "../utils/rtl";
 import ValidationModal from "../components/ValidationModal";
 import { useModal } from "../hooks/useModal";
+import { scale } from "../utils/normalizeSize";
 
 export default function ProfileScreen({ navigation }) {
   const { user, logout } = useAuth();
@@ -46,7 +47,6 @@ export default function ProfileScreen({ navigation }) {
     } catch (error) {
       console.error("Error fetching customer profile:", error);
       showModal(t('error'), t('errors.loadTransactions'));
-      // Alert.alert(t('error'), t('errors.loadTransactions'));
     } finally {
       setFetching(false);
     }
@@ -367,19 +367,19 @@ const AVATAR_SIZE = 150;
 const EDIT_SIZE = 32;
 
 const styles = StyleSheet.create({
-  safeArea: { 
-    flex: 1, 
-    backgroundColor: Colors.white 
+  safeArea: {
+    flex: 1,
+    backgroundColor: Colors.white,
   },
   menuWrapper: {
     flex: 1,
     backgroundColor: Colors.white,
-    marginTop: 100,
+    marginTop: scale.hp(13),
   },
   header: {
-    height: 150,
-    paddingHorizontal: 24,
-    paddingTop: Platform.OS === "android" ? 24 : 0,
+    height: scale.hp(19.4),
+    paddingHorizontal: scale.wp(6.2),
+    paddingTop: Platform.OS === "android" ? scale.hp(3.1) : 0,
     justifyContent: "flex-end",
     alignItems: "center",
     position: 'relative',
@@ -396,7 +396,7 @@ const styles = StyleSheet.create({
     width: AVATAR_SIZE,
     height: AVATAR_SIZE,
     borderRadius: AVATAR_SIZE / 2,
-    borderWidth: 3,
+    borderWidth: scale.hp(0.4),
     borderColor: "#fff",
   },
   avatarPlaceholder: {
@@ -404,7 +404,7 @@ const styles = StyleSheet.create({
     height: AVATAR_SIZE,
     borderRadius: AVATAR_SIZE / 2,
     backgroundColor: "#000",
-    borderWidth: 3,
+    borderWidth: scale.hp(0.4),
     borderColor: "#fff",
     zIndex: 99,
     justifyContent: "center",
@@ -412,8 +412,8 @@ const styles = StyleSheet.create({
   },
   editBtn: {
     position: "absolute",
-    right: -4,
-    bottom: -4,
+    right: scale.wp(-1),
+    bottom: scale.hp(-0.5),
     width: EDIT_SIZE,
     height: EDIT_SIZE,
     borderRadius: EDIT_SIZE / 2,
@@ -423,8 +423,8 @@ const styles = StyleSheet.create({
     elevation: 2,
     shadowColor: "#000",
     shadowOpacity: 0.15,
-    shadowRadius: 2,
-    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: scale.hp(0.26),
+    shadowOffset: { width: 0, height: scale.hp(0.13) },
   },
   editBtnDisabled: {
     opacity: 0.7,
@@ -435,162 +435,160 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: scale.hp(0.8),
+    height: scale.hp(0.8),
+    borderRadius: scale.hp(0.4),
     backgroundColor: Colors.primary,
   },
   decoration1: {
-    position: "absolute", 
-    top: 15, 
-    right: -186, 
-    backgroundColor: "#FFFFFF0A", 
-    height: 80, 
+    position: "absolute",
+    top: scale.hp(2),
+    right: -186,
+    backgroundColor: "#FFFFFF0A",
+    height: scale.hp(10.4),
     width: "100%",
     transform: [{ rotate: "130deg" }],
   },
   decoration2: {
-    position: "absolute", 
-    top: 15, 
-    right: -300, 
-    backgroundColor: "#FFFFFF14", 
-    height: 120, 
+    position: "absolute",
+    top: scale.hp(2),
+    right: -300,
+    backgroundColor: "#FFFFFF14",
+    height: scale.hp(15.5),
     width: "100%",
     transform: [{ rotate: "130deg" }],
   },
   body: {
     flex: 1,
-    paddingHorizontal: 24,
-    paddingBottom: 120,
+    paddingHorizontal: scale.wp(6.2),
+    paddingBottom: scale.hp(15.5),
   },
   nameRow: {
     flexDirection: "row",
     alignSelf: "center",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: scale.hp(2.1),
   },
   nameText: {
     color: Colors.textPrimary,
-    fontSize: 20,
+    fontSize: scale.hp(2.6),
     fontWeight: "600",
   },
-    skeletonCard: {
-    paddingVertical: 10,
-    marginTop: 50,
+  skeletonCard: {
+    paddingVertical: scale.hp(1.3),
+    marginTop: scale.hp(6.5),
     overflow: "hidden",
   },
   card: {
-    paddingVertical: 10,
+    paddingVertical: scale.hp(1.3),
     overflow: "hidden",
   },
   row: {
     flexDirection: "row",
     direction: 'ltr',
-    gap: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    gap: scale.wp(2.6),
+    paddingVertical: scale.hp(1.55),
+    paddingHorizontal: scale.wp(4.2),
     alignItems: "center",
     borderWidth: 1,
     borderColor: "#F3F3F3",
-    marginBottom: 10,
+    marginBottom: scale.hp(1.3),
     justifyContent: "space-between",
-    borderRadius: 10,
+    borderRadius: scale.hp(1.3),
     backgroundColor: '#fff',
   },
-  rowLeft: { 
-    flexDirection: "row", 
-    alignItems: "center", 
-    flex: 1 
+  rowLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
   },
   rowIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 6,
+    width: scale.wp(8.3),
+    height: scale.wp(8.3),
+    borderRadius: scale.hp(0.8),
     backgroundColor: "#FFF5F5",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 12,
+    marginRight: scale.wp(3.1),
   },
-  rowTitle: { 
-    color: Colors.textPrimary, 
-    fontSize: 14, 
-    fontWeight: "500" 
+  rowTitle: {
+    color: Colors.textPrimary,
+    fontSize: scale.hp(1.95),
+    fontWeight: "500",
   },
-  rowSubtitle: { 
-    color: "#9E9E9E", 
-    fontSize: 11, 
-    marginTop: 2 
+  rowSubtitle: {
+    color: "#9E9E9E",
+    fontSize: scale.hp(1.55),
+    marginTop: scale.hp(0.26),
   },
-
-
   skeletonAvatar: {
     backgroundColor: '#E0E0E0',
     borderColor: '#E0E0E0',
   },
   skeletonIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: scale.wp(12.4),
+    height: scale.wp(12.4),
+    borderRadius: scale.wp(6.2),
     backgroundColor: '#BDBDBD',
   },
   skeletonName: {
-    width: 120,
-    height: 20,
+    width: scale.wp(31.2),
+    height: scale.hp(2.6),
     backgroundColor: '#E0E0E0',
-    borderRadius: 4,
-    marginRight: 8,
+    borderRadius: scale.hp(0.5),
+    marginRight: scale.wp(2.1),
   },
   skeletonCheckmark: {
-    width: 16,
-    height: 16,
+    width: scale.wp(4.2),
+    height: scale.wp(4.2),
     backgroundColor: '#E0E0E0',
-    borderRadius: 8,
+    borderRadius: scale.wp(2.1),
   },
   skeletonRow: {
     flexDirection: "row",
-    gap: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    gap: scale.wp(2.6),
+    paddingVertical: scale.hp(1.55),
+    paddingHorizontal: scale.wp(4.2),
     alignItems: "center",
     borderWidth: 1,
     borderColor: "#F3F3F3",
-    marginBottom: 10,
+    marginBottom: scale.hp(1.3),
     justifyContent: "space-between",
-    borderRadius: 10,
+    borderRadius: scale.hp(1.3),
     backgroundColor: '#fff',
   },
-  skeletonRowLeft: { 
-    flexDirection: "row", 
-    alignItems: "center", 
-    flex: 1 
+  skeletonRowLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
   },
   skeletonIconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 6,
+    width: scale.wp(8.3),
+    height: scale.wp(8.3),
+    borderRadius: scale.hp(0.8),
     backgroundColor: '#E0E0E0',
-    marginRight: 12,
+    marginRight: scale.wp(3.1),
   },
   skeletonTextContainer: {
     flex: 1,
   },
   skeletonTitle: {
     width: '60%',
-    height: 14,
+    height: scale.hp(1.95),
     backgroundColor: '#E0E0E0',
-    borderRadius: 4,
-    marginBottom: 6,
+    borderRadius: scale.hp(0.5),
+    marginBottom: scale.hp(0.8),
   },
   skeletonSubtitle: {
     width: '80%',
-    height: 11,
+    height: scale.hp(1.55),
     backgroundColor: '#E0E0E0',
-    borderRadius: 4,
+    borderRadius: scale.hp(0.5),
   },
   skeletonChevron: {
-    width: 18,
-    height: 18,
+    width: scale.wp(4.7),
+    height: scale.wp(4.7),
     backgroundColor: '#E0E0E0',
-    borderRadius: 9,
+    borderRadius: scale.wp(2.4),
   },
 });

@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../theme/colors";
 import { useMutation } from "@tanstack/react-query";
 import { updateSlab } from "../../services/slabs";
+import { scale } from "../../utils/normalizeSize";
 
 const UpdateSlabModal = ({ visible, onClose, onSuccess, slabData }) => {
   const [payload, setPayload] = useState({
@@ -88,7 +89,6 @@ const UpdateSlabModal = ({ visible, onClose, onSuccess, slabData }) => {
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
-          {/* Header */}
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Update Slab</Text>
             <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
@@ -97,7 +97,6 @@ const UpdateSlabModal = ({ visible, onClose, onSuccess, slabData }) => {
           </View>
 
           <View style={styles.modalBody}>
-            {/* Current Slab Info */}
             <View style={styles.currentSlabInfo}>
               <Text style={styles.infoLabel}>Current Slab Type</Text>
               <Text style={styles.infoValue}>
@@ -108,7 +107,6 @@ const UpdateSlabModal = ({ visible, onClose, onSuccess, slabData }) => {
               </Text>
             </View>
 
-            {/* Percentage Input */}
             <View style={styles.formGroup}>
               <Text style={styles.sectionLabel}>Percentage *</Text>
               <TextInput
@@ -126,7 +124,6 @@ const UpdateSlabModal = ({ visible, onClose, onSuccess, slabData }) => {
               )}
             </View>
 
-            {/* Additional Info */}
             <View style={styles.additionalInfo}>
               <Text style={styles.additionalInfoTitle}>Slab Details</Text>
               <View style={styles.infoRow}>
@@ -150,7 +147,6 @@ const UpdateSlabModal = ({ visible, onClose, onSuccess, slabData }) => {
             </View>
           </View>
 
-          {/* Footer Actions */}
           <View style={styles.modalFooter}>
             <TouchableOpacity
               style={[styles.button, styles.cancelButton]}
@@ -186,7 +182,7 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: "#fff",
-    borderRadius: 12,
+    borderRadius: scale.hp(1.55),
     width: "90%",
     maxHeight: "80%",
     overflow: "hidden",
@@ -195,58 +191,58 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 16,
+    padding: scale.hp(2.1),
     borderBottomWidth: 1,
     borderBottomColor: "#e5e7eb",
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: scale.hp(2.35),
     fontWeight: "600",
     color: Colors.textPrimary,
   },
   closeButton: {
-    padding: 4,
+    padding: scale.hp(0.5),
   },
   modalBody: {
-    padding: 16,
+    padding: scale.hp(2.1),
   },
   currentSlabInfo: {
     backgroundColor: "#f8f9fa",
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
+    padding: scale.hp(1.55),
+    borderRadius: scale.hp(1.05),
+    marginBottom: scale.hp(2.1),
   },
   infoLabel: {
-    fontSize: 12,
+    fontSize: scale.hp(1.55),
     color: Colors.textSecondary,
-    marginBottom: 4,
+    marginBottom: scale.hp(0.5),
   },
   infoValue: {
-    fontSize: 14,
+    fontSize: scale.hp(1.8),
     color: Colors.textPrimary,
     fontWeight: "600",
   },
   infoNote: {
-    fontSize: 11,
+    fontSize: scale.hp(1.4),
     color: Colors.textSecondary,
     fontStyle: "italic",
-    marginTop: 4,
+    marginTop: scale.hp(0.5),
   },
   formGroup: {
-    marginBottom: 16,
+    marginBottom: scale.hp(2.1),
   },
   sectionLabel: {
-    fontSize: 14,
+    fontSize: scale.hp(1.8),
     fontWeight: "600",
     color: Colors.textPrimary,
-    marginBottom: 8,
+    marginBottom: scale.hp(1.05),
   },
   textInput: {
     borderWidth: 1,
     borderColor: "#e5e7eb",
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 14,
+    borderRadius: scale.hp(1.05),
+    padding: scale.hp(1.55),
+    fontSize: scale.hp(1.8),
     color: Colors.textPrimary,
   },
   inputError: {
@@ -254,36 +250,36 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: "#dc2626",
-    fontSize: 12,
-    marginTop: 4,
+    fontSize: scale.hp(1.55),
+    marginTop: scale.hp(0.5),
   },
   additionalInfo: {
     backgroundColor: "#dbeafe",
-    padding: 12,
-    borderRadius: 8,
+    padding: scale.hp(1.55),
+    borderRadius: scale.hp(1.05),
   },
   additionalInfoTitle: {
-    fontSize: 14,
+    fontSize: scale.hp(1.8),
     fontWeight: "600",
     color: Colors.primary,
-    marginBottom: 8,
+    marginBottom: scale.hp(1.05),
   },
   infoRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 4,
+    marginBottom: scale.hp(0.5),
   },
   modalFooter: {
     flexDirection: "row",
-    padding: 16,
+    padding: scale.hp(2.1),
     borderTopWidth: 1,
     borderTopColor: "#e5e7eb",
-    gap: 8,
+    gap: scale.wp(2.1),
   },
   button: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
+    paddingVertical: scale.hp(1.55),
+    borderRadius: scale.hp(1.05),
     alignItems: "center",
     justifyContent: "center",
   },

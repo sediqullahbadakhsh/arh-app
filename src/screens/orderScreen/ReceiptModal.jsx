@@ -22,10 +22,11 @@ import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { Colors } from "../../theme/colors";
 import { useTranslation } from 'react-i18next';
+import { scale } from '../../utils/normalizeSize';
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 
-const ReceiptModal1 = ({ visible, onClose, transaction }) => {
+const ReceiptModal1 = ({ visible, onClose, transaction, transactionType }) => {
   const [slideAnim] = useState(new Animated.Value(screenHeight));
   const { t } = useTranslation();
   const lottieRef = useRef(null);
@@ -55,7 +56,6 @@ const ReceiptModal1 = ({ visible, onClose, transaction }) => {
     }
   }, [visible]);
 
-  // Request media library permissions
   useEffect(() => {
     (async () => {
       const { status } = await MediaLibrary.requestPermissionsAsync();
@@ -63,9 +63,33 @@ const ReceiptModal1 = ({ visible, onClose, transaction }) => {
     })();
   }, []);
 
-  const getStatusColor = (status) => {
+  // Get status for stock transactions (they're typically completed)
+  const getStockStatus = () => {
+    return 'completed';
+  };
+
+  // Get actual status based on transaction type
+  const getActualStatus = () => {
+    if (transactionType === 'stock') {
+      return getStockStatus();
+    }
+    return transaction?.status || 'pending';
+  };
+
+  const getStatusColor = () => {
+    const status = getActualStatus();
+    
+    if (transactionType === 'stock') {
+      // For stock transactions, use type-based colors
+      if (transaction?.type === "IN") return '#4caf50'; // Green for IN
+      if (transaction?.type === "OUT") return Colors.primary; // Primary color for OUT
+      return '#6B7280';
+    }
+    
+    // For order transactions
     switch (status) {
       case 'succeeded':
+      case 'completed':
         return '#4caf50';
       case 'failed':
         return '#f44336';
@@ -77,10 +101,37 @@ const ReceiptModal1 = ({ visible, onClose, transaction }) => {
   };
 
   const getStatusAnimation = () => {
-    if (!transaction) return null;
+    const status = getActualStatus();
 
-    switch (transaction.status) {
+    if (transactionType === 'stock') {
+      // Stock transactions - use type-based animations
+      if (transaction?.type === "IN") {
+        return (
+          <LottieView
+            ref={lottieRef}
+            source={require('../../../assets/lotties/succcess.json')}
+            autoPlay={true}
+            loop={false}
+            style={styles.successAnimation}
+          />
+        );
+      } else if (transaction?.type === "OUT") {
+        return (
+          <LottieView
+            ref={lottieRef}
+            source={require('../../../assets/lotties/succcess.json')}
+            autoPlay={true}
+            loop={false}
+            style={styles.successAnimation}
+          />
+        );
+      }
+    }
+
+    // Order transactions
+    switch (status) {
       case 'succeeded':
+      case 'completed':
         return (
           <LottieView
             ref={lottieRef}
@@ -114,12 +165,12 @@ const ReceiptModal1 = ({ visible, onClose, transaction }) => {
         return (
           <View style={[
             styles.receiptStatusIconContainer,
-            { backgroundColor: `${getStatusColor(transaction.status)}15` }
+            { backgroundColor: `${getStatusColor()}15` }
           ]}>
             <Ionicons 
               name="help-circle" 
               size={80} 
-              color={getStatusColor(transaction.status)} 
+              color={getStatusColor()} 
             />
           </View>
         );
@@ -127,10 +178,17 @@ const ReceiptModal1 = ({ visible, onClose, transaction }) => {
   };
 
   const getStatusTitle = () => {
-    if (!transaction) return '';
+    const status = getActualStatus();
     
-    switch (transaction.status) {
+    if (transactionType === 'stock') {
+      if (transaction?.type === "IN") return t('receipt.stockReceived');
+      if (transaction?.type === "OUT") return t('receipt.stockSent');
+      return t('receipt.stockTransaction');
+    }
+    
+    switch (status) {
       case 'succeeded':
+      case 'completed':
         return t('receipt.topupSuccessful');
       case 'failed':
         return t('receipt.topupFailed');
@@ -141,9 +199,18 @@ const ReceiptModal1 = ({ visible, onClose, transaction }) => {
     }
   };
 
-  const getStatusText = (status) => {
+  const getStatusText = () => {
+    const status = getActualStatus();
+    
+    if (transactionType === 'stock') {
+      if (transaction?.type === "IN") return t('status.received');
+      if (transaction?.type === "OUT") return t('status.sent');
+      return t('status.completed');
+    }
+    
     switch (status) {
       case 'succeeded':
+      case 'completed':
         return t('status.succeeded');
       case 'failed':
         return t('status.failed');
@@ -154,9 +221,16 @@ const ReceiptModal1 = ({ visible, onClose, transaction }) => {
     }
   };
 
-  const getServiceName = (source) => {
-    switch (source) {
+  const getServiceName = () => {
+    if (transactionType === 'stock') {
+      return transaction?.type === "IN" 
+        ? t('services.stockIn') 
+        : t('services.stockOut');
+    }
+    
+    switch (transaction?.source || transaction?.type) {
       case 'stripe_card':
+      case 'recharge':
         return t('services.mobileTopup');
       case 'data_bundle':
         return t('services.dataBundle');
@@ -167,7 +241,26 @@ const ReceiptModal1 = ({ visible, onClose, transaction }) => {
     }
   };
 
+  const getTransactionAmount = () => {
+    if (!transaction) return { amount: 0, currency: 'AFN' };
+    
+    if (transactionType === 'stock') {
+      return {
+        amount: Math.abs(transaction.amount || 0),
+        currency: 'AF',
+        sign: transaction.type === "IN" ? "+" : "-"
+      };
+    }
+    
+    return {
+      amount: transaction.amount || 0,
+      currency: transaction.currency || 'AFN',
+      sign: ""
+    };
+  };
+
   const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', { 
       year: 'numeric',
@@ -181,8 +274,6 @@ const ReceiptModal1 = ({ visible, onClose, transaction }) => {
   const captureReceipt = async () => {
     try {
       setIsCapturing(true);
-      
-      // Wait a bit for the component to be ready
       await new Promise(resolve => setTimeout(resolve, 100));
       
       if (receiptCaptureRef.current) {
@@ -220,7 +311,6 @@ const ReceiptModal1 = ({ visible, onClose, transaction }) => {
       if (receiptUri) {
         console.log('Sharing receipt URI:', receiptUri);
         
-        // Try direct sharing first without file copying
         if (await Sharing.isAvailableAsync()) {
           console.log('Using expo-sharing directly...');
           await Sharing.shareAsync(receiptUri, {
@@ -229,18 +319,14 @@ const ReceiptModal1 = ({ visible, onClose, transaction }) => {
             UTI: 'public.png'
           });
         } else {
-          // Fallback to React Native Share API with proper URI formatting
           console.log('expo-sharing not available, using React Native Share...');
           
-          // For Android, we need to use content:// URI or file:// URI
           let shareUri = receiptUri;
           if (Platform.OS === 'android') {
-            // On Android, try both formats
             if (!receiptUri.startsWith('file://') && !receiptUri.startsWith('content://')) {
               shareUri = `file://${receiptUri}`;
             }
           } else {
-            // On iOS, ensure file:// prefix
             if (!receiptUri.startsWith('file://')) {
               shareUri = `file://${receiptUri}`;
             }
@@ -261,15 +347,23 @@ const ReceiptModal1 = ({ visible, onClose, transaction }) => {
     } catch (error) {
       console.error('Error sharing receipt:', error);
       
-      // Fallback to text sharing
-      console.log('Image sharing failed, falling back to text sharing');
+ 
+      const amountInfo = getTransactionAmount();
+      const serviceName = getServiceName();
+      const statusText = getStatusText();
+      
       const receiptText = `
 🎫 ${t('receipt.transactionReceipt')}
-${t('receipt.totalAmount')}: ${Number(transaction.amount).toFixed(2)} ${transaction.currency}
-${t('receipt.receiver')}: ${transaction.receiver}
-${t('receipt.status')}: ${getStatusText(transaction.status)}
+${t('receipt.service')}: ${serviceName}
+${t('receipt.totalAmount')}: ${amountInfo.sign}${Number(amountInfo.amount).toFixed(2)} ${amountInfo.currency}
+${transactionType === 'stock' ? 
+  `${transaction?.type === "IN" ? t('receipt.from') : t('receipt.to')}: ${transaction?.type === "IN" ? 
+    (transaction.from_wallet_id || 'N/A') : 
+    (transaction.to_wallet_id || "Activate Bundle")}` : 
+  `${t('receipt.receiver')}: ${transaction.receiver}`}
+${t('receipt.status')}: ${statusText}
 ${t('receipt.dateTime')}: ${formatDate(transaction.createdAt)}
-${t('receipt.transactionId')}: ${transaction.txnNumber}
+${t('receipt.transactionId')}: ${transaction.txnNumber || transaction.id}
 
 ${t('receipt.thankYou')}
       `.trim();
@@ -304,7 +398,7 @@ ${t('receipt.thankYou')}
         console.log('Downloading receipt:', receiptUri);
         
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const filename = `Receipt-${transaction.txnNumber}-${timestamp}.png`;
+        const filename = `Receipt-${transaction.txnNumber || transaction.id}-${timestamp}.png`;
         
         const asset = await MediaLibrary.createAssetAsync(receiptUri);
         const album = await MediaLibrary.getAlbumAsync('Receipts');
@@ -333,63 +427,90 @@ ${t('receipt.thankYou')}
     }
   };
 
-  const ReceiptContent = React.forwardRef((props, ref) => (
-    <View ref={ref} style={styles.receiptCaptureContainer}>
-      <View style={styles.captureHeader}>
-        <Image
-          source={require('../../../assets/logoV.png')} 
-          style={styles.captureLogo}
-          resizeMode="contain"
-        />
-        <Text style={styles.captureTitle}>{t('receipt.transactionReceipt').toUpperCase()}</Text>
-      </View>
+  const ReceiptContent = React.forwardRef((props, ref) => {
+    const amountInfo = getTransactionAmount();
+    const serviceName = getServiceName();
+    const statusText = getStatusText();
+    const statusColor = getStatusColor();
 
-      <View style={styles.captureStatusSection}>
-        <Text style={styles.captureStatusTitle}>
-          {getStatusTitle()}
-        </Text>
-      </View>
-
-      <View style={styles.captureDetails}>
-        <View style={styles.captureDetailRow}>
-          <Text style={styles.captureDetailLabel}>{t('receipt.transactionId')}:</Text>
-          <Text style={styles.captureDetailValue}>{transaction.txnNumber}</Text>
-        </View>
-        
-        <View style={styles.captureDetailRow}>
-          <Text style={styles.captureDetailLabel}>{t('receipt.dateTime')}:</Text>
-          <Text style={styles.captureDetailValue}>{formatDate(transaction.createdAt)}</Text>
-        </View>
-        
-        <View style={styles.captureDetailRow}>
-          <Text style={styles.captureDetailLabel}>{t('receipt.receiver')}:</Text>
-          <Text style={styles.captureDetailValue}>{transaction.receiver}</Text>
+    return (
+      <View ref={ref} style={styles.receiptCaptureContainer}>
+        <View style={styles.captureHeader}>
+          <Image
+            source={require('../../../assets/logoV.png')} 
+            style={styles.captureLogo}
+            resizeMode="contain"
+          />
+          <Text style={styles.captureTitle}>{t('receipt.transactionReceipt').toUpperCase()}</Text>
         </View>
 
-      
-
-        <View style={styles.captureDetailRow}>
-          <Text style={styles.captureDetailLabel}>{t('receipt.status')}:</Text>
-          <Text style={[styles.captureDetailValue, { color: getStatusColor(transaction.status) }]}>
-            {getStatusText(transaction.status)}
+        <View style={styles.captureStatusSection}>
+          <Text style={styles.captureStatusTitle}>
+            {getStatusTitle()}
           </Text>
         </View>
-      </View>
 
-      <View style={styles.captureAmountSection}>
-        <Text style={styles.captureAmountLabel}>{t('receipt.totalAmount').toUpperCase()}</Text>
-        <Text style={styles.captureAmountValue}>
-          {Number(transaction.amount).toFixed(2)} {transaction.currency}
-        </Text>
-      </View>
+        <View style={styles.captureDetails}>
+          <View style={styles.captureDetailRow}>
+            <Text style={styles.captureDetailLabel}>{t('receipt.transactionId')}:</Text>
+            <Text style={styles.captureDetailValue}>{transaction.txnNumber || transaction.id || 'N/A'}</Text>
+          </View>
+          
+          <View style={styles.captureDetailRow}>
+            <Text style={styles.captureDetailLabel}>{t('receipt.dateTime')}:</Text>
+            <Text style={styles.captureDetailValue}>{formatDate(transaction.createdAt)}</Text>
+          </View>
+          
+          <View style={styles.captureDetailRow}>
+            <Text style={styles.captureDetailLabel}>{t('receipt.service')}:</Text>
+            <Text style={styles.captureDetailValue}>{serviceName}</Text>
+          </View>
 
-      <View style={styles.captureFooter}>
-        <Text style={styles.captureFooterText}>{t('receipt.thankYou')}</Text>
+          {transactionType === 'stock' ? (
+            <>
+              <View style={styles.captureDetailRow}>
+                <Text style={styles.captureDetailLabel}>
+                  {transaction.type === "IN" ? t('receipt.from') : t('receipt.to')}:
+                </Text>
+                <Text style={styles.captureDetailValue}>
+                  {transaction.type === "IN" ? 
+                    (transaction.from_wallet_id || 'N/A') : 
+                    (transaction.to_wallet_id || "Activate Bundle")}
+                </Text>
+              </View>
+            </>
+          ) : (
+            <View style={styles.captureDetailRow}>
+              <Text style={styles.captureDetailLabel}>{t('receipt.receiver')}:</Text>
+              <Text style={styles.captureDetailValue}>{transaction.receiver || 'N/A'}</Text>
+            </View>
+          )}
+
+          <View style={styles.captureDetailRow}>
+            <Text style={styles.captureDetailLabel}>{t('receipt.status')}:</Text>
+            <Text style={[styles.captureDetailValue, { color: statusColor }]}>
+              {statusText}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.captureAmountSection}>
+          <Text style={styles.captureAmountLabel}>{t('receipt.totalAmount').toUpperCase()}</Text>
+          <Text style={styles.captureAmountValue}>
+            {amountInfo.sign}{Number(amountInfo.amount).toFixed(2)} {amountInfo.currency}
+          </Text>
+        </View>
+
+        <View style={styles.captureFooter}>
+          <Text style={styles.captureFooterText}>{t('receipt.thankYou')}</Text>
+        </View>
       </View>
-    </View>
-  ));
+    );
+  });
 
   if (!transaction) return null;
+
+  const amountInfo = getTransactionAmount();
 
   return (
     <Modal
@@ -445,6 +566,16 @@ ${t('receipt.thankYou')}
             </View>
           </View>
 
+          <View style={styles.backgroundImage1}>
+            <View style={styles.secon}>
+              <Image
+                source={require('../../../assets/Receipt.png')} 
+                style={styles.logoImage1}
+                resizeMode="stretch" 
+              />
+            </View>
+          </View>
+
           <ScrollView style={styles.receiptContent} showsVerticalScrollIndicator={false}>
             <View style={styles.logoContainer}>
               <Image
@@ -465,7 +596,7 @@ ${t('receipt.thankYou')}
               <View style={styles.receiptDetailItem}>
                 <Text style={styles.receiptDetailLabel}>{t('receipt.transactionId')}</Text>
                 <Text style={styles.receiptDetailValue} numberOfLines={1} ellipsizeMode="middle">
-                  {transaction.txnNumber}
+                  {transaction.txnNumber || transaction.id || 'N/A'}
                 </Text>
               </View>
               
@@ -476,136 +607,178 @@ ${t('receipt.thankYou')}
                 </Text>
               </View>
               
-              <View style={styles.receiptDetailItem}>
-                <Text style={styles.receiptDetailLabel}>{t('receipt.receiver')}</Text>
-                <Text style={styles.receiptDetailValue}>
-                  {transaction.receiver}
-                </Text>
-              </View>
+   
 
-            
+              {transactionType === 'stock' ? (
+                <>
+                  <View style={styles.receiptDetailItem}>
+                    <Text style={styles.receiptDetailLabel}>
+                      {transaction.type === "IN" ? t('receipt.from') : t('receipt.to')}
+                    </Text>
+                    <Text style={styles.receiptDetailValue}>
+                      {transaction.type === "IN" ? 
+                        (transaction.from_wallet_id || 'N/A') : 
+                        (transaction.to_wallet_id || "Activate Bundle")}
+                    </Text>
+                  </View>
+                </>
+              ) : (
+                <View style={styles.receiptDetailItem}>
+                  <Text style={styles.receiptDetailLabel}>{t('receipt.receiver')}</Text>
+                  <Text style={styles.receiptDetailValue}>
+                    {transaction.receiver || 'N/A'}
+                  </Text>
+                </View>
+              )}
+
+         
+
               <View style={styles.receiptAmountSection}>
                 <Text style={styles.receiptAmountLabel}>{t('receipt.totalAmount')}</Text>
                 <Text style={styles.receiptAmountValue}>
-                  {Number(transaction.amount).toFixed(2)} {transaction.currency}
+                  {amountInfo.sign}{Number(amountInfo.amount).toFixed(2)} {amountInfo.currency}
                 </Text>
               </View>
+            </View>  
+            
+            <View style={styles.receiptActions}>
+              <TouchableOpacity 
+                style={[
+                  styles.receiptPrimaryButton,
+                  isCapturing && styles.receiptButtonDisabled
+                ]}
+                onPress={onClose}
+                disabled={isCapturing}
+              >
+                <Text style={styles.receiptPrimaryButtonText}>
+                  {isCapturing ? t('receipt.processing') : t('receipt.done')}
+                </Text>
+              </TouchableOpacity>
             </View>
           </ScrollView>
-
-          <View style={styles.receiptActions}>
-            <TouchableOpacity 
-              style={[
-                styles.receiptPrimaryButton,
-                isCapturing && styles.receiptButtonDisabled
-              ]}
-              onPress={onClose}
-              disabled={isCapturing}
-            >
-              <Text style={styles.receiptPrimaryButtonText}>
-                {isCapturing ? t('receipt.processing') : t('receipt.done')}
-              </Text>
-            </TouchableOpacity>
-          </View>
         </Animated.View>
       </View>
     </Modal>
   );
 };
 
+
+
 const styles = StyleSheet.create({
   receiptModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    alignContent: "center",
+    alignItems: "center",
   },
   receiptModalBackdrop: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
+    alignItems: "center",
+    alignContent: "center",
     bottom: 0,
   },
   receiptModalContainer: {
     width: '100%',
+    paddingHorizontal: 20,
     height: '100%',
-    backgroundColor: '#fff',
+    backgroundColor: '#CD0202',
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 10,
+      height: scale.hp(1.25),
     },
     shadowOpacity: 0.3,
-    shadowRadius: 20,
+    shadowRadius: scale.hp(2.5),
     elevation: 10,
   },
   hiddenCaptureView: {
     position: 'absolute',
-    left: 20,
-    top: -1000, // Position off-screen but still renderable
-    width: screenWidth - 40,
+    left: scale.wp(5),
+    top: -scale.hp(125),
+    width: scale.wp(90),
     opacity: 1,
   },
+  backgroundImage1: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    marginTop: scale.hp(2.5),
+    justifyContent: 'center',
+    alignItems: 'center',
+    opacity: 1,
+    zIndex: 0, 
+  },
+  logoImage1: {
+    width: scale.wp(92.5),
+    height: "100%",
+    zIndex: 1,
+  },
   receiptCaptureContainer: {
-    width: screenWidth - 40,
+    width: scale.wp(90),
     backgroundColor: '#ffffff',
-    padding: 25,
-    borderRadius: 12,
+    padding: scale.hp(3),
+    borderRadius: scale.hp(1.5),
     borderWidth: 2,
     borderColor: '#E5E7EB',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: scale.hp(0.5) },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
+    shadowRadius: scale.hp(1),
     elevation: 5,
   },
   captureHeader: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: scale.hp(2.5),
     borderBottomWidth: 2,
     borderBottomColor: Colors.primary,
-    paddingBottom: 15,
+    paddingBottom: scale.hp(2),
   },
   captureLogo: {
-    width: 200,
-    height: 50,
-    marginBottom: 10,
+    width: scale.wp(50),
+    height: scale.hp(6.25),
+    marginBottom: scale.hp(1.25),
   },
   captureTitle: {
-    fontSize: 18,
+    fontSize: scale.hp(2.25),
     fontWeight: 'bold',
     color: Colors.primary,
     textAlign: 'center',
   },
   captureStatusSection: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: scale.hp(2.5),
   },
   captureStatusTitle: {
-    fontSize: 20,
+    fontSize: scale.hp(2.5),
     fontWeight: 'bold',
     color: Colors.textPrimary,
     textAlign: 'center',
   },
   captureDetails: {
-    marginBottom: 20,
+    marginBottom: scale.hp(2.5),
   },
   captureDetailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: scale.hp(1.25),
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
   },
   captureDetailLabel: {
-    fontSize: 14,
+    fontSize: scale.hp(1.75),
     color: '#6B7280',
     fontWeight: '600',
     flex: 1,
   },
   captureDetailValue: {
-    fontSize: 14,
+    fontSize: scale.hp(1.75),
     fontWeight: '600',
     color: Colors.textPrimary,
     flex: 1,
@@ -614,50 +787,44 @@ const styles = StyleSheet.create({
   captureAmountSection: {
     alignItems: 'center',
     backgroundColor: '#F8F9FA',
-    borderRadius: 8,
-    padding: 20,
-    marginBottom: 20,
+    borderRadius: scale.hp(1),
+    padding: scale.hp(2.5),
+    marginBottom: scale.hp(2.5),
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
   captureAmountLabel: {
-    fontSize: 16,
+    fontSize: scale.hp(2),
     color: '#6B7280',
     fontWeight: '600',
-    marginBottom: 8,
+    marginBottom: scale.hp(1),
   },
   captureAmountValue: {
-    fontSize: 24,
+    fontSize: scale.hp(3),
     fontWeight: 'bold',
     color: Colors.textPrimary,
   },
   captureFooter: {
     alignItems: 'center',
-    paddingTop: 15,
+    paddingTop: scale.hp(2),
     borderTopWidth: 1,
     borderTopColor: '#F3F4F6',
   },
   captureFooterText: {
-    fontSize: 14,
+    fontSize: scale.hp(1.75),
     color: '#6B7280',
     fontStyle: 'italic',
-    marginBottom: 5,
+    marginBottom: scale.hp(0.625),
   },
-  captureFooterNote: {
-    fontSize: 12,
-    color: '#9CA3AF',
-  },
-
   receiptHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 30,
-    paddingBottom: 14,
+    paddingHorizontal: scale.wp(5),
+    paddingTop: scale.hp(5),
     backgroundColor: Colors.primary,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: scale.hp(3),
+    borderTopRightRadius: scale.hp(3),
   },
   receiptHeaderLeft: {
     flex: 1,
@@ -673,87 +840,88 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   receiptCloseButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: scale.wp(8),
+    height: scale.wp(8),
+    borderRadius: scale.wp(4),
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   receiptHeaderActionButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: scale.wp(9),
+    height: scale.wp(9),
+    borderRadius: scale.wp(4.5),
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 8,
+    marginLeft: scale.wp(2),
   },
   receiptTitle: {
-    fontSize: 18,
+    fontSize: scale.hp(2.25),
     fontWeight: 'bold',
     color: '#fff',
     textAlign: 'center',
   },
   receiptContent: {
     flex: 1,
-    padding: 20,
+    padding: scale.hp(2.5),
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: scale.hp(2.5),
   },
   logoImage: {
-    width: 300,
-    height: 70,
+    marginTop: scale.hp(4),
+    width: scale.wp(70),
+    height: scale.hp(8.75),
   },
   receiptStatusSection: {
     alignItems: 'center',
   },
   receiptStatusIconContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 100,
+    width: scale.wp(25),
+    height: scale.wp(25),
+    borderRadius: scale.wp(25),
     justifyContent: 'center',
     alignItems: 'center',
   },
   successAnimation: {
-    width: 200,
-    height: 200,
+    width: scale.wp(50),
+    height: scale.wp(45),
   },
   errorAnimation: {
-    width: 200,
-    height: 200,
+    width: scale.wp(50),
+    height: scale.wp(50),
   },
   pendingAnimation: {
-    width: 200,
-    height: 200,
+    width: scale.wp(50),
+    height: scale.wp(50),
   },
   receiptAmountValueTop: {
-    fontSize: 24,
+    fontSize: scale.hp(3),
     textAlign: 'center',
     fontWeight: 'bold',
-    marginBottom: 24,
+    marginBottom: scale.hp(1.5),
     color: Colors.textPrimary,
   },
   receiptDetailsGrid: {
-    marginBottom: 24,
+    marginBottom: scale.hp(3),
   },
   receiptDetailItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: scale.hp(1.5),
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
   },
   receiptDetailLabel: {
-    fontSize: 14,
+    fontSize: scale.hp(1.75),
     color: '#6B7280',
     flex: 1,
   },
   receiptDetailValue: {
-    fontSize: 14,
+    fontSize: scale.hp(1.75),
     fontWeight: '500',
     color: Colors.textPrimary,
     flex: 1,
@@ -761,30 +929,31 @@ const styles = StyleSheet.create({
   },
   receiptAmountSection: {
     alignItems: 'center',
-    marginTop: 15,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 12,
-    padding: 16,
+    marginTop: scale.hp(2),
+    backgroundColor: '#F8FFE6',
+    borderRadius: scale.hp(1.5),
+    padding: scale.hp(2),
   },
   receiptAmountLabel: {
-    fontSize: 14,
+    fontSize: scale.hp(1.75),
     color: '#6B7280',
-    marginBottom: 4,
+    marginBottom: scale.hp(0.5),
   },
   receiptAmountValue: {
-    fontSize: 24,
+    fontSize: scale.hp(3),
     fontWeight: 'bold',
     color: Colors.textPrimary,
   },
   receiptActions: {
-    padding: 20,
+    padding: scale.hp(2.5),
     paddingTop: 0,
   },
   receiptPrimaryButton: {
     backgroundColor: Colors.primary,
-    paddingVertical: 14,
-    borderRadius: 100,
-    width: "100%",
+    paddingVertical: scale.hp(1.75),
+    borderRadius: scale.hp(12.5),
+    width: '100%',
+    marginBottom: scale.hp(2),
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -793,7 +962,7 @@ const styles = StyleSheet.create({
   },
   receiptPrimaryButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: scale.hp(2),
     fontWeight: '600',
   },
 });

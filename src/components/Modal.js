@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { View, Text, Modal, TouchableOpacity, StyleSheet } from "react-native";
+import { scale } from "../utils/normalizeSize";
 
 export default function CustomDialog({ visible, onClose, title, message }) {
   return (
@@ -30,17 +31,43 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   dialog: {
-    width: 300,
+    width: scale.wp(78),
     backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 20,
+    borderRadius: scale.hp(1.55),
+    padding: scale.hp(2.6),
     alignItems: "center",
   },
-  title: { fontSize: 18, fontWeight: "bold", marginBottom: 10 },
-  message: { fontSize: 16, marginBottom: 20, textAlign: "center" },
-  buttons: { flexDirection: "row", justifyContent: "space-between", width: "100%" },
-  button: { flex: 1, padding: 10, alignItems: "center", borderRadius: 8, marginHorizontal: 5, backgroundColor: "#eee" },
-  confirmButton: { backgroundColor: "#4A90E2" },
-  buttonText: { color: "#333", fontWeight: "bold" },
-  confirmText: { color: "#fff" },
+  title: {
+    fontSize: scale.hp(2.35),
+    fontWeight: "bold",
+    marginBottom: scale.hp(1.3),
+  },
+  message: {
+    fontSize: scale.hp(2.1),
+    marginBottom: scale.hp(2.6),
+    textAlign: "center",
+  },
+  buttons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+  },
+  button: {
+    flex: 1,
+    padding: scale.hp(1.3),
+    alignItems: "center",
+    borderRadius: scale.hp(1.05),
+    marginHorizontal: scale.wp(1.3),
+    backgroundColor: "#eee",
+  },
+  confirmButton: {
+    backgroundColor: "#4A90E2",
+  },
+  buttonText: {
+    color: "#333",
+    fontWeight: "bold",
+  },
+  confirmText: {
+    color: "#fff",
+  },
 });

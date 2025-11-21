@@ -1,6 +1,7 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, View } from 'react-native';
 import { Colors } from '../theme/colors';
+import { scale } from '../utils/normalizeSize';
 
 export default function SocialButton({ label, icon, onPress }) {
     return (
@@ -12,21 +13,21 @@ export default function SocialButton({ label, icon, onPress }) {
 }
 
 const styles = StyleSheet.create({
-    button: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: 50,
-        paddingHorizontal: 24,
-        borderRadius: 12,
-        backgroundColor: '#fff',
-        borderWidth: 1,
-        borderColor: '#EFEFEF',
-    },
-    label: {
-        fontSize: 15,
-        color: Colors.textPrimary,
-        // fontWeight: '500',
-        fontFamily: "dmsansMedium"
-    },
+  button: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: scale.hp(6.25),               
+    paddingHorizontal: scale.wp(6),     
+    borderRadius: scale.hp(1.5),         
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#EFEFEF',
+  },
+  label: {
+    fontSize: scale.hp(1.875),            
+    color: Colors.textPrimary,
+    fontFamily: 'dmsansMedium',
+    // fontWeight: '500', 
+  },
 });

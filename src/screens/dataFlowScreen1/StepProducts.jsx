@@ -1,4 +1,13 @@
-import { Image, Text, TouchableOpacity, View, ScrollView, FlatList, TextInput } from "react-native";
+import React from "react";
+import { 
+  Image, 
+  Text, 
+  TouchableOpacity, 
+  View, 
+  ScrollView, 
+  FlatList, 
+  TextInput 
+} from "react-native";
 import { getMnoLogo } from "../../utils/getMnoLogo";
 import DataStyles from "./DataStyles";
 import { Ionicons } from "@expo/vector-icons";
@@ -7,12 +16,14 @@ import { Colors } from "../../theme/colors";
 import { getSetaraganMnoId } from "../../utils/getCompanyIdForSetaragan";
 import formatLocal from "../../utils/formatLocal";
 
-
-
 function StepProducts({
   country,
-  category,
-  setCategory,
+  bundleCategories,
+  selectedCategory,
+  setSelectedCategory,
+  bundleTypes,
+  selectedType,
+  setSelectedType,
   search,
   setSearch,
   products,
@@ -21,11 +32,10 @@ function StepProducts({
   onEditNumber,
   summary,
 }) {
-  const categories = ["Data", "Voice", "SMS", "Combo"];
+  const operatorLogo = getMnoLogo(getSetaraganMnoId(summary.localNumber));
 
   const renderItem = ({ item }) => {
     const active = product?.id === item.id;
-    const operatorLogo = getMnoLogo(getSetaraganMnoId(summary.localNumber));
 
     return (
       <TouchableOpacity
@@ -39,7 +49,7 @@ function StepProducts({
           )}
           <View style={DataStyles.bundleInfo}>
             <Text style={[DataStyles.bundleName, active && { color: Colors.primary }]}>
-              {item.productName}
+              {item.productName?.en || item.productName}
             </Text>
             <Text style={[DataStyles.bundleDesc, active && { color: Colors.primary }]}>
               {item.description || "High-speed internet bundle"}
@@ -63,33 +73,60 @@ function StepProducts({
      
 
       <Text style={DataStyles.smallLabel}>Bundle Category</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={DataStyles.categoriesScroll}>
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false} 
+        style={DataStyles.categoriesScroll}
+      >
         <View style={DataStyles.categoriesContainer}>
-          {categories.map((cat) => (
+          {bundleCategories.map((category) => (
             <TouchableOpacity
-              key={cat}
-              style={[DataStyles.categoryChip, category === cat && DataStyles.categoryChipActive]}
-              onPress={() => setCategory(cat)}
+              key={category.id}
+              style={[
+                DataStyles.categoryChip, 
+                selectedCategory?.id === category.id && DataStyles.categoryChipActive
+              ]}
+              onPress={() => setSelectedCategory(category)}
             >
-              <Text style={[DataStyles.categoryText, category === cat && DataStyles.categoryTextActive]}>
-                {cat}
+              <Text style={[
+                DataStyles.categoryText, 
+                selectedCategory?.id === category.id && DataStyles.categoryTextActive
+              ]}>
+                {category.category_name?.en || category.category_name || "Unnamed Category"}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
       </ScrollView>
 
-      <Text style={DataStyles.smallLabel}>Search Bundles</Text>
-      <View style={DataStyles.searchContainer}>
-        <Ionicons name="search" size={20} color="#999" style={DataStyles.searchIcon} />
-        <TextInput
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Search bundle or price..."
-          style={DataStyles.searchInput}
-          placeholderTextColor="#999"
-        />
-      </View>
+      <Text style={DataStyles.smallLabel}>Bundle Type</Text>
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false} 
+        style={DataStyles.categoriesScroll}
+      >
+        <View style={DataStyles.categoriesContainer}>
+          {bundleTypes.map((type) => (
+            <TouchableOpacity
+              key={type.id}
+              style={[
+                DataStyles.categoryChip, 
+                selectedType?.id === type.id && DataStyles.categoryChipActive
+              ]}
+              onPress={() => setSelectedType(type)}
+            >
+              <Text style={[
+                DataStyles.categoryText, 
+                selectedType?.id === type.id && DataStyles.categoryTextActive
+              ]}>
+                {type.productType?.en || type.productType || "Unnamed Type"}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
+
+ 
 
       <FlatList
         data={products}
@@ -98,10 +135,27 @@ function StepProducts({
         ItemSeparatorComponent={() => <View style={DataStyles.bundleSeparator} />}
         contentContainerStyle={{ paddingTop: 8 }}
         showsVerticalScrollIndicator={false}
+        scrollEnabled={false}
         ListEmptyComponent={
           <View style={DataStyles.emptyProducts}>
             <Ionicons name="wifi-outline" size={48} color="#999" />
-            <Text style={DataStyles.emptyProductsText}>No bundles available</Text>
+            <Text style={DataStyles.emptyProductsText}>
+              {selectedCategory || selectedType 
+                ? "No bundles available for selected filters" 
+                : "No bundles available"
+              }
+            </Text>
+            {(selectedCategory || selectedType) && (
+              <TouchableOpacity
+                style={DataStyles.clearFiltersButton}
+                onPress={() => {
+                  setSelectedCategory(null);
+                  setSelectedType(null);
+                }}
+              >
+                <Text style={DataStyles.clearFiltersText}>Clear Filters</Text>
+              </TouchableOpacity>
+            )}
           </View>
         }
       />
@@ -116,7 +170,9 @@ function StepProducts({
           </View>
           <View style={DataStyles.summaryRow}>
             <Text style={DataStyles.summaryKey}>Selected Plan</Text>
-            <Text style={DataStyles.summaryValue}>{product.productName}</Text>
+            <Text style={DataStyles.summaryValue}>
+              {product.productName?.en || product.productName}
+            </Text>
           </View>
           <View style={[DataStyles.summaryRow, DataStyles.summaryTotal]}>
             <Text style={[DataStyles.summaryKey, { fontWeight: "700" }]}>
@@ -131,7 +187,5 @@ function StepProducts({
     </View>
   );
 }
-
-
 
 export default StepProducts;

@@ -17,6 +17,7 @@ import PrimaryButton from '../../components/PrimaryButton';
 import PaymentMethodToggle from '../../components/PaymentMethodToggle';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { scale } from '../../utils/normalizeSize';
 
 export default function PaymentMethodScreen({ navigation, route }) {
     const { product, mobile, usdAmount, afnAmount } = route.params || {};
@@ -155,28 +156,37 @@ export default function PaymentMethodScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-    label: { fontSize: 13, color: Colors.textPrimary, marginBottom: 6, marginTop: 16 },
-    dropdown: {
-        height: 48,
-        borderRadius: 6,
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
-        backgroundColor: '#FFF',
-        paddingHorizontal: 16,
-        justifyContent: 'space-between',
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    paypalBtn: {
-        marginTop: 16,
-        height: 48,
-        borderRadius: 6,
-        backgroundColor: '#F7F7F7',
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    paypalText: { color: '#003087', fontSize: 14, fontWeight: '600' },
+  label: {
+    fontSize: scale.hp(1.8), 
+    color: Colors.textPrimary,
+    marginBottom: scale.hp(0.8), 
+    marginTop: scale.hp(2.1), 
+  },
+  dropdown: {
+    height: scale.hp(6.2), 
+    borderRadius: scale.hp(0.8), 
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    backgroundColor: '#FFF',
+    paddingHorizontal: scale.wp(4.2), 
+    justifyContent: 'space-between',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  paypalBtn: {
+    marginTop: scale.hp(2.1), 
+    height: scale.hp(6.2), 
+    borderRadius: scale.hp(0.8), 
+    backgroundColor: '#F7F7F7',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  paypalText: {
+    color: '#003087',
+    fontSize: scale.hp(1.95), 
+    fontWeight: '600',
+  },
 });

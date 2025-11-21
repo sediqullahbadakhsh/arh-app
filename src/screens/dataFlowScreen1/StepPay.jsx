@@ -16,7 +16,7 @@ function StepPay({ summary, onEditProduct }) {
           </View>
           <View style={DataStyles.summaryRow}>
             <Text style={DataStyles.summaryKey}>Selected Plan</Text>
-            <Text style={DataStyles.summaryValue}>{summary.product?.productName}</Text>
+            <Text style={DataStyles.summaryValue}>{summary.product?.productName?.en}</Text>
           </View>
           <View style={DataStyles.summaryRow}>
             <Text style={DataStyles.summaryKey}>Plan Description</Text>

@@ -7,6 +7,7 @@ import PasswordField from '../components/PasswordField';
 import PrimaryButton from '../components/PrimaryButton';
 import SocialButton from '../components/SocialButton';
 import { Ionicons, AntDesign } from '@expo/vector-icons';
+import { scale } from '../utils/normalizeSize';
 
 export default function SignUpScreen({ navigation }) {
     const [name, setName] = useState('');
@@ -59,15 +60,35 @@ export default function SignUpScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-    safeArea: { flex: 1, backgroundColor: Colors.white },
-    container: {
-        flex: 1,
-        paddingHorizontal: 24,
-        paddingTop: 24,
-        backgroundColor: Colors.white,
-    },
-    dividerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 24, marginTop: 8 },
-    divider: { flex: 1, height: 1, backgroundColor: Colors.divider },
-    dividerText: { marginHorizontal: 12, color: '#9E9E9E', fontSize: 13 },
-    socialRow: { flexDirection: 'row', justifyContent: 'center', marginBottom: 32 },
+  safeArea: {
+    flex: 1,
+    backgroundColor: Colors.white,
+  },
+  container: {
+    flex: 1,
+    paddingHorizontal: scale.wp(6.2),
+    paddingTop: scale.hp(3.1),
+    backgroundColor: Colors.white,
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: scale.hp(3.1),
+    marginTop: scale.hp(1.05),
+  },
+  divider: {
+    flex: 1,
+    height: scale.hp(0.13),
+    backgroundColor: Colors.divider,
+  },
+  dividerText: {
+    marginHorizontal: scale.wp(3.1),
+    color: '#9E9E9E',
+    fontSize: scale.hp(1.8),
+  },
+  socialRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: scale.hp(4.2),
+  },
 });

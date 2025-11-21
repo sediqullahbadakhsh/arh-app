@@ -17,9 +17,11 @@ import ServiceHeader from "../../components/ServiceHeader";
 import { getAllSlabsForMerchant, setComission } from "../../services/merchantApi";
 import CreateSlabModal from "../../components/modals/CreateSlabModal";
 import SlabListModal from "../../components/modals/SlabListModal";
-
+import { scale } from "../../utils/normalizeSize";
+import { useTranslation } from "react-i18next";
 
 export default function AssignCommissionSlabScreen({ navigation, route }) {
+  const { t } = useTranslation();
   const { agent, refreshAgentList } = route.params || {};
   const [slabs, setSlabs] = useState([]);
   const [selectedSlab, setSelectedSlab] = useState(null);
@@ -49,7 +51,7 @@ export default function AssignCommissionSlabScreen({ navigation, route }) {
       setSlabs(res?.data || []);
     } catch (error) {
       console.error("Fetch slabs error:", error);
-      Alert.alert("Error", "Failed to load commission slabs");
+      Alert.alert(t('error'), t('failedToLoadSlabs'));
     } finally {
       setLoadingSlabs(false);
       setRefreshing(false);
@@ -63,7 +65,7 @@ export default function AssignCommissionSlabScreen({ navigation, route }) {
 
   const handleAssignSlab = async () => {
     if (!selectedSlab) {
-      Alert.alert("Error", "Please select a commission slab");
+      Alert.alert(t('error'), t('selectCommissionSlab'));
       return;
     }
 
@@ -72,11 +74,11 @@ export default function AssignCommissionSlabScreen({ navigation, route }) {
       await setComission(agent.user.id, { slabId: selectedSlab.id });
       
       Alert.alert(
-        "Success", 
-        "Commission slab assigned successfully!",
+        t('success'), 
+        t('slabAssignedSuccessfully'),
         [
           {
-            text: "OK",
+            text: t('ok'),
             onPress: () => {
               refreshAgentList?.();
               navigation.goBack();
@@ -87,8 +89,8 @@ export default function AssignCommissionSlabScreen({ navigation, route }) {
     } catch (error) {
       console.error("Assign slab error:", error);
       Alert.alert(
-        "Error", 
-        error.response?.data?.error || "Failed to assign commission slab"
+        t('error'), 
+        error.response?.data?.error || t('failedToAssignSlab')
       );
     } finally {
       setLoading(false);
@@ -121,14 +123,10 @@ export default function AssignCommissionSlabScreen({ navigation, route }) {
             </View>
           </View>
           
-     
-
-         
-
           {isCurrent && (
             <View style={styles.currentBadge}>
               <Ionicons name="checkmark-circle" size={14} color="#16A34A" />
-              <Text style={styles.currentText}>Currently Assigned</Text>
+              <Text style={styles.currentText}>{t('currentlyAssigned')}</Text>
             </View>
           )}
         </View>
@@ -160,9 +158,9 @@ export default function AssignCommissionSlabScreen({ navigation, route }) {
   if (!agent) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
-        <ServiceHeader title="Assign Slab" onBack={() => navigation.goBack()} />
+        <ServiceHeader title={t('assignSlab')} onBack={() => navigation.goBack()} />
         <View style={styles.errorContainer}>
-          <Text>Agent information not available</Text>
+          <Text>{t('agentInfoNotAvailable')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -170,7 +168,7 @@ export default function AssignCommissionSlabScreen({ navigation, route }) {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
-      <ServiceHeader title="Assign Commission Slab" onBack={() => navigation.goBack()} />
+      <ServiceHeader title={t('assignCommissionSlab')} onBack={() => navigation.goBack()} />
       
       <ScrollView 
         style={styles.container}
@@ -182,14 +180,13 @@ export default function AssignCommissionSlabScreen({ navigation, route }) {
           />
         }
       >
-  
         <View style={styles.actionButtons}>
           <TouchableOpacity
             style={[styles.actionButton, styles.createButton]}
             onPress={() => setCreateModalVisible(true)}
           >
             <Ionicons name="add-circle-outline" size={20} color="#fff" />
-            <Text style={styles.actionButtonText}>Create Slab</Text>
+            <Text style={styles.actionButtonText}>{t('createSlab')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -197,11 +194,10 @@ export default function AssignCommissionSlabScreen({ navigation, route }) {
             onPress={() => setListModalVisible(true)}
           >
             <Ionicons name="list-outline" size={20} color="#fff" />
-            <Text style={styles.actionButtonText}>Slab List</Text>
+            <Text style={styles.actionButtonText}>{t('slabList')}</Text>
           </TouchableOpacity>
         </View>
 
-   
         <View style={styles.agentInfo}>
           <Text style={styles.agentName}>{agent.user?.username}</Text>
           <Text style={styles.agentEmail}>{agent.user?.email}</Text>
@@ -210,13 +206,13 @@ export default function AssignCommissionSlabScreen({ navigation, route }) {
           {agent.commissionRateDetails && (
             <View style={styles.currentCommission}>
               <Text style={styles.currentCommissionText}>
-                Current Commission: {agent.commissionRateDetails.percentage}%
+                {t('currentCommission')}: {agent.commissionRateDetails.percentage}%
               </Text>
               <Text style={styles.currentSlabText}>
-                Current Slab: {agent.commissionRateDetails.slabTypeDetails?.title}
+                {t('currentSlab')}: {agent.commissionRateDetails.slabTypeDetails?.title}
               </Text>
               <Text style={styles.assignedText}>
-                (Slab Assigned)
+                ({t('slabAssigned')})
               </Text>
             </View>
           )}
@@ -224,38 +220,37 @@ export default function AssignCommissionSlabScreen({ navigation, route }) {
 
         {selectedSlab && (
           <View style={styles.selectedSlabInfo}>
-            <Text style={styles.selectedTitle}>Selected Slab</Text>
+            <Text style={styles.selectedTitle}>{t('selectedSlab')}</Text>
             <Text style={styles.selectedSlabName}>{selectedSlab.slabTypeDetails?.title}</Text>
-            <Text style={styles.selectedSlabPercentage}>{selectedSlab.percentage}% Commission</Text>
+            <Text style={styles.selectedSlabPercentage}>{selectedSlab.percentage}% {t('commission')}</Text>
             <Text style={styles.selectedSlabNote}>
-              This slab will be automatically applied to the agent's transactions
+              {t('slabAutoApplied')}
             </Text>
             {selectedSlab.countryDetails && (
               <Text style={styles.selectedSlabDetail}>
-                Country: {selectedSlab.countryDetails.countryName}
+                {t('country')}: {selectedSlab.countryDetails.countryName}
               </Text>
             )}
             {selectedSlab.providerDetails && (
               <Text style={styles.selectedSlabDetail}>
-                Provider: {selectedSlab.providerDetails.companyName}
+                {t('provider')}: {selectedSlab.providerDetails.companyName}
               </Text>
             )}
           </View>
         )}
 
-   
         <View style={styles.slabsSection}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Available Commission Slabs</Text>
+            <Text style={styles.sectionTitle}>{t('availableCommissionSlabs')}</Text>
             <Text style={styles.slabCount}>
-              {slabs.length} slab{slabs.length !== 1 ? 's' : ''} available
+              {slabs.length} {t('slabAvailable', { count: slabs.length })}
             </Text>
           </View>
           
           {loadingSlabs ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={Colors.primary} />
-              <Text style={styles.loadingText}>Loading commission slabs...</Text>
+              <Text style={styles.loadingText}>{t('loadingCommissionSlabs')}</Text>
             </View>
           ) : (
             <FlatList
@@ -267,15 +262,15 @@ export default function AssignCommissionSlabScreen({ navigation, route }) {
               ListEmptyComponent={
                 <View style={styles.emptyContainer}>
                   <Ionicons name="document-outline" size={48} color="#9E9E9E" />
-                  <Text style={styles.emptyText}>No commission slabs available</Text>
+                  <Text style={styles.emptyText}>{t('noCommissionSlabs')}</Text>
                   <Text style={styles.emptySubtext}>
-                    Create your first slab to get started
+                    {t('createFirstSlab')}
                   </Text>
                   <TouchableOpacity
                     style={styles.createFirstButton}
                     onPress={() => setCreateModalVisible(true)}
                   >
-                    <Text style={styles.createFirstButtonText}>Create Slab</Text>
+                    <Text style={styles.createFirstButtonText}>{t('createSlab')}</Text>
                   </TouchableOpacity>
                 </View>
               }
@@ -283,7 +278,6 @@ export default function AssignCommissionSlabScreen({ navigation, route }) {
           )}
         </View>
       </ScrollView>
-
 
       <View style={styles.footer}>
         <TouchableOpacity
@@ -297,17 +291,16 @@ export default function AssignCommissionSlabScreen({ navigation, route }) {
           {loading ? (
             <View style={styles.loadingButton}>
               <ActivityIndicator size="small" color="#fff" />
-              <Text style={styles.assignButtonText}>Assigning...</Text>
+              <Text style={styles.assignButtonText}>{t('assigning')}</Text>
             </View>
           ) : (
             <>
               <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
-              <Text style={styles.assignButtonText}>Assign Slab</Text>
+              <Text style={styles.assignButtonText}>{t('assignSlab')}</Text>
             </>
           )}
         </TouchableOpacity>
       </View>
-
 
       <CreateSlabModal
         visible={createModalVisible}
@@ -328,28 +321,28 @@ export default function AssignCommissionSlabScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingHorizontal: scale.wp(3.9),
+    paddingTop: scale.hp(1.55),
   },
   errorContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-  marginBottom: 300,
+  marginBottom: scale.hp(38.7),
   actionButtons: {
     flexDirection: "row",
-    gap: 12,
-    marginBottom: 16,
+    gap: scale.wp(2.9),
+    marginBottom: scale.hp(2.1),
   },
   actionButton: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    paddingVertical: 12,
-    borderRadius: 10,
+    gap: scale.wp(1.95),
+    paddingVertical: scale.hp(1.55),
+    borderRadius: scale.hp(1.3),
   },
   createButton: {
     backgroundColor: Colors.primary,
@@ -359,111 +352,111 @@ const styles = StyleSheet.create({
   },
   actionButtonText: {
     color: "#fff",
-    fontSize: 14,
+    fontSize: scale.hp(1.8),
     fontWeight: "600",
   },
   agentInfo: {
     backgroundColor: "#f8f9fa",
-    borderRadius: 10,
-    padding: 16,
-    marginBottom: 16,
+    borderRadius: scale.hp(1.3),
+    padding: scale.hp(2.1),
+    marginBottom: scale.hp(2.1),
   },
   agentName: {
-    fontSize: 18,
+    fontSize: scale.hp(2.35),
     fontWeight: "600",
     color: Colors.textPrimary,
-    marginBottom: 4,
+    marginBottom: scale.hp(0.5),
   },
   agentEmail: {
-    fontSize: 14,
+    fontSize: scale.hp(1.8),
     color: Colors.textSecondary,
-    marginBottom: 2,
+    marginBottom: scale.hp(0.25),
   },
   agentPhone: {
-    fontSize: 14,
+    fontSize: scale.hp(1.8),
     color: Colors.textSecondary,
-    marginBottom: 8,
+    marginBottom: scale.hp(1.05),
   },
   currentCommission: {
-    marginTop: 8,
-    paddingTop: 8,
+    marginTop: scale.hp(1.05),
+    paddingTop: scale.hp(1.05),
     borderTopWidth: 1,
     borderTopColor: "#e5e7eb",
   },
   currentCommissionText: {
-    fontSize: 14,
+    fontSize: scale.hp(1.8),
     color: Colors.textPrimary,
     fontWeight: "500",
   },
   currentSlabText: {
-    fontSize: 12,
+    fontSize: scale.hp(1.55),
     color: Colors.textSecondary,
-    marginTop: 2,
+    marginTop: scale.hp(0.25),
   },
   assignedText: {
-    fontSize: 11,
+    fontSize: scale.hp(1.4),
     color: "#3B82F6",
     fontStyle: "italic",
-    marginTop: 2,
+    marginTop: scale.hp(0.25),
   },
   selectedSlabInfo: {
     backgroundColor: "#dbeafe",
-    borderRadius: 10,
-    padding: 16,
-    marginBottom: 16,
+    borderRadius: scale.hp(1.3),
+    padding: scale.hp(2.1),
+    marginBottom: scale.hp(2.1),
     borderLeftWidth: 4,
     borderLeftColor: Colors.primary,
   },
   selectedTitle: {
-    fontSize: 12,
+    fontSize: scale.hp(1.55),
     color: Colors.primary,
     fontWeight: "600",
-    marginBottom: 4,
+    marginBottom: scale.hp(0.5),
   },
   selectedSlabName: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     color: Colors.textPrimary,
     fontWeight: "600",
-    marginBottom: 2,
+    marginBottom: scale.hp(0.25),
   },
   selectedSlabPercentage: {
-    fontSize: 14,
+    fontSize: scale.hp(1.8),
     color: Colors.textSecondary,
-    marginBottom: 4,
+    marginBottom: scale.hp(0.5),
   },
   selectedSlabNote: {
-    fontSize: 12,
+    fontSize: scale.hp(1.55),
     color: Colors.textSecondary,
     fontStyle: "italic",
-    marginBottom: 4,
+    marginBottom: scale.hp(0.5),
   },
   selectedSlabDetail: {
-    fontSize: 12,
+    fontSize: scale.hp(1.55),
     color: Colors.textSecondary,
   },
   slabsSection: {
-    marginBottom: 200,
+    marginBottom: scale.hp(25.8),
   },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: scale.hp(1.55),
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     fontWeight: "600",
     color: Colors.textPrimary,
   },
   slabCount: {
-    fontSize: 12,
+    fontSize: scale.hp(1.55),
     color: Colors.textSecondary,
   },
   slabItem: {
     flexDirection: "row",
     backgroundColor: "#fff",
-    borderRadius: 10,
-    padding: 16,
+    borderRadius: scale.hp(1.3),
+    padding: scale.hp(2.1),
     borderWidth: 1,
     borderColor: "#e5e7eb",
   },
@@ -480,61 +473,60 @@ const styles = StyleSheet.create({
   },
   slabHeader: {
     flexDirection: "row",
-    gap: 10,
+    gap: scale.wp(2.4),
     alignItems: "flex-start",
-    marginBottom: 8,
+    marginBottom: scale.hp(1.05),
   },
   slabTitle: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     fontWeight: "600",
     color: Colors.textPrimary,
-
   },
   slabPercentage: {
     backgroundColor: Colors.primary,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    marginLeft: 8,
+    paddingHorizontal: scale.wp(1.95),
+    paddingVertical: scale.hp(0.5),
+    borderRadius: scale.hp(0.8),
+    marginLeft: scale.wp(1.95),
   },
   percentageText: {
     color: "#fff",
-    fontSize: 12,
+    fontSize: scale.hp(1.55),
     fontWeight: "600",
   },
   slabDescription: {
-    fontSize: 12,
+    fontSize: scale.hp(1.55),
     color: Colors.textSecondary,
-    marginBottom: 8,
-    lineHeight: 16,
+    marginBottom: scale.hp(1.05),
+    lineHeight: scale.hp(2.1),
   },
   slabMeta: {
-    gap: 2,
+    gap: scale.hp(0.25),
   },
   metaText: {
-    fontSize: 11,
+    fontSize: scale.hp(1.4),
     color: Colors.textSecondary,
   },
   currentBadge: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 8,
-    gap: 4,
+    marginTop: scale.hp(1.05),
+    gap: scale.wp(1),
   },
   currentText: {
-    fontSize: 11,
+    fontSize: scale.hp(1.4),
     color: "#16A34A",
     fontWeight: "500",
   },
   selector: {
     justifyContent: "center",
     alignItems: "center",
-    marginLeft: 12,
+    marginLeft: scale.wp(2.9),
   },
   radio: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: scale.wp(4.9),
+    height: scale.wp(4.9),
+    borderRadius: scale.wp(2.4),
     borderWidth: 2,
     borderColor: "#d1d5db",
     alignItems: "center",
@@ -547,48 +539,48 @@ const styles = StyleSheet.create({
     borderColor: "#16A34A",
   },
   radioInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: scale.wp(2.4),
+    height: scale.wp(2.4),
+    borderRadius: scale.wp(1.2),
     backgroundColor: Colors.primary,
   },
   separator: {
-    height: 8,
+    height: scale.hp(1.05),
   },
   loadingContainer: {
     alignItems: "center",
-    padding: 40,
+    padding: scale.hp(5.2),
   },
   loadingText: {
-    marginTop: 12,
+    marginTop: scale.hp(1.55),
     color: Colors.textSecondary,
   },
   emptyContainer: {
     alignItems: "center",
-    padding: 40,
+    padding: scale.hp(5.2),
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     color: Colors.textSecondary,
-    marginTop: 12,
+    marginTop: scale.hp(1.55),
     textAlign: "center",
   },
   emptySubtext: {
-    fontSize: 12,
+    fontSize: scale.hp(1.55),
     color: Colors.textSecondary,
-    marginTop: 4,
+    marginTop: scale.hp(0.5),
     textAlign: "center",
   },
   createFirstButton: {
-    marginTop: 16,
+    marginTop: scale.hp(2.1),
     backgroundColor: Colors.primary,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
+    paddingHorizontal: scale.wp(4.9),
+    paddingVertical: scale.hp(1.3),
+    borderRadius: scale.hp(1.05),
   },
   createFirstButtonText: {
     color: "#fff",
-    fontSize: 14,
+    fontSize: scale.hp(1.8),
     fontWeight: "600",
   },
   footer: {
@@ -597,19 +589,19 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: "#fff",
-    padding: 16,
-    marginBottom: 100,
+    padding: scale.hp(2.1),
+    marginBottom: scale.hp(12.9),
     borderTopWidth: 1,
     borderTopColor: "#e5e7eb",
   },
   assignButton: {
     backgroundColor: Colors.primary,
-    borderRadius: 10,
-    padding: 16,
+    borderRadius: scale.hp(1.3),
+    padding: scale.hp(2.1),
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
-    gap: 8,
+    gap: scale.wp(1.95),
   },
   assignButtonDisabled: {
     backgroundColor: "#9ca3af",
@@ -617,11 +609,11 @@ const styles = StyleSheet.create({
   loadingButton: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: scale.wp(1.95),
   },
   assignButtonText: {
     color: "#fff",
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     fontWeight: "600",
   },
 });

@@ -6,12 +6,16 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Colors } from "../../theme/colors";
+import { scale } from "../../utils/normalizeSize";
+import { useTranslation } from "react-i18next";
 
 const StatementFilterModal = ({ visible, onClose, onSubmit, isLoading }) => {
+  const { t } = useTranslation();
   const [filterType, setFilterType] = useState("currentMonth");
   const [startDate, setStartDate] = useState(new Date());
   const [endDate, setEndDate] = useState(new Date());
@@ -66,7 +70,7 @@ const StatementFilterModal = ({ visible, onClose, onSubmit, isLoading }) => {
     
     if (filterType === "custom") {
       if (startDate > endDate) {
-        alert("Start date cannot be after end date");
+        Alert.alert(t('error'), t('startDateAfterEndDate'));
         return;
       }
       selectedRange = { startDate, endDate };
@@ -89,11 +93,11 @@ const StatementFilterModal = ({ visible, onClose, onSubmit, isLoading }) => {
   };
 
   const filterOptions = [
-    { key: "currentMonth", label: "Current Month", icon: "calendar-outline" },
-    { key: "previousMonth", label: "Previous Month", icon: "calendar-clear-outline" },
-    { key: "last7Days", label: "Last 7 Days", icon: "time-outline" },
-    { key: "last30Days", label: "Last 30 Days", icon: "calendar-number-outline" },
-    { key: "custom", label: "Custom Range", icon: "options-outline" },
+    { key: "currentMonth", label: t('currentMonth'), icon: "calendar-outline" },
+    { key: "previousMonth", label: t('previousMonth'), icon: "calendar-clear-outline" },
+    { key: "last7Days", label: t('last7Days'), icon: "time-outline" },
+    { key: "last30Days", label: t('last30Days'), icon: "calendar-number-outline" },
+    { key: "custom", label: t('customRange'), icon: "options-outline" },
   ];
 
   return (
@@ -105,14 +109,14 @@ const StatementFilterModal = ({ visible, onClose, onSubmit, isLoading }) => {
     >
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.title}>Generate Statement Report</Text>
+          <Text style={styles.title}>{t('generateStatementReport')}</Text>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
             <Ionicons name="close" size={24} color={Colors.textPrimary} />
           </TouchableOpacity>
         </View>
 
         <ScrollView style={styles.content}>
-          <Text style={styles.sectionTitle}>Select Time Period</Text>
+          <Text style={styles.sectionTitle}>{t('selectTimePeriod')}</Text>
           
           <View style={styles.filterGrid}>
             {filterOptions.map((option) => (
@@ -141,7 +145,7 @@ const StatementFilterModal = ({ visible, onClose, onSubmit, isLoading }) => {
 
           {filterType === "custom" && (
             <View style={styles.customRangeSection}>
-              <Text style={styles.rangeTitle}>Custom Date Range</Text>
+              <Text style={styles.rangeTitle}>{t('customDateRange')}</Text>
               
               <View style={styles.dateInputs}>
                 <TouchableOpacity 
@@ -154,7 +158,7 @@ const StatementFilterModal = ({ visible, onClose, onSubmit, isLoading }) => {
                   </Text>
                 </TouchableOpacity>
 
-                <Text style={styles.dateSeparator}>to</Text>
+                <Text style={styles.dateSeparator}>{t('to')}</Text>
 
                 <TouchableOpacity 
                   style={styles.dateInput}
@@ -194,7 +198,7 @@ const StatementFilterModal = ({ visible, onClose, onSubmit, isLoading }) => {
           )}
 
           <View style={styles.selectedRange}>
-            <Text style={styles.rangeLabel}>Selected Period:</Text>
+            <Text style={styles.rangeLabel}>{t('selectedPeriod')}:</Text>
             <Text style={styles.rangeValue}>
               {formatDate(startDate)} - {formatDate(endDate)}
             </Text>
@@ -207,7 +211,7 @@ const StatementFilterModal = ({ visible, onClose, onSubmit, isLoading }) => {
             onPress={onClose}
             disabled={isLoading}
           >
-            <Text style={styles.cancelButtonText}>Cancel</Text>
+            <Text style={styles.cancelButtonText}>{t('cancel')}</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
@@ -216,11 +220,11 @@ const StatementFilterModal = ({ visible, onClose, onSubmit, isLoading }) => {
             disabled={isLoading}
           >
             {isLoading ? (
-              <Text style={styles.submitButtonText}>Generating...</Text>
+              <Text style={styles.submitButtonText}>{t('generating')}</Text>
             ) : (
               <>
                 <Ionicons name="document-text-outline" size={20} color={Colors.white} />
-                <Text style={styles.submitButtonText}>Generate Report</Text>
+                <Text style={styles.submitButtonText}>{t('generateReport')}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -239,50 +243,50 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: scale.wp(5),
+    paddingVertical: scale.hp(2.1),
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
   title: {
-    fontSize: 18,
+    fontSize: scale.hp(2.35),
     fontWeight: '600',
     color: Colors.textPrimary,
   },
   closeButton: {
-    padding: 4,
+    padding: scale.hp(0.5),
   },
   content: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingHorizontal: scale.wp(5),
+    paddingTop: scale.hp(2.6),
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     fontWeight: '600',
     color: Colors.textPrimary,
-    marginBottom: 16,
+    marginBottom: scale.hp(2.1),
   },
   filterGrid: {
-    gap: 12,
-    marginBottom: 24,
+    gap: scale.hp(1.55),
+    marginBottom: scale.hp(3.1),
   },
   filterOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    padding: scale.hp(2.1),
     backgroundColor: '#F8FAFC',
-    borderRadius: 12,
+    borderRadius: scale.hp(1.55),
     borderWidth: 2,
     borderColor: 'transparent',
-    gap: 12,
+    gap: scale.wp(3.1),
   },
   filterOptionSelected: {
     backgroundColor: '#FFF5F5',
     borderColor: Colors.primary,
   },
   filterOptionText: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     color: Colors.textSecondary,
     fontWeight: '500',
   },
@@ -291,59 +295,59 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   customRangeSection: {
-    marginBottom: 24,
+    marginBottom: scale.hp(3.1),
   },
   rangeTitle: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     fontWeight: '600',
     color: Colors.textPrimary,
-    marginBottom: 12,
+    marginBottom: scale.hp(1.55),
   },
   dateInputs: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: scale.wp(3.1),
   },
   dateInput: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    padding: 16,
-    gap: 12,
+    borderRadius: scale.hp(1.55),
+    padding: scale.hp(2.1),
+    gap: scale.wp(3.1),
   },
   dateInputText: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     color: Colors.textPrimary,
     fontWeight: '500',
   },
   dateSeparator: {
-    fontSize: 14,
+    fontSize: scale.hp(1.8),
     color: Colors.textSecondary,
     fontWeight: '500',
   },
   selectedRange: {
     backgroundColor: '#F0F9FF',
-    borderRadius: 12,
-    padding: 16,
-    borderLeftWidth: 4,
+    borderRadius: scale.hp(1.55),
+    padding: scale.hp(2.1),
+    borderLeftWidth: scale.wp(1),
     borderLeftColor: '#3B82F6',
   },
   rangeLabel: {
-    fontSize: 14,
+    fontSize: scale.hp(1.8),
     color: Colors.textSecondary,
-    marginBottom: 4,
+    marginBottom: scale.hp(0.5),
   },
   rangeValue: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     color: Colors.textPrimary,
     fontWeight: '600',
   },
   footer: {
     flexDirection: 'row',
-    gap: 12,
-    padding: 20,
+    gap: scale.wp(3.1),
+    padding: scale.hp(2.6),
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
   },
@@ -352,11 +356,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#F1F5F9',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: scale.hp(1.55),
+    padding: scale.hp(2.1),
   },
   cancelButtonText: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     color: Colors.textPrimary,
     fontWeight: '600',
   },
@@ -366,12 +370,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.primary,
-    borderRadius: 12,
-    padding: 16,
-    gap: 8,
+    borderRadius: scale.hp(1.55),
+    padding: scale.hp(2.1),
+    gap: scale.wp(2),
   },
   submitButtonText: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     color: Colors.white,
     fontWeight: '600',
   },

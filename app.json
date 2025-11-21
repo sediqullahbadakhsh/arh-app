@@ -4,7 +4,7 @@
     "slug": "arh",
     "version": "1.0.0",
     "orientation": "portrait",
-    "owner": "ahmad2028",
+    "owner": "karim1224",
     "icon": "./assets/icon.png",
     "assetBundlePatterns": [
       "**/*"
@@ -20,7 +20,16 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSCameraUsageDescription": "Allow ARH to use your camera to capture verification photos.",
-        "NSPhotoLibraryAddUsageDescription": "Allow ARH to save photos for your application."
+        "NSPhotoLibraryAddUsageDescription": "Allow ARH to save photos for your application.",
+        "NSUserTrackingUsageDescription": "This identifier will be used to deliver personalized ads to you.",
+        "SKAdNetworkItems": [
+          {
+            "SKAdNetworkIdentifier": "v9wttpbfk9.skadnetwork"
+          },
+          {
+            "SKAdNetworkIdentifier": "n38lu8286q.skadnetwork"
+          }
+        ]
       },
       "bundleIdentifier": "com.sediqullah.badakhsh.arh"
     },
@@ -44,7 +53,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "b5d11eff-12f9-41d0-90cc-24f02bcce686"
+        "projectId": "38589898-6912-4328-8434-33fbfb422422"
       }
     },
     "plugins": [
@@ -72,7 +81,9 @@
             "deploymentTarget": "15.1"
           }
         }
-      ]
+      ],
+      "expo-web-browser",
+      "expo-facebook"
     ]
   }
 }
