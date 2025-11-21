@@ -20,6 +20,7 @@ import { useTranslation } from "react-i18next";
 import { getProductCategories, getDataProductsCustomer, activateDataBundleCustomer } from "../../services/merchantApi";
 import { getSetaraganMnoId } from "../../utils/getCompanyIdForSetaragan";
 import formatLocal from "../../utils/formatLocal";
+import { scale } from "../../utils/normalizeSize";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -1257,20 +1258,20 @@ function StepAmount({
 
 const AdditionalStyles = {
   slabInfoContainer: {
-    marginTop: 8,
-    padding: 8,
+    marginTop: scale.hp(1),
+    padding: scale.hp(1),
     backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    borderLeftWidth: 3,
+    borderRadius: scale.hp(1),
+    borderLeftWidth: scale.wp(0.75),
     borderLeftColor: Colors.primary,
   },
   slabInfoText: {
-    fontSize: 12,
+    fontSize: scale.hp(1.5),
     color: Colors.textSecondary,
-    marginBottom: 2,
+    marginBottom: scale.hp(0.25),
   },
   amountTotal: {
-    fontSize: 11,
+    fontSize: scale.hp(1.4),
     color: Colors.textSecondary,
     fontWeight: '500',
   },
@@ -1281,23 +1282,24 @@ const AdditionalStyles = {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.primary + '20',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginTop: 4,
+    paddingHorizontal: scale.wp(2),
+    paddingVertical: scale.hp(0.5),
+    borderRadius: scale.hp(1.5),
+    marginTop: scale.hp(0.5),
   },
   slabBadgeSelected: {
     backgroundColor: Colors.primary + '40',
   },
   slabBadgeText: {
-    fontSize: 10,
+    fontSize: scale.hp(1.25),
     color: Colors.primary,
     fontWeight: '600',
-    marginLeft: 2,
+    marginLeft: scale.wp(0.5),
   },
   slabBadgeTextSelected: {
     color: Colors.white,
   },
+
 };
 
 export default StepAmount;

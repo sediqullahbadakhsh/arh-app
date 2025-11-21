@@ -19,11 +19,11 @@ export default function ContactPickerScreen({ navigation, route }) {
   const { onSelect, cc } = route.params || {};
 
   const normalizePicked = (raw) => {
-    let d = String(raw || "").replace(/[^\d]/g, ""); // digits only
+    let d = String(raw || "").replace(/[^\d]/g, ""); 
     const dial = ((DIAL_CODES[cc] || "") + "").replace("+", "");
-    if (dial && d.startsWith(dial)) d = d.slice(dial.length); // remove +93...
-    if (cc === "AF" && d.startsWith("0")) d = d.slice(1); // kill leading 0
-    if (cc === "AF") d = d.slice(-9); // AF mobiles = 9 digits
+    if (dial && d.startsWith(dial)) d = d.slice(dial.length);
+    if (cc === "AF" && d.startsWith("0")) d = d.slice(1); 
+    if (cc === "AF") d = d.slice(-9); 
     return d;
   };
 
@@ -38,7 +38,7 @@ export default function ContactPickerScreen({ navigation, route }) {
         const withNumbers = data.filter(
           (c) => c.phoneNumbers && c.phoneNumbers.length
         );
-        // sort by name
+ 
         withNumbers.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
         setList(withNumbers);
       }

@@ -3,6 +3,7 @@ import { View, Text,  SafeAreaView , StyleSheet, TouchableOpacity } from 'react-
 // import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '../../theme/colors';
 import { Ionicons } from '@expo/vector-icons';
+import { scale } from '../../utils/normalizeSize';
 
 export default function TopupResultScreen({ navigation, route }) {
     const { mobile, usdAmount, cardType, cardNumber, transactionId, date, status } = route.params || {};
@@ -60,53 +61,84 @@ export default function TopupResultScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-    header: {
-        height: 120,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-    },
-    backBtn: { padding: 6 },
-    printBtn: { padding: 6 },
-
-    container: { flex: 1, paddingHorizontal: 24, alignItems: 'center', paddingTop: 16 },
-    checkCircle: {
-        width: 96,
-        height: 96,
-        borderRadius: 48,
-        backgroundColor: Colors.primary,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 16,
-    },
-    title: { fontSize: 20, fontWeight: '600', color: Colors.textPrimary, marginBottom: 24 },
-    detailRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        width: '100%',
-        paddingVertical: 6,
-    },
-    key: { color: Colors.textSecondary, fontSize: 13 },
-    value: { color: Colors.textPrimary, fontSize: 13 },
-    totalBox: {
-        width: '100%',
-        backgroundColor: '#F44336',
-        borderRadius: 12,
-        paddingVertical: 16,
-        marginTop: 24,
-        marginBottom: 24,
-        alignItems: 'center',
-    },
-    totalLabel: { color: '#fff', fontSize: 13, marginBottom: 4 },
-    totalValue: { color: '#fff', fontSize: 24, fontWeight: '600' },
-    doneBtn: {
-        width: '100%',
-        height: 52,
-        borderRadius: 26,
-        backgroundColor: Colors.primary,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    doneText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  header: {
+    height: scale.hp(15.5),
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: scale.wp(4.2),
+  },
+  backBtn: {
+    padding: scale.hp(0.8),
+  },
+  printBtn: {
+    padding: scale.hp(0.8),
+  },
+  container: {
+    flex: 1,
+    paddingHorizontal: scale.wp(6.2),
+    alignItems: 'center',
+    paddingTop: scale.hp(2.1),
+  },
+  checkCircle: {
+    width: scale.wp(24.8),
+    height: scale.wp(24.8),
+    borderRadius: scale.wp(12.4),
+    backgroundColor: Colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: scale.hp(2.1),
+  },
+  title: {
+    fontSize: scale.hp(3.1),
+    fontWeight: '600',
+    color: Colors.textPrimary,
+    marginBottom: scale.hp(3.1),
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    paddingVertical: scale.hp(0.8),
+  },
+  key: {
+    color: Colors.textSecondary,
+    fontSize: scale.hp(1.8),
+  },
+  value: {
+    color: Colors.textPrimary,
+    fontSize: scale.hp(1.8),
+  },
+  totalBox: {
+    width: '100%',
+    backgroundColor: '#F44336',
+    borderRadius: scale.hp(1.55),
+    paddingVertical: scale.hp(2.1),
+    marginTop: scale.hp(3.1),
+    marginBottom: scale.hp(3.1),
+    alignItems: 'center',
+  },
+  totalLabel: {
+    color: '#fff',
+    fontSize: scale.hp(1.8),
+    marginBottom: scale.hp(0.5),
+  },
+  totalValue: {
+    color: '#fff',
+    fontSize: scale.hp(3.7),
+    fontWeight: '600',
+  },
+  doneBtn: {
+    width: '100%',
+    height: scale.hp(6.7),
+    borderRadius: scale.hp(3.4),
+    backgroundColor: Colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  doneText: {
+    color: '#fff',
+    fontSize: scale.hp(2.6),
+    fontWeight: '600',
+  },
 });

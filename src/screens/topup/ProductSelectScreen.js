@@ -1,10 +1,14 @@
 import React from 'react';
-import { View, Text,SafeAreaView, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import { View, Text, SafeAreaView, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { Colors } from '../../theme/colors';
 import ServiceHeader from '../../components/ServiceHeader';
 import { TOPUP_PRODUCTS } from '../../constants/products';
+import { scale } from '../../utils/normalizeSize';
+import { useTranslation } from 'react-i18next';
 
 export default function ProductSelectScreen({ navigation }) {
+    const { t } = useTranslation();
+
     const onSelect = (item) => {
         navigation.navigate('TopupForm', { product: item });
     };
@@ -13,24 +17,24 @@ export default function ProductSelectScreen({ navigation }) {
         if (item.custom) {
             return (
                 <TouchableOpacity style={styles.customCard} onPress={() => onSelect(item)} activeOpacity={0.85}>
-                    <Text style={styles.customText}>Custom Amount</Text>
+                    <Text style={styles.customText}>{t('customAmount')}</Text>
                 </TouchableOpacity>
             );
         }
         return (
             <TouchableOpacity style={styles.card} onPress={() => onSelect(item)} activeOpacity={0.85}>
                 <Text style={styles.usd}>${item.usd}</Text>
-                <Text style={styles.afn}>{item.afn} AFN</Text>
+                <Text style={styles.afn}>{item.afn} {t('afn')}</Text>
             </TouchableOpacity>
         );
     };
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
-            <ServiceHeader title="Mobile Top-up" onBack={() => navigation.goBack()} />
+            <ServiceHeader title={t('mobileTopup')} onBack={() => navigation.goBack()} />
 
             <View style={styles.container}>
-                <Text style={styles.sectionTitle}>Choose a Product</Text>
+                <Text style={styles.sectionTitle}>{t('chooseProduct')}</Text>
 
                 <FlatList
                     data={TOPUP_PRODUCTS}
@@ -59,18 +63,43 @@ const cardBase = {
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1, paddingHorizontal: 24, paddingTop: 8 },
-    sectionTitle: { fontSize: 16, fontWeight: '600', color: Colors.textPrimary, marginBottom: 16 },
-    card: {
-        ...cardBase,
-        shadowColor: '#000',
-        shadowOpacity: 0.05,
-        shadowOffset: { width: 0, height: 2 },
-        shadowRadius: 3,
-        elevation: 2,
-    },
-    usd: { fontSize: 22, fontWeight: '600', color: Colors.primary, marginBottom: 4 },
-    afn: { fontSize: 13, color: Colors.textSecondary },
-    customCard: { ...cardBase, borderStyle: 'dashed', borderColor: Colors.primary },
-    customText: { color: Colors.primary, fontWeight: '600', fontSize: 15 },
+  container: {
+    flex: 1,
+    paddingHorizontal: scale.wp(6.2), 
+    paddingTop: scale.hp(1.05), 
+  },
+  sectionTitle: {
+    fontSize: scale.hp(2.6), 
+    fontWeight: '600',
+    color: Colors.textPrimary,
+    marginBottom: scale.hp(2.1), 
+  },
+  card: {
+    ...cardBase,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: scale.hp(0.26) }, 
+    shadowRadius: scale.hp(0.4), 
+    elevation: 2,
+  },
+  usd: {
+    fontSize: scale.hp(3.4), 
+    fontWeight: '600',
+    color: Colors.primary,
+    marginBottom: scale.hp(0.5), 
+  },
+  afn: {
+    fontSize: scale.hp(1.8),
+    color: Colors.textSecondary,
+  },
+  customCard: {
+    ...cardBase,
+    borderStyle: 'dashed',
+    borderColor: Colors.primary,
+  },
+  customText: {
+    color: Colors.primary,
+    fontWeight: '600',
+    fontSize: scale.hp(2.3), 
+  },
 });

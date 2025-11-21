@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
+import { scale } from '../../utils/normalizeSize';
 
 const { width, height } = Dimensions.get('window');
 
@@ -30,13 +31,11 @@ export default function ErrorModal({
 
   useEffect(() => {
     if (visible) {
-      // Reset animations
       slideAnim.setValue(height);
       fadeAnim.setValue(0);
       scaleAnim.setValue(0.8);
       shakeAnim.setValue(0);
 
-      // Start animations
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -57,7 +56,7 @@ export default function ErrorModal({
         }),
       ]).start();
 
-      // Shake animation
+ 
       Animated.sequence([
         Animated.delay(300),
         Animated.timing(shakeAnim, {
@@ -68,7 +67,6 @@ export default function ErrorModal({
         }),
       ]).start();
     } else {
-      // Hide animations
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 0,
@@ -116,14 +114,14 @@ export default function ErrorModal({
     >
       <Animated.View style={[styles.backdrop, backdropStyle]}>
         <Animated.View style={[styles.modalContainer, modalStyle]}>
-          {/* Error Icon */}
+        
           <View style={styles.iconContainer}>
             <Animated.View style={[styles.iconCircle, iconStyle]}>
               <Ionicons name="close" size={32} color={Colors.white} />
             </Animated.View>
           </View>
 
-          {/* Content */}
+      
           <View style={styles.content}>
             <Text style={styles.title}>{title}</Text>
             
@@ -131,7 +129,7 @@ export default function ErrorModal({
               {message}
             </Text>
 
-            {/* Action Buttons */}
+       
             <View style={styles.buttonContainer}>
               <TouchableOpacity
                 style={[styles.button, styles.closeButton]}
@@ -156,7 +154,7 @@ export default function ErrorModal({
             </View>
           </View>
 
-          {/* Close Button */}
+  
           {showCloseButton && (
             <TouchableOpacity
               style={styles.closeButtonX}
@@ -177,81 +175,81 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: scale.wp(5.2),
   },
   modalContainer: {
     width: '100%',
     maxWidth: 400,
     backgroundColor: Colors.white,
-    borderRadius: 20,
+    borderRadius: scale.hp(2.6),
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 10,
+      height: scale.hp(1.3),
     },
     shadowOpacity: 0.3,
-    shadowRadius: 20,
+    shadowRadius: scale.hp(2.6),
     elevation: 10,
   },
   iconContainer: {
     alignItems: 'center',
-    marginTop: 32,
-    marginBottom: 16,
+    marginTop: scale.hp(4.2),
+    marginBottom: scale.hp(2.1),
   },
   iconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: scale.wp(20.8),
+    height: scale.wp(20.8),
+    borderRadius: scale.wp(10.4),
     backgroundColor: '#DC2626',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#DC2626',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: scale.hp(0.5),
     },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowRadius: scale.hp(1.05),
     elevation: 6,
   },
   content: {
-    padding: 24,
-    paddingTop: 8,
+    padding: scale.wp(6.2),
+    paddingTop: scale.hp(1.05),
   },
   title: {
-    fontSize: 22,
+    fontSize: scale.hp(2.9),
     fontWeight: '700',
     color: Colors.textPrimary,
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: scale.hp(1.55),
   },
   message: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     color: Colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 24,
+    lineHeight: scale.hp(3.1),
+    marginBottom: scale.hp(3.1),
   },
   buttonContainer: {
     flexDirection: 'row',
-    gap: 12,
+    gap: scale.wp(3.1),
   },
   button: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 12,
+    gap: scale.wp(2.1),
+    paddingVertical: scale.hp(1.8),
+    borderRadius: scale.hp(1.55),
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: scale.hp(0.26),
     },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: scale.hp(0.5),
     elevation: 3,
   },
   closeButton: {
@@ -263,7 +261,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#DC2626',
   },
   buttonText: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     fontWeight: '600',
   },
   closeButtonText: {
@@ -274,11 +272,11 @@ const styles = StyleSheet.create({
   },
   closeButtonX: {
     position: 'absolute',
-    top: 16,
-    right: 16,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    top: scale.hp(2.1),
+    right: scale.hp(2.1),
+    width: scale.wp(8.3),
+    height: scale.wp(8.3),
+    borderRadius: scale.wp(4.2),
     backgroundColor: '#F3F4F6',
     justifyContent: 'center',
     alignItems: 'center',

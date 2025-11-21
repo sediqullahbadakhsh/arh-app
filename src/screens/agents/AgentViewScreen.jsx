@@ -13,6 +13,7 @@ import ServiceHeader from "../../components/ServiceHeader";
 import DeleteConfirmationModal from "../../components/modals/DeleteConfirmationModal";
 import SuccessModal from "../../components/modals/SuccessModalShort";
 import ErrorModal from "../../components/modals/ErrorModal";
+import { scale } from "../../utils/normalizeSize";
 
 const deleteDownlineAgent = async (agentId) => {
   return new Promise((resolve, reject) => {
@@ -192,7 +193,7 @@ export default function AgentViewScreen({ navigation, route }) {
         </View>
       </ScrollView>
 
-      {/* Delete Confirmation Modal */}
+
       <DeleteConfirmationModal
         visible={showDeleteModal}
         onCancel={cancelDelete}
@@ -205,17 +206,17 @@ export default function AgentViewScreen({ navigation, route }) {
         cancelText="Cancel"
       />
 
-      {/* Success Modal */}
+
       <SuccessModal
         visible={showSuccessModal}
         onClose={handleSuccessClose}
         title="Agent Deleted Successfully"
         message="The agent has been permanently removed from the system. All associated data has been deleted."
         buttonText="Continue"
-        autoHideDuration={0} // Don't auto-hide, let user click
+        autoHideDuration={0} 
       />
 
-      {/* Error Modal */}
+
       <ErrorModal
         visible={showErrorModal}
         onClose={handleErrorClose}
@@ -254,8 +255,8 @@ function InfoRow({ label, value, valueColor }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingHorizontal: scale.wp(3.9), 
+    paddingTop: scale.hp(1.55),       
   },
   errorContainer: {
     flex: 1,
@@ -265,20 +266,20 @@ const styles = StyleSheet.create({
   btnBox: {
     flexDirection: "row",
     justifyContent: "space-between",
-    gap: 8,
-    marginBottom: 20,
-    padding: 12,
+    gap: scale.wp(1.95),             
+    marginBottom: scale.hp(2.6),      
+    padding: scale.hp(1.55),         
     backgroundColor: "#f8f9fa",
-    borderRadius: 10,
+    borderRadius: scale.hp(1.3),      
   },
   actionBtn: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
-    paddingVertical: 10,
-    borderRadius: 8,
+    gap: scale.wp(1.45),              
+    paddingVertical: scale.hp(1.3),   
+    borderRadius: scale.hp(1.05),    
   },
   editBtn: {
     backgroundColor: Colors.primary,
@@ -291,39 +292,39 @@ const styles = StyleSheet.create({
   },
   actionBtnText: {
     color: "#fff",
-    fontSize: 12,
+    fontSize: scale.hp(1.55),        
     fontWeight: "600",
   },
   section: {
     backgroundColor: "#fff",
-    borderRadius: 10,
-    padding: 16,
-    marginBottom: 16,
+    borderRadius: scale.hp(1.3),   
+    padding: scale.hp(2.1),         
+    marginBottom: scale.hp(2.1),      
     borderWidth: 1,
     borderColor: "#f1f1f1",
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),        
     fontWeight: "600",
     color: Colors.textPrimary,
-    marginBottom: 12,
+    marginBottom: scale.hp(1.55),     
   },
   infoRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    paddingVertical: 8,
+    paddingVertical: scale.hp(1.05),  
     borderBottomWidth: 1,
     borderBottomColor: "#f8f9fa",
   },
   infoLabel: {
-    fontSize: 14,
+    fontSize: scale.hp(1.8),          
     color: Colors.textSecondary,
     fontWeight: "500",
     flex: 1,
   },
   infoValue: {
-    fontSize: 14,
+    fontSize: scale.hp(1.8),          
     color: Colors.textPrimary,
     fontWeight: "400",
     flex: 1,
@@ -336,7 +337,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   loadingText: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),         
     color: Colors.textPrimary,
   },
 });

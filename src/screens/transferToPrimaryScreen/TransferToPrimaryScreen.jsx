@@ -21,6 +21,7 @@ import { useUser } from "../../context/userContext";
 import { transferApiToMainWallet } from "../../services/merchantApi";
 import { Ionicons } from "@expo/vector-icons";
 import TopUpStyles from "./topupScreen/TopupStyle";
+import { scale } from "../../utils/normalizeSize";
 
 const { width, height } = Dimensions.get('window');
 
@@ -128,7 +129,7 @@ const Confetti = () => {
   );
 };
 
-// Success Icon with Animation
+
 const AnimatedSuccessIcon = ({ animated }) => {
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const checkmarkOpacity = useRef(new Animated.Value(0)).current;
@@ -136,7 +137,6 @@ const AnimatedSuccessIcon = ({ animated }) => {
 
   useEffect(() => {
     if (animated) {
-      // Scale up the circle
       Animated.sequence([
         Animated.spring(scaleAnim, {
           toValue: 1.2,
@@ -152,7 +152,7 @@ const AnimatedSuccessIcon = ({ animated }) => {
         }),
       ]).start();
 
-      // Show checkmark after circle animation
+  
       setTimeout(() => {
         Animated.timing(checkmarkOpacity, {
           toValue: 1,
@@ -161,7 +161,7 @@ const AnimatedSuccessIcon = ({ animated }) => {
         }).start();
       }, 300);
 
-      // Continuous pulse effect
+  
       Animated.loop(
         Animated.sequence([
           Animated.timing(circlePulse, {
@@ -193,7 +193,6 @@ const AnimatedSuccessIcon = ({ animated }) => {
 
   return (
     <View style={styles.successIconContainer}>
-      {/* Outer pulse ring */}
       <Animated.View
         style={[
           styles.pulseRing,
@@ -204,7 +203,6 @@ const AnimatedSuccessIcon = ({ animated }) => {
         ]}
       />
       
-      {/* Main success circle */}
       <Animated.View
         style={[
           styles.successCircle,
@@ -213,7 +211,6 @@ const AnimatedSuccessIcon = ({ animated }) => {
           },
         ]}
       >
-        {/* Animated checkmark */}
         <Animated.View
           style={[
             styles.checkmarkContainer,
@@ -645,89 +642,89 @@ export default function TransferToPrimaryScreen({ navigation, route }) {
 
 const styles = {
   container: {
-    height: 8,
+    height: scale.hp(1.05),
     width: '100%',
     backgroundColor: '#E5E7EB',
-    borderRadius: 4,
+    borderRadius: scale.hp(0.5),
     overflow: 'hidden',
-    marginTop: 24,
-    marginBottom: 16,
+    marginTop: scale.hp(3.1),
+    marginBottom: scale.hp(2.1),
   },
   bar: {
     height: '100%',
     backgroundColor: Colors.primary,
-    borderRadius: 4,
+    borderRadius: scale.hp(0.5),
   },
   balanceCard: {
     backgroundColor: '#F8F9FA',
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: scale.hp(2.1),
+    padding: scale.hp(2.6),
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#E9ECEF',
-    marginBottom: 8,
+    marginBottom: scale.hp(1.05),
   },
   balanceLabel: {
-    fontSize: 14,
+    fontSize: scale.hp(1.95),
     color: Colors.textSecondary,
-    marginBottom: 8,
+    marginBottom: scale.hp(1.05),
     fontWeight: '500',
   },
   balanceAmount: {
-    fontSize: 28,
+    fontSize: scale.hp(3.65),
     fontWeight: '700',
     color: Colors.primary,
   },
   errorText: {
-    fontSize: 13,
+    fontSize: scale.hp(1.8),
     color: '#DC2626',
     fontWeight: '500',
   },
   infoCard: {
-    marginTop: 32,
+    marginTop: scale.hp(4.2),
     backgroundColor: '#F0F9FF',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: scale.hp(1.55),
+    padding: scale.hp(2.1),
     borderWidth: 1,
     borderColor: '#E0F2FE',
   },
   infoHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: scale.hp(1.05),
   },
   infoTitle: {
-    fontSize: 14,
+    fontSize: scale.hp(1.95),
     fontWeight: '600',
     color: Colors.primary,
-    marginLeft: 8,
+    marginLeft: scale.wp(2.1),
   },
   infoText: {
-    fontSize: 13,
+    fontSize: scale.hp(1.8),
     color: Colors.textSecondary,
-    lineHeight: 20,
+    lineHeight: scale.hp(2.6),
   },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    padding: scale.hp(3.1),
   },
   progressModal: {
     backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 24,
+    borderRadius: scale.hp(2.6),
+    padding: scale.hp(3.1),
     width: '100%',
-    maxWidth: 400,
+    maxWidth: scale.wp(104),
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: scale.hp(0.26),
     },
     shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    shadowRadius: scale.hp(0.5),
     elevation: 5,
   },
   progressContent: {
@@ -735,77 +732,75 @@ const styles = {
     width: '100%',
   },
   progressTitle: {
-    fontSize: 20,
+    fontSize: scale.hp(2.6),
     fontWeight: '700',
     color: Colors.textPrimary,
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: scale.hp(2.1),
+    marginBottom: scale.hp(1.05),
   },
   progressText: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     color: Colors.textSecondary,
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: scale.hp(3.1),
   },
   cancelButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
+    paddingVertical: scale.hp(1.55),
+    paddingHorizontal: scale.wp(6.2),
   },
   cancelButtonText: {
     color: Colors.textSecondary,
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     fontWeight: '600',
   },
-  // Enhanced Success Modal Styles
   successModal: {
     backgroundColor: 'white',
-    borderRadius: 24,
+    borderRadius: scale.hp(3.1),
     padding: 0,
     width: '100%',
-    maxWidth: 400,
+    maxWidth: scale.wp(104),
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 10,
+      height: scale.hp(1.3),
     },
     shadowOpacity: 0.3,
-    shadowRadius: 20,
+    shadowRadius: scale.hp(2.6),
     elevation: 10,
     overflow: 'hidden',
   },
   successContent: {
     alignItems: 'center',
     width: '100%',
-    padding: 32,
+    padding: scale.hp(4.2),
   },
-  // Success Icon Styles
   successIconContainer: {
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 24,
+    marginBottom: scale.hp(3.1),
   },
   successCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: scale.wp(26),
+    height: scale.wp(26),
+    borderRadius: scale.wp(13),
     backgroundColor: '#4CAF50',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#4CAF50',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: scale.hp(0.5),
     },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowRadius: scale.hp(1),
     elevation: 6,
   },
   pulseRing: {
     position: 'absolute',
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: scale.wp(31.2),
+    height: scale.wp(31.2),
+    borderRadius: scale.wp(15.6),
     backgroundColor: '#4CAF50',
   },
   checkmarkContainer: {
@@ -813,53 +808,53 @@ const styles = {
     alignItems: 'center',
   },
   successTitle: {
-    fontSize: 28,
+    fontSize: scale.hp(3.65),
     fontWeight: '800',
     color: Colors.textPrimary,
-    marginBottom: 8,
+    marginBottom: scale.hp(1.05),
     textAlign: 'center',
   },
   successSubtitle: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     color: Colors.textSecondary,
     textAlign: 'center',
-    marginBottom: 32,
-    lineHeight: 22,
+    marginBottom: scale.hp(4.2),
+    lineHeight: scale.hp(2.9),
   },
   successDetails: {
     width: '100%',
     backgroundColor: '#F8F9FA',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
+    borderRadius: scale.hp(2.1),
+    padding: scale.hp(2.6),
+    marginBottom: scale.hp(3.1),
   },
   detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: scale.hp(1.55),
     borderBottomWidth: 1,
     borderBottomColor: '#E9ECEF',
   },
   detailIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: scale.wp(9.4),
+    height: scale.wp(9.4),
+    borderRadius: scale.wp(4.7),
     backgroundColor: 'rgba(76, 175, 80, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: scale.wp(3.1),
   },
   detailTextContainer: {
     flex: 1,
   },
   detailLabel: {
-    fontSize: 14,
+    fontSize: scale.hp(1.95),
     color: Colors.textSecondary,
     fontWeight: '500',
-    marginBottom: 2,
+    marginBottom: scale.hp(0.26),
   },
   detailValue: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     color: Colors.textPrimary,
     fontWeight: '600',
   },
@@ -872,20 +867,19 @@ const styles = {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: scale.hp(1.55),
+    paddingHorizontal: scale.wp(4.2),
     borderWidth: 2,
     borderColor: Colors.primary,
-    borderRadius: 12,
+    borderRadius: scale.hp(1.55),
     flex: 1,
   },
   shareButtonText: {
     color: Colors.primary,
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     fontWeight: '600',
-    marginLeft: 8,
+    marginLeft: scale.wp(2.1),
   },
- 
   confettiContainer: {
     position: 'absolute',
     top: 0,

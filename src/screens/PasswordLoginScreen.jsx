@@ -21,8 +21,8 @@ import Checkbox from "../components/Checkbox";
 import { useUser } from "../context/userContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
-import {widthPercentageToDP as wp, heightPercentageToDP as hp} from 'react-native-responsive-screen';
 import { ScrollView } from "react-native";
+import { scale } from "../utils/normalizeSize";
 export default function PasswordLoginScreen({ route, navigation }) {
   const { target = "" } = route.params || {}; 
    const { user, setUser } = useUser();
@@ -173,12 +173,19 @@ const onLogin = async () => {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.white },
+  safeArea: {
+    flex: 1,
+    backgroundColor: Colors.white,
+  },
   container: {
     flex: 1,
-    paddingHorizontal: 36,
-    paddingTop: 24,
+    paddingHorizontal: scale.wp(9.4),
+    paddingTop: scale.hp(3.1),
     backgroundColor: Colors.pageBackColor,
   },
-  infoTxt: { fontSize: 13, color: Colors.textSecondary, marginBottom: 12 },
+  infoTxt: {
+    fontSize: scale.hp(1.8),
+    color: Colors.textSecondary,
+    marginBottom: scale.hp(1.55),
+  },
 });

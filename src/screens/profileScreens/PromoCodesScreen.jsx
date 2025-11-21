@@ -26,6 +26,7 @@ import {
   applyForPromoCode 
 } from "../../services/promoCodeApi";
 import ServiceHeader from "../../components/ServiceHeader";
+import { scale } from "../../utils/normalizeSize";
 
 export default function PromoCodesScreen({ navigation }) {
   const { user } = useAuth();
@@ -200,85 +201,79 @@ export default function PromoCodesScreen({ navigation }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    paddingBottom: 100,
+    paddingBottom: scale.hp(13),
     backgroundColor: Colors.white,
   },
-  // header: {
-  //   paddingHorizontal: 20,
-  //   paddingTop: 20,
-  //   paddingBottom: 20,
-  // },
   headerContent: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    // marginBottom: 15,
   },
   backButton: {
-    padding: 5,
+    padding: scale.hp(0.65),
   },
   headerTitle: {
     color: Colors.white,
-    fontSize: 20,
+    fontSize: scale.hp(2.6),
     fontWeight: "600",
   },
   headerRight: {
-    width: 24,
+    width: scale.wp(6.2),
   },
   statusCard: {
     backgroundColor: "rgba(255, 255, 255, 0.9)",
-    borderRadius: 12,
-    padding: 16,
-    marginTop: 10,
+    borderRadius: scale.hp(1.55),
+    padding: scale.hp(2.1),
+    marginTop: scale.hp(1.3),
   },
   statusTitle: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     fontWeight: "600",
     color: Colors.textPrimary,
-    marginBottom: 8,
+    marginBottom: scale.hp(1.05),
   },
   statusRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: scale.hp(1.05),
   },
   statusIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 8,
+    width: scale.wp(3.1),
+    height: scale.wp(3.1),
+    borderRadius: scale.wp(1.55),
+    marginRight: scale.wp(2),
   },
   statusText: {
-    fontSize: 14,
+    fontSize: scale.hp(1.8),
     fontWeight: "500",
     color: Colors.textPrimary,
   },
   adminNotes: {
-    fontSize: 12,
+    fontSize: scale.hp(1.55),
     color: "#666",
     fontStyle: "italic",
-    marginTop: 4,
+    marginTop: scale.hp(0.5),
   },
   promoCodeDisplay: {
-    marginTop: 12,
-    paddingTop: 12,
+    marginTop: scale.hp(1.55),
+    paddingTop: scale.hp(1.55),
     borderTopWidth: 1,
     borderTopColor: "#f0f0f0",
   },
   promoCodeLabel: {
-    fontSize: 14,
+    fontSize: scale.hp(1.8),
     fontWeight: "500",
     color: Colors.textPrimary,
-    marginBottom: 4,
+    marginBottom: scale.hp(0.5),
   },
   promoCodeValue: {
-    fontSize: 18,
+    fontSize: scale.hp(2.35),
     fontWeight: "bold",
     color: Colors.primary,
-    marginBottom: 4,
+    marginBottom: scale.hp(0.5),
   },
   promoCodeDetails: {
-    fontSize: 12,
+    fontSize: scale.hp(1.55),
     color: "#666",
   },
   tabContainer: {
@@ -289,7 +284,7 @@ const styles = StyleSheet.create({
   },
   tab: {
     flex: 1,
-    paddingVertical: 15,
+    paddingVertical: scale.hp(2),
     alignItems: "center",
   },
   activeTab: {
@@ -297,7 +292,7 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.primary,
   },
   tabText: {
-    fontSize: 14,
+    fontSize: scale.hp(1.8),
     fontWeight: "500",
     color: "#666",
   },
@@ -314,7 +309,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   loadingText: {
-    marginTop: 10,
+    marginTop: scale.hp(1.3),
     color: Colors.textSecondary,
   },
 });

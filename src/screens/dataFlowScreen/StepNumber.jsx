@@ -1,13 +1,10 @@
 import { useState } from "react";
 import formatLocal from "../../utils/formatLocal";
-import DataStyles from "./DataStyles";
 import { Image, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { Colors } from "../../theme/colors";
-import { codeToFlag } from "../../utils/flag";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import TopUpStyles from "../topupScreen/TopupStyle";
-import { isRTL } from "../../utils/rtl";
 const OPERATOR_LOGOS = {
 
   'AWCC': require('../../../assets/mnos/awcc.png'),

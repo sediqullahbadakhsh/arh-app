@@ -18,6 +18,9 @@ import { capitalizeFirstLetter } from "../utils/capitalizeFirstLetter";
 import { useTranslation } from "react-i18next";
 import { useUser } from "../context/userContext";
 import ServiceHeader from "../components/ServiceHeader";
+import ReceiptModal1 from "../components/ReceiptModal";
+import { scale } from "../utils/normalizeSize";
+
 
 export default function AllTransactionsScreen({ navigation }) {
   const { t } = useTranslation();
@@ -28,7 +31,12 @@ export default function AllTransactionsScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState("all"); 
+  const [activeTab, setActiveTab] = useState("all");
+  
+
+  const [receiptModalVisible, setReceiptModalVisible] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState(null);
+  const [selectedTransactionType, setSelectedTransactionType] = useState(null);
 
   useEffect(() => {
     fetchAllTransactions();
@@ -57,6 +65,13 @@ export default function AllTransactionsScreen({ navigation }) {
     setRefreshing(false);
   };
 
+
+  const handleTransactionPress = (transaction, transactionType) => {
+    setSelectedTransaction(transaction);
+    setSelectedTransactionType(transactionType);
+    setReceiptModalVisible(true);
+  };
+
   const getStatusText = (status) => {
     switch (status) {
       case 'completed':
@@ -74,7 +89,7 @@ export default function AllTransactionsScreen({ navigation }) {
     switch (type) {
       case 'recharge':
         return t('services.mobileTopup');
-      case 'data_bundle':
+      case 'bundle':
         return t('services.dataBundle');
       case 'game_coins':
         return t('services.gameCoins');
@@ -86,7 +101,6 @@ export default function AllTransactionsScreen({ navigation }) {
   const formatAF = (n) =>
     Number(n).toLocaleString("en-US", { maximumFractionDigits: 0 });
 
-  // Filter transactions based on search query and active tab
   const filteredTransactions = useMemo(() => {
     const allTransactions = [
       ...orderTransactions.map(tx => ({ ...tx, transactionType: 'order' })),
@@ -95,14 +109,14 @@ export default function AllTransactionsScreen({ navigation }) {
 
     let filtered = allTransactions;
 
-    // Filter by tab
+
     if (activeTab === "orders") {
       filtered = filtered.filter(tx => tx.transactionType === 'order');
     } else if (activeTab === "stock") {
       filtered = filtered.filter(tx => tx.transactionType === 'stock');
     }
 
-    // Filter by search query
+
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(tx => {
@@ -127,7 +141,11 @@ export default function AllTransactionsScreen({ navigation }) {
 
 
   const OrderTransactionItem = ({ item }) => (
-    <TouchableOpacity style={styles.transactionItem} activeOpacity={0.8}>
+    <TouchableOpacity 
+      style={styles.transactionItem} 
+      activeOpacity={0.8}
+      onPress={() => handleTransactionPress(item, 'order')}
+    >
       <View style={styles.itemLeft}>
         <View style={[
           styles.itemIcon,
@@ -136,9 +154,9 @@ export default function AllTransactionsScreen({ navigation }) {
         ]}>
           <Ionicons
             name={item.type === 'recharge' ? 'phone-portrait-outline' : 
-                  item.type === 'data_bundle' ? 'wifi-outline' : 'game-controller-outline'}
+                  item.type === 'bundle' ? 'wifi-outline' : 'game-controller-outline'}
             size={22}
-            color={item.status === 'completed' ? '#4CAF50' : 
+            color={item.status === 'succeeded' ? '#4CAF50' : 
                    item.status === 'failed' ? '#F44336' : '#FFC107'}
           />
         </View>
@@ -155,19 +173,19 @@ export default function AllTransactionsScreen({ navigation }) {
       <View style={styles.itemRight}>
         <Text style={[
           styles.itemAmount,
-          { color: item.status === 'completed' ? '#4CAF50' : 
+          { color: item.status === 'succeeded' ? '#4CAF50' : 
                  item.status === 'failed' ? '#F44336' : '#FFC107' }
         ]}>
           {Number(item.amount || 0).toFixed(2)} {item.currency || 'USD'}
         </Text>
         <View style={[
           styles.statusBadge,
-          { backgroundColor: item.status === 'completed' ? '#E8F5E9' : 
+          { backgroundColor: item.status === 'succeeded' ? '#E8F5E9' : 
                             item.status === 'failed' ? '#FFEBEE' : '#FFF8E1' }
         ]}>
           <Text style={[
             styles.statusText,
-            { color: item.status === 'completed' ? '#4CAF50' : 
+            { color: item.status === 'succeeded' ? '#4CAF50' : 
                    item.status === 'failed' ? '#F44336' : '#FFC107' }
           ]}>
             {getStatusText(item.status)}
@@ -179,7 +197,11 @@ export default function AllTransactionsScreen({ navigation }) {
 
 
   const StockTransactionItem = ({ item }) => (
-    <TouchableOpacity style={styles.transactionItem} activeOpacity={0.8}>
+    <TouchableOpacity 
+      style={styles.transactionItem} 
+      activeOpacity={0.8}
+      onPress={() => handleTransactionPress(item, 'stock')}
+    >
       <View style={styles.itemLeft}>
         <View style={[
           styles.itemIcon,
@@ -254,17 +276,14 @@ export default function AllTransactionsScreen({ navigation }) {
       </Text>
     </View>
   );
+
   const goBack = () => {
     navigation.goBack();
   };
 
-
   return (
     <SafeAreaView style={styles.container}>
-         <ServiceHeader title="Transactions" onBack={goBack} />
-      
-  
-     
+      <ServiceHeader title="Transactions" onBack={goBack} />
   
       <View style={styles.searchContainer}>
         <Ionicons name="search-outline" size={20} color="#9E9E9E" />
@@ -309,14 +328,12 @@ export default function AllTransactionsScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
- 
       <View style={styles.countContainer}>
         <Text style={styles.countText}>
           {filteredTransactions.length} {t('transactions.transactionsFound')}
         </Text>
       </View>
 
- 
       <FlatList
         data={filteredTransactions}
         keyExtractor={(item, index) => `${item.transactionType}-${item.id}-${index}`}
@@ -339,13 +356,21 @@ export default function AllTransactionsScreen({ navigation }) {
           <Text style={styles.loadingText}>{t('common.loading')}</Text>
         </View>
       )}
+
+  
+      <ReceiptModal1
+        visible={receiptModalVisible}
+        onClose={() => setReceiptModalVisible(false)}
+        transaction={selectedTransaction}
+        transactionType={selectedTransactionType}
+      />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 100,
+    marginBottom: scale.hp(12.9),
     flex: 1,
     backgroundColor: Colors.white,
   },
@@ -353,61 +378,61 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: scale.wp(4.9),
+    paddingVertical: scale.hp(2.1),
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
   },
   backButton: {
-    padding: 4,
+    padding: scale.hp(0.5),
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: scale.hp(2.3),
     fontWeight: '600',
     color: Colors.textPrimary,
   },
   headerRight: {
-    width: 32,
+    width: scale.wp(7.8),
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F8F8F8',
-    margin: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
+    margin: scale.wp(4.9),
+    paddingHorizontal: scale.wp(3.9),
+    paddingVertical: scale.hp(1.55),
+    borderRadius: scale.hp(1.55),
   },
   searchInput: {
     flex: 1,
-    marginLeft: 12,
-    fontSize: 16,
+    marginLeft: scale.wp(2.9),
+    fontSize: scale.hp(2.1),
     color: Colors.textPrimary,
   },
   tabContainer: {
     flexDirection: 'row',
-    marginHorizontal: 20,
-    marginBottom: 16,
+    marginHorizontal: scale.wp(4.9),
+    marginBottom: scale.hp(2.1),
     backgroundColor: '#F8F8F8',
-    borderRadius: 12,
-    padding: 4,
+    borderRadius: scale.hp(1.55),
+    padding: scale.hp(0.5),
   },
   tab: {
     flex: 1,
-    paddingVertical: 8,
+    paddingVertical: scale.hp(1),
     alignItems: 'center',
-    borderRadius: 8,
+    borderRadius: scale.hp(1),
   },
   activeTab: {
     backgroundColor: Colors.white,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: scale.hp(0.25) },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: scale.hp(0.5),
     elevation: 2,
   },
   tabText: {
-    fontSize: 14,
+    fontSize: scale.hp(1.8),
     fontWeight: '500',
     color: '#9E9E9E',
   },
@@ -416,26 +441,26 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   countContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 8,
+    paddingHorizontal: scale.wp(4.9),
+    marginBottom: scale.hp(1),
   },
   countText: {
-    fontSize: 14,
+    fontSize: scale.hp(1.8),
     color: '#9E9E9E',
   },
   listContent: {
     flexGrow: 1,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingHorizontal: scale.wp(4.9),
+    paddingBottom: scale.hp(2.6),
   },
   transactionItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: '#FFF',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
+    padding: scale.hp(2.1),
+    borderRadius: scale.hp(1.55),
+    marginBottom: scale.hp(1),
     borderWidth: 1,
     borderColor: '#F0F0F0',
   },
@@ -445,12 +470,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   itemIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: scale.wp(11.7),
+    height: scale.wp(11.7),
+    borderRadius: scale.wp(5.8),
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: scale.wp(2.9),
   },
   stockInIcon: {
     backgroundColor: 'rgba(11, 163, 96, 0.1)',
@@ -462,55 +487,55 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   itemTitle: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     fontWeight: '600',
     color: Colors.textPrimary,
-    marginBottom: 4,
+    marginBottom: scale.hp(0.5),
   },
   itemSubtitle: {
-    fontSize: 12,
+    fontSize: scale.hp(1.55),
     color: '#9E9E9E',
-    marginBottom: 2,
+    marginBottom: scale.hp(0.25),
   },
   itemDetail: {
-    fontSize: 12,
+    fontSize: scale.hp(1.55),
     color: '#9E9E9E',
   },
   itemRight: {
     alignItems: 'flex-end',
   },
   itemAmount: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     fontWeight: '700',
-    marginBottom: 6,
+    marginBottom: scale.hp(0.8),
   },
   statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: scale.wp(2),
+    paddingVertical: scale.hp(0.5),
+    borderRadius: scale.hp(1.55),
   },
   statusText: {
-    fontSize: 12,
+    fontSize: scale.hp(1.55),
     fontWeight: '600',
   },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 40,
+    paddingVertical: scale.hp(7.75),
+    paddingHorizontal: scale.wp(9.7),
   },
   emptyStateTitle: {
-    fontSize: 18,
+    fontSize: scale.hp(2.3),
     fontWeight: '600',
     color: '#9E9E9E',
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: scale.hp(2.1),
+    marginBottom: scale.hp(1),
   },
   emptyStateSubtitle: {
-    fontSize: 14,
+    fontSize: scale.hp(1.8),
     color: '#9E9E9E',
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: scale.hp(2.6),
   },
   loadingContainer: {
     ...StyleSheet.absoluteFillObject,
@@ -519,8 +544,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   loadingText: {
-    marginTop: 12,
-    fontSize: 16,
+    marginTop: scale.hp(1.55),
+    fontSize: scale.hp(2.1),
     color: Colors.primary,
     fontWeight: '500',
   },

@@ -6,6 +6,7 @@ import { codeToFlag } from "../../utils/flag";
 import { DIAL_CODES } from "../../constants/dialing";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
+import { scale } from "../../utils/normalizeSize";
 
 function StepCountry({ country, onOpen }) {
   const { t } = useTranslation();
@@ -63,7 +64,7 @@ function StepCountry({ country, onOpen }) {
 const styles = {
   watermarkContainer: {
     position: 'absolute',
-    top: 300,
+    top: scale.hp(42), 
     left: 0,
     right: 0,
     bottom: 0,
@@ -72,10 +73,11 @@ const styles = {
     zIndex: -1,
   },
   watermarkLogo: {
-    width: 270,
-    height: 270,
-    opacity: 0.1, 
-  }
+    width: scale.wp(67.5),  
+    height: scale.wp(67.5),
+    opacity: 0.1,
+  },
+
 };
 
 export default StepCountry;

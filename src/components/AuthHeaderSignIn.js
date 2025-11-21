@@ -4,6 +4,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Fonts } from "../utils/fonts";
+import { scale } from "../utils/normalizeSize";
 
 export default function AuthHeaderSignIn({ title, onBack, onLanguagePress, selectedLang }) {
   const insets = useSafeAreaInsets();
@@ -33,7 +34,7 @@ export default function AuthHeaderSignIn({ title, onBack, onLanguagePress, selec
         end={{ x: 1, y: 2 }}
         style={[styles.gradient, { paddingTop: insets.top + 16 }]}
       >
-        {/* Header Row with Title on left and Language Button on right */}
+     
         <View style={styles.headerRow}>
           <View style={styles.titleContainer}>
             <Text style={styles.title}>{title}</Text>
@@ -79,8 +80,8 @@ export default function AuthHeaderSignIn({ title, onBack, onLanguagePress, selec
 const styles = StyleSheet.create({
   gradient: {
     width: "100%",
-    height: 220,
-    paddingHorizontal: 24,
+    height: scale.hp(28.6),
+    paddingHorizontal: scale.wp(6.2),
     justifyContent: "center",
   },
   headerRow: {
@@ -93,14 +94,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
-    fontSize: 32,
+    fontSize: scale.hp(4.2),
     fontFamily: "dmsansBold",
     color: "#fff",
   },
   languageButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: scale.wp(10.4),
+    height: scale.wp(10.4),
+    borderRadius: scale.wp(5.2),
     backgroundColor: "rgba(255,255,255,0.2)",
     justifyContent: "center",
     alignItems: "center",
@@ -108,13 +109,13 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.3)",
   },
   languageFlag: {
-    width: 24,
-    height: 18,
-    borderRadius: 3,
+    width: scale.wp(6.2),
+    height: scale.hp(2.35),
+    borderRadius: scale.hp(0.4),
   },
   backBtn: {
-    width: 32,
-    height: 32,
+    width: scale.wp(8.3),
+    height: scale.wp(8.3),
     justifyContent: "center",
     alignItems: "center",
   },

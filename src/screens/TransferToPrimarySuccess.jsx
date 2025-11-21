@@ -10,6 +10,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../theme/colors";
 import ServiceHeader from "../components/ServiceHeader";
+import { scale } from "../utils/normalizeSize";
 
 export default function TransferToPrimarySuccess({ navigation, route }) {
   const amount = route.params?.amount ?? 0;
@@ -44,42 +45,46 @@ export default function TransferToPrimarySuccess({ navigation, route }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: 24,
+    paddingHorizontal: scale.wp(6.2),
     alignItems: "center",
-    paddingTop: 24,
+    paddingTop: scale.hp(3.1),
   },
   checkWrap: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
+    width: scale.wp(23),
+    height: scale.wp(23),
+    borderRadius: scale.wp(11.5),
     backgroundColor: "rgba(76,175,80,0.1)",
-    borderWidth: 2,
+    borderWidth: scale.hp(0.26),
     borderColor: "rgba(76,175,80,0.35)",
     alignItems: "center",
     justifyContent: "center",
-    marginVertical: 14,
+    marginVertical: scale.hp(1.8),
   },
   title: {
-    fontSize: 18,
+    fontSize: scale.hp(2.35),
     fontWeight: "700",
     color: Colors.textPrimary,
-    marginTop: 8,
+    marginTop: scale.hp(1.05),
   },
   sub: {
     color: Colors.textSecondary,
-    fontSize: 13,
+    fontSize: scale.hp(1.7),
     textAlign: "center",
-    marginTop: 10,
-    lineHeight: 20,
+    marginTop: scale.hp(1.3),
+    lineHeight: scale.hp(2.6),
   },
   btn: {
-    marginTop: 22,
+    marginTop: scale.hp(2.9),
     width: "100%",
-    height: 52,
-    borderRadius: 26,
+    height: scale.hp(6.8),
+    borderRadius: scale.hp(3.4),
     backgroundColor: Colors.primary,
     alignItems: "center",
     justifyContent: "center",
   },
-  btnText: { color: "#fff", fontSize: 16, fontWeight: "600" },
+  btnText: {
+    color: "#fff",
+    fontSize: scale.hp(2.1),
+    fontWeight: "600",
+  },
 });

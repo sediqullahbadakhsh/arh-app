@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../theme/colors";
 import { codeToFlag } from "../../utils/flag";
 import { useTranslation } from "react-i18next";
+import { scale } from "../../utils/normalizeSize";
 
 function StepCountry({ country, onOpen }) {
   const { t } = useTranslation();
@@ -45,20 +46,20 @@ function StepCountry({ country, onOpen }) {
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    marginTop: 16 
+  container: {
+    marginTop: scale.hp(2.1),
   },
   sectionTitle: {
-    fontSize: 14,
+    fontSize: scale.hp(1.8),
     fontWeight: "400",
     color: Colors.textPrimary,
-    marginBottom: 12,
+    marginBottom: scale.hp(1.55),
   },
   dropField: {
-    height: 48,
-    borderRadius: 24,
+    height: scale.hp(6.2),
+    borderRadius: scale.hp(3.1),
     borderWidth: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: scale.wp(3.9),
     backgroundColor: "#fff",
     flexDirection: "row",
     alignItems: "center",
@@ -70,12 +71,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   flag: {
-    fontSize: 18,
-    marginRight: 8,
+    fontSize: scale.hp(2.35),
+    marginRight: scale.wp(2),
   },
   countryName: {
     color: Colors.textPrimary,
-    fontSize: 14,
+    fontSize: scale.hp(1.8),
     fontFamily: 'dmsansRegular',
   },
 });

@@ -16,10 +16,13 @@ import ServiceHeader from "../../components/ServiceHeader";
 import { DUMMY_REPORTS, REPORT_META } from "../../constants/reports";
 import { getStatementReport } from "../../services/merchantApi";
 import { formatDateTime } from "../../utils/formatDate";
+import { scale } from "../../utils/normalizeSize";
+import { useTranslation } from "react-i18next";
 
 export default function ReportListScreen({ navigation, route }) {
+  const { t } = useTranslation();
   const type = route.params?.type;
-  const meta = REPORT_META[type] || { title: "Report" };
+  const meta = REPORT_META[type] || { title: t('report') };
   const data = useMemo(() => DUMMY_REPORTS[type] || [], [type]);
 
   const [open, setOpen] = useState(false);
@@ -78,7 +81,7 @@ export default function ReportListScreen({ navigation, route }) {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
-      <ServiceHeader title={"Statement Report"} onBack={() => navigation.goBack()} />
+      <ServiceHeader title={t('statementReport')} onBack={() => navigation.goBack()} />
       <View style={styles.container}>
         <FlatList
           data={statements}
@@ -89,7 +92,6 @@ export default function ReportListScreen({ navigation, route }) {
         />
       </View>
 
-
       <Modal
         transparent
         visible={open}
@@ -99,7 +101,7 @@ export default function ReportListScreen({ navigation, route }) {
         <View style={styles.backdrop}>
           <View style={styles.modal}>
             <View style={styles.modalHead}>
-              <Text style={styles.modalTitle}>Statement Report Detail</Text>
+              <Text style={styles.modalTitle}>{t('statementReportDetail')}</Text>
               <View style={{ flexDirection: "row", alignItems: "center" }}>
                 <TouchableOpacity
                   onPress={shareRow}
@@ -143,47 +145,79 @@ function labelize(s) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 24, paddingTop: 8 },
+  container: {
+    flex: 1,
+    paddingHorizontal: scale.wp(6.2),
+    paddingTop: scale.hp(1),
+  },
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 12,
+    paddingVertical: scale.hp(1.55),
   },
-  sep: { height: 1, backgroundColor: "#EEE" },
-  left: { flexDirection: "row", alignItems: "center" },
+  sep: {
+    height: scale.hp(0.13),
+    backgroundColor: "#EEE",
+  },
+  left: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
   iconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: scale.wp(8.3),
+    height: scale.wp(8.3),
+    borderRadius: scale.wp(4.15),
     backgroundColor: "#FFF5F5",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 12,
+    marginRight: scale.wp(3.1),
   },
-  titleLine: { color: Colors.textPrimary, fontSize: 14, fontWeight: "600" },
-  sub: { color: Colors.textSecondary, fontSize: 12, marginTop: 2 },
+  titleLine: {
+    color: Colors.textPrimary,
+    fontSize: scale.hp(1.8),
+    fontWeight: "600",
+  },
+  sub: {
+    color: Colors.textSecondary,
+    fontSize: scale.hp(1.55),
+    marginTop: scale.hp(0.25),
+  },
 
-  // modal
   backdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.25)",
     justifyContent: "center",
-    padding: 24,
+    padding: scale.wp(6.2),
   },
-  modal: { backgroundColor: "#fff", borderRadius: 14, padding: 14 },
+  modal: {
+    backgroundColor: "#fff",
+    borderRadius: scale.hp(1.8),
+    padding: scale.hp(1.8),
+  },
   modalHead: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: scale.hp(1.05),
   },
-  modalTitle: { fontSize: 16, fontWeight: "700", color: Colors.textPrimary },
+  modalTitle: {
+    fontSize: scale.hp(2.1),
+    fontWeight: "700",
+    color: Colors.textPrimary,
+  },
   kv: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: 6,
+    paddingVertical: scale.hp(0.8),
   },
-  k: { color: Colors.textSecondary, fontSize: 13 },
-  v: { color: Colors.textPrimary, fontSize: 13, maxWidth: "60%" },
+  k: {
+    color: Colors.textSecondary,
+    fontSize: scale.hp(1.7),
+  },
+  v: {
+    color: Colors.textPrimary,
+    fontSize: scale.hp(1.7),
+    maxWidth: "60%",
+  },
 });

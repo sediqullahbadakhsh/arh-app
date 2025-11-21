@@ -11,13 +11,14 @@ import { useTranslation } from "react-i18next";
 import SuccessModal from "../../components/modals/SuccessModal";
 import ErrorModal from "../../components/modals/ErrorModal";
 import DeleteConfirmationModal from "../../components/modals/DeleteConfirmationModal";
+import { scale } from "../../utils/normalizeSize";
 
 const { width, height } = Dimensions.get('window');
 
 const SecurityScreen = ({ navigation }) => {
     const [isBiometricEnabled, setIsBiometricEnabled] = useState(false);
     
-    // Modal states
+
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [showErrorModal, setShowErrorModal] = useState(false);
     const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -131,7 +132,6 @@ const SecurityScreen = ({ navigation }) => {
 
     const handleBiometricToggle = async () => {
         if (!isBiometricEnabled) {
-            // Enable biometric
             const isAvailable = await checkBiometricAvailability();
             if (!isAvailable) return;
             
@@ -142,7 +142,6 @@ const SecurityScreen = ({ navigation }) => {
                 showCustomSuccessModal('Biometric authentication has been enabled successfully!');
             }
         } else {
-            // Show confirmation before disabling
             showConfirmationModal();
         }
     };
@@ -256,88 +255,87 @@ const SecurityScreen = ({ navigation }) => {
 };
 
 const styles = {
-    contentContainer: {
-        marginTop: 0,
-        paddingHorizontal: 24,
-    },
-    optionRow: {
-        paddingHorizontal: 20,
-        borderRadius: 16,
-        paddingVertical: 20,
-        marginBottom: 16,
-        backgroundColor: '#fff',
-        borderWidth: 1,
-        borderColor: "#F5F5F5",
-        display: "flex",
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.04,
-        shadowRadius: 12,
-        elevation: 3,
-    },
-    optionLeft: {
-        display: "flex",
-        flexDirection: "row",
-        alignItems: "center",
-        flex: 1,
-    },
-    iconWrapper: {
-        width: 44,
-        height: 44,
-        borderRadius: 12,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 16,
-    },
-    iconEnabled: {
-        backgroundColor: '#CD0202',
-    },
-    iconDisabled: {
-        backgroundColor: '#F5F5F5',
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
-    },
-    passwordIcon: {
-        backgroundColor: '#2196F3',
-    },
-    optionText: {
-        flex: 1,
-    },
-    optionTitle: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#333',
-        marginBottom: 4,
-    },
-    optionSubtitle: {
-        fontSize: 14,
-        color: '#666',
-        lineHeight: 18,
-    },
-    // Toggle Styles
-    toggleContainer: {
-        width: 52,
-        height: 28,
-        borderRadius: 16,
-        padding: 2,
-        justifyContent: 'center',
-    },
-    toggleCircle: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        backgroundColor: '#fff',
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
-        elevation: 2,
-    },
+  contentContainer: {
+    marginTop: 0,
+    paddingHorizontal: scale.wp(6.2),
+  },
+  optionRow: {
+    paddingHorizontal: scale.wp(5.2),
+    borderRadius: scale.hp(2.1),
+    paddingVertical: scale.hp(2.6),
+    marginBottom: scale.hp(2.1),
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: "#F5F5F5",
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale.hp(0.25) },
+    shadowOpacity: 0.04,
+    shadowRadius: scale.hp(1.55),
+    elevation: 3,
+  },
+  optionLeft: {
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  iconWrapper: {
+    width: scale.wp(11.4),
+    height: scale.wp(11.4),
+    borderRadius: scale.hp(1.55),
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: scale.wp(4.2),
+  },
+  iconEnabled: {
+    backgroundColor: '#CD0202',
+  },
+  iconDisabled: {
+    backgroundColor: '#F5F5F5',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  passwordIcon: {
+    backgroundColor: '#2196F3',
+  },
+  optionText: {
+    flex: 1,
+  },
+  optionTitle: {
+    fontSize: scale.hp(2.1),
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: scale.hp(0.5),
+  },
+  optionSubtitle: {
+    fontSize: scale.hp(1.8),
+    color: '#666',
+    lineHeight: scale.hp(2.35),
+  },
+  toggleContainer: {
+    width: scale.wp(13.5),
+    height: scale.hp(3.6),
+    borderRadius: scale.hp(2.1),
+    padding: scale.hp(0.25),
+    justifyContent: 'center',
+  },
+  toggleCircle: {
+    width: scale.wp(6.2),
+    height: scale.wp(6.2),
+    borderRadius: scale.wp(3.1),
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: scale.hp(0.25) },
+    shadowOpacity: 0.1,
+    shadowRadius: scale.hp(0.4),
+    elevation: 2,
+  },
 };
 
 export default SecurityScreen;

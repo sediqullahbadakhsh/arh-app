@@ -2,7 +2,7 @@ import React from "react";
 import {
   View,
   Text,
-   SafeAreaView ,
+  SafeAreaView,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
@@ -10,8 +10,11 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../theme/colors";
 import ServiceHeader from "../../components/ServiceHeader";
+import { scale } from "../../utils/normalizeSize";
+import { useTranslation } from "react-i18next";
 
 export default function StatementDetailScreen({ navigation, route }) {
+  const { t } = useTranslation();
   const { statement } = route.params;
 
   const formatCurrency = (value) => {
@@ -35,30 +38,30 @@ export default function StatementDetailScreen({ navigation, route }) {
 
   const detailSections = [
     {
-      title: "Transaction Details",
+      title: t('transactionDetails'),
       items: [
-        { label: "Transaction ID", value: statement.transactionId, icon: "receipt-outline" },
-        { label: "Type", value: statement.transactionType, icon: "swap-horizontal-outline" },
-        { label: "Date & Time", value: formatDate(statement.createdAt), icon: "time-outline" },
+        { label: t('transactionId'), value: statement.transactionId, icon: "receipt-outline" },
+        { label: t('type'), value: statement.transactionType, icon: "swap-horizontal-outline" },
+        { label: t('dateTime'), value: formatDate(statement.createdAt), icon: "time-outline" },
       ],
     },
     {
-      title: "Amount Details",
+      title: t('amountDetails'),
       items: [
         { 
-          label: "Debit", 
+          label: t('debit'), 
           value: statement.debit ? formatCurrency(statement.debit) : "-", 
           icon: "arrow-down-circle-outline",
           color: statement.debit ? '#EF4444' : Colors.textSecondary 
         },
         { 
-          label: "Credit", 
+          label: t('credit'), 
           value: statement.credit ? formatCurrency(statement.credit) : "-", 
           icon: "arrow-up-circle-outline",
           color: statement.credit ? '#10B981' : Colors.textSecondary 
         },
         { 
-          label: "Balance After", 
+          label: t('balanceAfter'), 
           value: formatCurrency(statement.walletBalance), 
           icon: "wallet-outline",
           color: Colors.textPrimary 
@@ -66,10 +69,10 @@ export default function StatementDetailScreen({ navigation, route }) {
       ],
     },
     {
-      title: "Additional Information",
+      title: t('additionalInformation'),
       items: [
-        { label: "Remarks", value: statement.remarks || "No remarks", icon: "document-text-outline" },
-        { label: "Agent", value: statement.agent?.username || "N/A", icon: "person-outline" },
+        { label: t('remarks'), value: statement.remarks || t('noRemarks'), icon: "document-text-outline" },
+        { label: t('agent'), value: statement.agent?.username || t('notAvailable'), icon: "person-outline" },
       ],
     },
   ];
@@ -77,15 +80,14 @@ export default function StatementDetailScreen({ navigation, route }) {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
       <ServiceHeader 
-        title="Transaction Details" 
+        title={t('transactionDetails')} 
         onBack={() => navigation.goBack()} 
       />
       
       <ScrollView style={styles.container}>
-        {/* Header Card */}
         <View style={styles.headerCard}>
           <View style={styles.amountSection}>
-            <Text style={styles.amountLabel}>Transaction Amount</Text>
+            <Text style={styles.amountLabel}>{t('transactionAmount')}</Text>
             <Text style={[
               styles.amount,
               { color: getStatusColor(statement.transactionType) }
@@ -110,12 +112,11 @@ export default function StatementDetailScreen({ navigation, route }) {
               styles.statusText,
               { color: getStatusColor(statement.transactionType) }
             ]}>
-              {statement.debit ? 'Debit Transaction' : 'Credit Transaction'}
+              {statement.debit ? t('debitTransaction') : t('creditTransaction')}
             </Text>
           </View>
         </View>
 
-        {/* Detail Sections */}
         {detailSections.map((section, sectionIndex) => (
           <View key={sectionIndex} style={styles.section}>
             <Text style={styles.sectionTitle}>{section.title}</Text>
@@ -150,16 +151,15 @@ export default function StatementDetailScreen({ navigation, route }) {
           </View>
         ))}
 
-        {/* Action Buttons */}
         <View style={styles.actionSection}>
           <TouchableOpacity style={styles.actionButton}>
             <Ionicons name="share-outline" size={20} color={Colors.primary} />
-            <Text style={styles.actionButtonText}>Share Details</Text>
+            <Text style={styles.actionButtonText}>{t('shareDetails')}</Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.actionButton}>
             <Ionicons name="download-outline" size={20} color={Colors.primary} />
-            <Text style={styles.actionButtonText}>Save as PDF</Text>
+            <Text style={styles.actionButtonText}>{t('saveAsPDF')}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -170,76 +170,76 @@ export default function StatementDetailScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingHorizontal: scale.wp(5.2),
+    paddingTop: scale.hp(2.1),
   },
   headerCard: {
     backgroundColor: Colors.white,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
+    borderRadius: scale.hp(2.1),
+    padding: scale.hp(2.6),
+    marginBottom: scale.hp(2.6),
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: scale.hp(0.25),
     },
     shadowOpacity: 0.1,
-    shadowRadius: 3.84,
+    shadowRadius: scale.hp(0.5),
     elevation: 5,
     alignItems: 'center',
   },
   amountSection: {
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: scale.hp(2.1),
   },
   amountLabel: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     color: Colors.textSecondary,
-    marginBottom: 8,
+    marginBottom: scale.hp(1.05),
   },
   amount: {
-    fontSize: 32,
+    fontSize: scale.hp(4.2),
     fontWeight: '700',
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 8,
+    paddingHorizontal: scale.wp(4.2),
+    paddingVertical: scale.hp(1.05),
+    borderRadius: scale.hp(2.6),
+    gap: scale.wp(2),
   },
   statusText: {
-    fontSize: 14,
+    fontSize: scale.hp(1.8),
     fontWeight: '600',
   },
   section: {
-    marginBottom: 20,
+    marginBottom: scale.hp(2.6),
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: scale.hp(2.35),
     fontWeight: '600',
     color: Colors.textPrimary,
-    marginBottom: 12,
+    marginBottom: scale.hp(1.55),
   },
   sectionCard: {
     backgroundColor: Colors.white,
-    borderRadius: 12,
+    borderRadius: scale.hp(1.55),
     padding: 0,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 1,
+      height: scale.hp(0.13),
     },
     shadowOpacity: 0.1,
-    shadowRadius: 3,
+    shadowRadius: scale.hp(0.4),
     elevation: 3,
   },
   detailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    padding: scale.hp(2.1),
   },
   detailRowBorder: {
     borderBottomWidth: 1,
@@ -248,16 +248,16 @@ const styles = StyleSheet.create({
   detailLabel: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: scale.wp(3.1),
     flex: 1,
   },
   detailLabelText: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     color: Colors.textSecondary,
     fontWeight: '500',
   },
   detailValue: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     color: Colors.textPrimary,
     fontWeight: '500',
     textAlign: 'right',
@@ -265,8 +265,8 @@ const styles = StyleSheet.create({
   },
   actionSection: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 30,
+    gap: scale.wp(3.1),
+    marginBottom: scale.hp(3.9),
   },
   actionButton: {
     flex: 1,
@@ -274,12 +274,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    padding: 16,
-    gap: 8,
+    borderRadius: scale.hp(1.55),
+    padding: scale.hp(2.1),
+    gap: scale.wp(2),
   },
   actionButtonText: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     color: Colors.primary,
     fontWeight: '600',
   },

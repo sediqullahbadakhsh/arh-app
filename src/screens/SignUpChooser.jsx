@@ -4,6 +4,7 @@ import { Colors } from "../theme/colors";
 import AuthHeader from "../components/AuthHeader";
 import PrimaryButton from "../components/PrimaryButton";
 import OutlineButton from "../components/OutlineButton";
+import { scale } from "../utils/normalizeSize";
 
 export default function SignUpChooser({ navigation }) {
   return (
@@ -16,7 +17,7 @@ export default function SignUpChooser({ navigation }) {
           onPress={() => navigation.navigate("SignUpCustomer")}
           style={{ marginBottom: 12 }}
         />
-        {/* Divider */}
+
                 <View style={styles.dividerRow}>
                   <View style={styles.divider} />
                   <Text style={styles.dividerText}>BECOME ONE OF OUR AGENT</Text>
@@ -36,27 +37,31 @@ export default function SignUpChooser({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-    dividerRow: {
+  dividerRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 30,
-    marginBottom: 30,
+    marginTop: scale.hp(2.6),
+    marginBottom: scale.hp(2.6),
   },
-    dividerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 20,
-    marginBottom: 20,
+  divider: {
+    flex: 1,
+    height: scale.hp(0.13),
+    backgroundColor: Colors.divider,
   },
-  divider: { flex: 1, height: 1, backgroundColor: Colors.divider },
-  dividerText: { marginHorizontal: 12, color: "#666666", fontSize: 13, fontFamily: "dmsansMedium" },
-  divider: { flex: 1, height: 1, backgroundColor: Colors.divider },
-  dividerText: { marginHorizontal: 12, color: "#666666", fontSize: 13, fontFamily: "dmsansMedium" },
-  safeArea: { flex: 1, backgroundColor: Colors.white },
+  dividerText: {
+    marginHorizontal: scale.wp(3.1),
+    color: "#666666",
+    fontSize: scale.hp(1.8),
+    fontFamily: "dmsansMedium",
+  },
+  safeArea: {
+    flex: 1,
+    backgroundColor: Colors.white,
+  },
   container: {
     flex: 1,
-    paddingHorizontal: 36,
-    paddingTop: 18,
+    paddingHorizontal: scale.wp(9.4),
+    paddingTop: scale.hp(2.3),
     backgroundColor: Colors.pageBackColor,
   },
 });

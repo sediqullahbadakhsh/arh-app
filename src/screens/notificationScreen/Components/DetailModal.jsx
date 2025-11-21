@@ -13,6 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../../theme/colors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
+import { scale } from "../../../utils/normalizeSize";
 
 const { height: screenHeight } = Dimensions.get('window');
 
@@ -57,7 +58,7 @@ function DetailModal({
   const time = formatTime(selectedNotification.createdAt || selectedNotification.created_at || selectedNotification.time);
   const notiType = getNotificationTypeName(selectedNotification);
 
-  // Determine if we should show an action button based on notification type
+ 
   const shouldShowAction = () => {
     return ['transaction', 'payment', 'promotion', 'security_alert', 'low_balance'].includes(notiType);
   };
@@ -168,31 +169,31 @@ const styles = {
     left: 0,
     right: 0,
     backgroundColor: '#fff',
-    borderTopLeftRadius: 25,
-    borderTopRightRadius: 25,
-    padding: 16,
+    borderTopLeftRadius: scale.hp(3.2),
+    borderTopRightRadius: scale.hp(3.2),
+    padding: scale.hp(2.1),
     elevation: 5,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
+    shadowOffset: { width: 0, height: -scale.hp(0.25) },
     shadowOpacity: 0.25,
-    shadowRadius: 4,
+    shadowRadius: scale.hp(0.5),
   },
   modalHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 16,
-    paddingBottom: 12,
+    marginBottom: scale.hp(2.1),
+    paddingBottom: scale.hp(1.55),
     borderBottomWidth: 1,
     borderBottomColor: "#F0F0F0",
   },
-  modalTitle: { 
-    fontSize: 18, 
-    fontWeight: "700", 
-    color: Colors.textPrimary 
+  modalTitle: {
+    fontSize: scale.hp(2.35),
+    fontWeight: "700",
+    color: Colors.textPrimary,
   },
   closeButton: {
-    padding: 4,
+    padding: scale.hp(0.5),
   },
   modalScrollContent: {
     flex: 1,
@@ -200,53 +201,53 @@ const styles = {
   detailHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: scale.hp(2.6),
   },
   detailIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: scale.wp(11.7),
+    height: scale.wp(11.7),
+    borderRadius: scale.wp(5.85),
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: scale.wp(2.9),
   },
   detailTitle: {
     flex: 1,
   },
   detailTitleText: {
-    fontSize: 18,
+    fontSize: scale.hp(2.35),
     fontWeight: 'bold',
     color: Colors.textPrimary,
-    marginBottom: 4,
+    marginBottom: scale.hp(0.5),
   },
   detailTime: {
-    fontSize: 12,
+    fontSize: scale.hp(1.55),
     color: Colors.textSecondary,
-    marginBottom: 2,
+    marginBottom: scale.hp(0.25),
   },
   notificationType: {
-    fontSize: 11,
+    fontSize: scale.hp(1.4),
     color: Colors.textSecondary,
     fontStyle: 'italic',
   },
   detailContent: {
-    marginBottom: 20,
+    marginBottom: scale.hp(2.6),
   },
   detailMessage: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     color: Colors.textPrimary,
-    lineHeight: 24,
-    marginBottom: 20,
+    lineHeight: scale.hp(3.1),
+    marginBottom: scale.hp(2.6),
   },
   actionButton: {
     backgroundColor: Colors.primary,
-    padding: 16,
-    borderRadius: 12,
+    padding: scale.hp(2.1),
+    borderRadius: scale.hp(1.55),
     alignItems: 'center',
   },
   actionButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     fontWeight: '600',
   },
 };

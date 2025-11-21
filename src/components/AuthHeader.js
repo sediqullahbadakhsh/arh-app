@@ -4,6 +4,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Fonts } from "../utils/fonts";
+import { scale } from "../utils/normalizeSize";
 
 export default function AuthHeader({ title, onBack }) {
   const insets = useSafeAreaInsets();
@@ -41,21 +42,19 @@ export default function AuthHeader({ title, onBack }) {
 const styles = StyleSheet.create({
   gradient: {
     width: "100%",
-    height: 220,
-    paddingHorizontal: 24,
+    height: scale.hp(28.6),
+    paddingHorizontal: scale.wp(6.2),
   },
   backBtn: {
-    width: 32,
-    height: 32,
+    width: scale.wp(8.3),
+    height: scale.wp(8.3),
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: scale.hp(2.1),
   },
   title: {
-    fontSize: 32,
+    fontSize: scale.hp(4.2),
     fontFamily: "dmsansBold",
     color: "#fff",
-
-
   },
 });

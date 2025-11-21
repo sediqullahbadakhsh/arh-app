@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Colors } from '../theme/colors';
 import {widthPercentageToDP as wp, heightPercentageToDP as hp} from 'react-native-responsive-screen';
+import { scale } from '../utils/normalizeSize';
 export default function RoundedInput({
     value,
     onChangeText,
@@ -98,26 +99,26 @@ export default function RoundedInput({
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    marginBottom: hp(1.25),
-    borderRadius: wp(15), 
+    marginBottom: scale.hp(1.25),
+    borderRadius: scale.wp(15), 
     alignItems: 'center',
-    borderWidth: wp(0.4), 
+    borderWidth: scale.wp(0.4), 
     backgroundColor: '#FFFFFF',
     shadowColor: Colors.primary,
     shadowOffset: {
       width: 0,
-      height: hp(0.5),
+      height: scale.hp(0.5),
     },
   },
   input: {
     width: '100%',
-    height: hp(7.5), 
-    borderRadius: wp(15),
+    height: scale.hp(7.5), 
+    borderRadius: scale.wp(15),
     backgroundColor: 'transparent',
-    paddingHorizontal: wp(5.5), 
-    paddingRight: wp(11.7),     
-    lineHeight: hp(3),         
-    fontSize: hp(2),          
+    paddingHorizontal: scale.wp(5.5), 
+    paddingRight: scale.wp(11.7),     
+    lineHeight: scale.hp(3),         
+    fontSize: scale.hp(2),          
     color: Colors.textPrimary,
     fontFamily: 'dmsansRegular',
   },
@@ -127,7 +128,7 @@ const styles = StyleSheet.create({
   },
   iconRight: {
     position: 'absolute',
-    right: wp(5.5), 
+    right: scale.wp(5.5), 
     top: '50%',
     transform: [{ translateY: -hp(1.5) }], 
   },

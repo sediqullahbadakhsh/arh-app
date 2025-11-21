@@ -2,6 +2,7 @@
 import React from "react";
 import { SafeAreaView, View, Text, StyleSheet } from "react-native";
 import { Colors } from "../theme/colors";
+import { scale } from "../utils/normalizeSize";
 export default function TopupTabScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
@@ -12,8 +13,20 @@ export default function TopupTabScreen() {
     </SafeAreaView>
   );
 }
+
 const styles = StyleSheet.create({
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  title: { fontSize: 20, fontWeight: "700", color: Colors.textPrimary },
-  sub: { marginTop: 6, color: Colors.textSecondary },
+  center: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  title: {
+    fontSize: scale.hp(2.6),
+    fontWeight: "700",
+    color: Colors.textPrimary,
+  },
+  sub: {
+    marginTop: scale.hp(0.8),
+    color: Colors.textSecondary,
+  },
 });

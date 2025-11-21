@@ -3,7 +3,6 @@ import LoginScreen from "../screens/loginScreen/LoginScreen";
 import SignUpCustomerScreen from "../screens/SignUpCustomerScreen";
 import SignUpMerchantScreen from "../screens/SignUpMerchantScreen";
 import SignupResultScreen from "../screens/SignupResultScreen";
-import ForgotPasswordScreen from "../screens/ForgotPasswordScreen/ForgotPasswordScreen";
 import TabNavigator from "./TabNavigator";
 import CountrySelectScreen from "../screens/introCountrySelectorScreen/CountrySelectScreen";
 import OtpVerificationScreen from "../screens/OtpVerificationScreen";
@@ -17,6 +16,8 @@ import { Text } from "react-native";
 import AllTransactionsScreen from "../screens/AllTransactionsScreen";
 import MerchantAnalyticsScreen from "../screens/MerchantAnalyticsScreen";
 import TopupFlowScreen from "../screens/topupScreen/TopupFlowScreen1";
+import MerchantOtpVerificationScreen from "../screens/MerchantOTPVerficationScreen";
+
 
 const Stack = createNativeStackNavigator();
 
@@ -46,6 +47,10 @@ export default function RootNavigator() {
           <Stack.Screen name="Onboarding" component={OnboardingScreen} />
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen 
+  name="MerchantOtpVerification" 
+  component={MerchantOtpVerificationScreen} 
+/>
+          <Stack.Screen 
   name="AllTransactions" 
   component={AllTransactionsScreen} 
   options={{ headerShown: false }}
@@ -69,10 +74,7 @@ export default function RootNavigator() {
             component={TopupFlowScreen}
           />
           <Stack.Screen name="SignupResult" component={SignupResultScreen} />
-          <Stack.Screen
-            name="ForgotPassword"
-            component={ForgotPasswordScreen}
-          />
+  
           <Stack.Screen
             name="OtpVerification"
             component={OtpVerificationScreen}

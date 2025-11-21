@@ -13,6 +13,7 @@ import { Colors } from "../../theme/colors";
 import { getSetaraganMnoId } from "../../utils/getCompanyIdForSetaragan";
 import { getMnoLogo } from "../../utils/getMnoLogo";
 import { useTranslation } from "react-i18next";
+import { scale } from "../../utils/normalizeSize";
 
 export default function StepNumber({
   dial,
@@ -118,7 +119,10 @@ function formatLocal(s) {
 }
 
 const styles = StyleSheet.create({
-  container: { marginTop: 12, gap: 16 },
+  container: {
+    marginTop: scale.hp(1.55),
+    gap: scale.hp(2.1),
+  },
   editHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -126,23 +130,23 @@ const styles = StyleSheet.create({
   },
   editLinks: {
     flexDirection: "row",
-    gap: 16,
+    gap: scale.wp(3.9),
   },
   editLink: {
     color: Colors.primary,
-    fontSize: 13,
+    fontSize: scale.hp(1.7),
     fontWeight: "600",
   },
   sectionTitle: {
-    fontSize: 14,
+    fontSize: scale.hp(1.8),
     fontWeight: "400",
     color: Colors.textPrimary,
-    marginBottom: 12,
+    marginBottom: scale.hp(1.55),
   },
   phoneRow: {
     flexDirection: "row",
-    height: 48,
-    borderRadius: 24,
+    height: scale.hp(6.2),
+    borderRadius: scale.hp(3.1),
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "#E6E6E6",
@@ -157,9 +161,9 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
   },
   operatorLogo: {
-    width: 52,
-    height: 52,
-    paddingLeft: 10,
+    width: scale.wp(12.65),
+    height: scale.wp(12.65),
+    paddingLeft: scale.wp(2.4),
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
@@ -173,36 +177,34 @@ const styles = StyleSheet.create({
   dialCode: {
     fontWeight: "700",
     color: Colors.textPrimary,
-    marginRight: 10,
+    marginRight: scale.wp(2.4),
   },
   phoneInput: {
     flex: 1,
-    paddingHorizontal: 14,
-    fontSize: 14,
+    paddingHorizontal: scale.wp(3.4),
+    fontSize: scale.hp(1.8),
     color: Colors.textPrimary,
   },
   contactButton: {
-    paddingHorizontal: 10,
+    paddingHorizontal: scale.wp(2.4),
     justifyContent: "center",
   },
   operatorInfo: {
-    marginTop: 10,
-    minHeight: 24,
+    marginTop: scale.hp(1.3),
+    minHeight: scale.hp(3.1),
   },
   autoDetectText: {
     color: "#9E9E9E",
-    fontSize: 12,
+    fontSize: scale.hp(1.55),
   },
-  amountSection: {
-
-  },
+  amountSection: {},
   amountInput: {
     borderWidth: 1,
     borderColor: "#E0E0E0",
-    borderRadius: 20,
+    borderRadius: scale.hp(2.6),
     flex: 1,
-    paddingHorizontal: 14,
-    fontSize: 14,
+    paddingHorizontal: scale.wp(3.4),
+    fontSize: scale.hp(1.8),
     color: Colors.textPrimary,
   },
 });

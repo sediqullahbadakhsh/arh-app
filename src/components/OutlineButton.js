@@ -2,6 +2,7 @@ import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, Dimensions, PixelRatio } from 'react-native';
 import { Colors } from '../theme/colors';
 import {widthPercentageToDP as wp, heightPercentageToDP as hp} from 'react-native-responsive-screen';
+import { scale } from '../utils/normalizeSize';
 const {height, width} = Dimensions.get('window');
 console.log(height, width);
 console.log('hp(1.8):', hp(1.8));
@@ -22,15 +23,15 @@ export default function OutlineButton({ label, onPress, style }) {
 const styles = StyleSheet.create({
   button: {
     backgroundColor: Colors.white,
-    borderRadius: wp(7.5),          
-    paddingVertical: hp(1.8),      
+    borderRadius: scale.wp(7.5),          
+    paddingVertical: scale.hp(1.8),      
     alignItems: 'center',
-    borderWidth: wp(0.4),          
+    borderWidth: scale.wp(0.4),          
     borderColor: Colors.primary,
   },
   label: {
     color: "#E20E02",
-    fontSize: hp(1.8),               
+    fontSize: scale.hp(1.8),               
     // fontWeight: '600',
   },
 });

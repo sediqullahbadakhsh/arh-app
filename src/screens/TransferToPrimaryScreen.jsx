@@ -21,6 +21,7 @@ import TopUpStyles from "./topupScreen/TopupStyle";
 import { useModal } from "../hooks/useModal";
 import ProgressModal from "../components/modals/ProgressModal";
 import SuccessModal from "../components/modals/SuccessModal";
+import { scale } from "../utils/normalizeSize";
 
 export default function TransferToPrimaryScreen({ navigation, route }) {
   const { user, setUser } = useUser();
@@ -315,51 +316,51 @@ Thank you for using our service! 🎉`;
 const styles = {
   balanceCard: {
     backgroundColor: '#F8F9FA',
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: scale.hp(2.1),
+    padding: scale.hp(2.6),
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#E9ECEF',
-    marginBottom: 8,
+    marginBottom: scale.hp(1.05),
   },
   balanceLabel: {
-    fontSize: 14,
+    fontSize: scale.hp(1.8),
     color: Colors.textSecondary,
-    marginBottom: 8,
+    marginBottom: scale.hp(1.05),
     fontWeight: '500',
   },
   balanceAmount: {
-    fontSize: 28,
+    fontSize: scale.hp(3.65),
     fontWeight: '700',
     color: Colors.primary,
   },
   errorText: {
-    fontSize: 13,
+    fontSize: scale.hp(1.7),
     color: '#DC2626',
     fontWeight: '500',
   },
   infoCard: {
-    marginTop: 32,
+    marginTop: scale.hp(4.2),
     backgroundColor: '#F0F9FF',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: scale.hp(1.6),
+    padding: scale.hp(2.1),
     borderWidth: 1,
     borderColor: '#E0F2FE',
   },
   infoHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: scale.hp(1.05),
   },
   infoTitle: {
-    fontSize: 14,
+    fontSize: scale.hp(1.8),
     fontWeight: '600',
     color: Colors.primary,
-    marginLeft: 8,
+    marginLeft: scale.wp(2.1),
   },
   infoText: {
-    fontSize: 13,
+    fontSize: scale.hp(1.7),
     color: Colors.textSecondary,
-    lineHeight: 20,
+    lineHeight: scale.hp(2.6),
   },
 };

@@ -5,6 +5,7 @@ import { CardField, useStripe } from "@stripe/stripe-react-native";
 import TopUpStyles from "./TopupStyle";
 import { Colors } from "../../theme/colors";
 import { useTranslation } from "react-i18next";
+import { scale } from "../../utils/normalizeSize";
 
 function StepPay({
   summary,
@@ -224,7 +225,7 @@ function StepPay({
           </View>
         )}
 
-        {/* PayPal Payment Method */}
+      
         {selectedPaymentMethod === 'paypal' && (
           <View style={styles.altPaymentContainer}>
             <Image 
@@ -235,7 +236,7 @@ function StepPay({
             <Text style={styles.altPaymentText}>
               {t('paypalRedirect')}
             </Text>
-            <TouchableOpacity style={[styles.paymentButton, { backgroundColor: '#0070BA' }]}>
+            <TouchableOpacity style={[styles.paymentButton, { backgroundColor: '#CD0202' }]}>
               <Image 
                 source={require('../../../assets/images/paypal.png')} 
                 style={styles.buttonIcon} 
@@ -246,7 +247,7 @@ function StepPay({
           </View>
         )}
 
-        {/* Google Pay Payment Method */}
+     
         {selectedPaymentMethod === 'googlepay' && (
           <View style={styles.altPaymentContainer}>
             <Image 
@@ -257,7 +258,7 @@ function StepPay({
             <Text style={styles.altPaymentText}>
               {t('googlePayRedirect')}
             </Text>
-            <TouchableOpacity style={[styles.paymentButton, { backgroundColor: '#4285F4' }]}>
+            <TouchableOpacity style={[styles.paymentButton, { backgroundColor: '#CD0202' }]}>
               <Image 
                 source={require('../../../assets/images/google-pay.png')} 
                 style={styles.buttonIcon} 
@@ -268,7 +269,7 @@ function StepPay({
           </View>
         )}
 
-        {/* Order Summary */}
+      
         <View style={TopUpStyles.summaryCard}>
           <View style={TopUpStyles.summaryRow}>
             <Text style={TopUpStyles.summaryKey}>{t('mobileNumber')}</Text>
@@ -323,23 +324,23 @@ function StepPay({
 }
 
 const styles = StyleSheet.create({
-  paymentMethodContainer: {
+ paymentMethodContainer: {
     flexDirection: 'column',
-    width: "100%",
-    marginVertical: 12,
-    gap: 8,
+    width: '100%',
+    marginVertical: scale.hp(1.5),
+    gap: scale.hp(1),
   },
   paymentMethodButton: {
     flex: 1,
     minWidth: '48%',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
+    paddingVertical: scale.hp(1.5),
+    paddingHorizontal: scale.wp(4),
+    borderRadius: scale.hp(1.5),
     borderWidth: 1,
     borderColor: '#E0E0E0',
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: scale.hp(1),
   },
   paymentMethodButtonSelected: {
     borderColor: Colors.primary,
@@ -351,16 +352,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   paymentIcon: {
-    width: 24,
-    height: 24,
-    marginRight: 8,
+    width: scale.wp(6),
+    height: scale.wp(6),
+    marginRight: scale.wp(2),
     tintColor: Colors.textSecondary,
   },
   paymentIconSelected: {
     tintColor: Colors.primary,
   },
   paymentMethodText: {
-    fontSize: 14,
+    fontSize: scale.hp(1.75),
     fontWeight: '600',
     color: Colors.textSecondary,
     textAlign: 'center',
@@ -369,105 +370,106 @@ const styles = StyleSheet.create({
     color: Colors.primary,
   },
   cardDetailsContainer: {
-    marginTop: 8,
+    marginTop: scale.hp(1),
   },
   fieldContainer: {
-    marginBottom: 16,
+    marginBottom: scale.hp(2),
   },
   fieldHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: scale.hp(1),
   },
   fieldLabel: {
-    fontSize: 14,
+    fontSize: scale.hp(1.75),
     fontWeight: '600',
     color: Colors.textPrimary,
   },
   clearButton: {
-    padding: 4,
+    padding: scale.hp(0.5),
   },
   clearButtonText: {
     color: Colors.primary,
-    fontSize: 12,
+    fontSize: scale.hp(1.5),
     fontWeight: '500',
   },
   errorText: {
     color: '#EF4444',
-    fontSize: 12,
-    marginTop: 8,
-    marginLeft: 4,
+    fontSize: scale.hp(1.5),
+    marginTop: scale.hp(1),
+    marginLeft: scale.wp(1),
   },
   processingContainer: {
     backgroundColor: 'rgba(59, 130, 246, 0.1)',
-    padding: 12,
-    borderRadius: 8,
-    marginTop: 8,
-    marginBottom: 8,
+    padding: scale.hp(1.5),
+    borderRadius: scale.hp(1),
+    marginTop: scale.hp(1),
+    marginBottom: scale.hp(1),
   },
   processingText: {
     color: Colors.primary,
-    fontSize: 14,
+    fontSize: scale.hp(1.75),
     textAlign: 'center',
     fontWeight: '500',
   },
   successContainer: {
     backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    padding: 12,
-    borderRadius: 8,
-    marginTop: 8,
-    marginBottom: 8,
-    borderLeftWidth: 4,
+    padding: scale.hp(1.5),
+    borderRadius: scale.hp(1),
+    marginTop: scale.hp(1),
+    marginBottom: scale.hp(1),
+    borderLeftWidth: scale.wp(1),
     borderLeftColor: '#10B981',
   },
   successMessage: {
     color: '#065F46',
-    fontSize: 14,
+    fontSize: scale.hp(1.75),
     textAlign: 'center',
     fontWeight: '500',
   },
   altPaymentContainer: {
     alignItems: 'center',
-    padding: 20,
+    padding: scale.hp(2.5),
     borderWidth: 1,
     borderColor: '#F2DAD7',
-    borderRadius: 12,
+    borderRadius: scale.hp(1.5),
     backgroundColor: '#FFF',
-    marginTop: 16,
+    marginTop: scale.hp(2),
   },
   paymentLogo: {
-    width: 60,
-    height: 60,
-    marginBottom: 16,
+    width: scale.wp(15),
+    height: scale.wp(15),
+    marginBottom: scale.hp(2),
   },
   altPaymentText: {
-    fontSize: 14,
+    fontSize: scale.hp(1.75),
     color: Colors.textSecondary,
     textAlign: 'center',
-    marginBottom: 16,
-    lineHeight: 20,
+    marginBottom: scale.hp(2),
+    lineHeight: scale.hp(2.5),
   },
   paymentButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
+    paddingVertical: scale.hp(1.5),
+    paddingHorizontal: scale.wp(6),
+    borderRadius: scale.hp(1),
     width: '100%',
   },
   buttonIcon: {
-    width: 20,
-    height: 20,
-    marginRight: 10,
+    width: scale.wp(5),
+    height: scale.wp(5),
+    marginRight: scale.wp(2.5),
     tintColor: '#FFFFFF',
   },
   paymentButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: scale.hp(2),
     fontWeight: '600',
   },
+
 });
 
 export default StepPay;

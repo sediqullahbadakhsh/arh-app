@@ -8,7 +8,6 @@ import {
   TextInput,
   Modal,
   FlatList,
-  Image,
   ScrollView,
   Alert,
   Animated,
@@ -30,6 +29,8 @@ import {
 import { useUser } from "../../context/userContext";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import SuccessModal from "../../components/modals/SuccessModal";
+import { scale } from "../../utils/normalizeSize";
+import { useTranslation } from "react-i18next";
 
 const { height: screenHeight } = Dimensions.get('window');
 
@@ -54,11 +55,11 @@ const GAP = 4;
 export default function AgentCreateScreen({ navigation, route }) {
   const { user } = useUser();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [isSuccessVisible, setIsSuccessVisible] = useState(false);
   const [agentData, setAgentData] = useState(null);
-
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -73,12 +74,10 @@ export default function AgentCreateScreen({ navigation, route }) {
   const [status, setStatus] = useState("active");
   const [accountType, setAccountType] = useState("retailer");
   
-  // Data states
   const [countries, setCountries] = useState([]);
   const [provinces, setProvinces] = useState([]);
   const [districts, setDistricts] = useState([]);
   
-
   const [modal, setModal] = useState({ 
     open: false, 
     type: null,
@@ -86,7 +85,6 @@ export default function AgentCreateScreen({ navigation, route }) {
     data: [],
     searchQuery: ""
   });
-
 
   const [modalSlideAnim] = useState(new Animated.Value(screenHeight));
 
@@ -238,19 +236,19 @@ export default function AgentCreateScreen({ navigation, route }) {
 
   const validateStep1 = () => {
     if (!firstName.trim()) {
-      Alert.alert("Error", "First name is required");
+      Alert.alert(t('error'), t('firstNameRequired'));
       return false;
     }
     if (!lastName.trim()) {
-      Alert.alert("Error", "Last name is required");
+      Alert.alert(t('error'), t('lastNameRequired'));
       return false;
     }
     if (!email.trim()) {
-      Alert.alert("Error", "Email is required");
+      Alert.alert(t('error'), t('emailRequired'));
       return false;
     }
     if (!mobileNumber.trim()) {
-      Alert.alert("Error", "Mobile number is required");
+      Alert.alert(t('error'), t('mobileNumberRequired'));
       return false;
     }
     return true;
@@ -258,23 +256,23 @@ export default function AgentCreateScreen({ navigation, route }) {
 
   const validateStep2 = () => {
     if (!country) {
-      Alert.alert("Error", "Country is required");
+      Alert.alert(t('error'), t('countryRequired'));
       return false;
     }
     if (!province) {
-      Alert.alert("Error", "Province is required");
+      Alert.alert(t('error'), t('provinceRequired'));
       return false;
     }
     if (!district) {
-      Alert.alert("Error", "District is required");
+      Alert.alert(t('error'), t('districtRequired'));
       return false;
     }
     if (!address.trim()) {
-      Alert.alert("Error", "Address is required");
+      Alert.alert(t('error'), t('addressRequired'));
       return false;
     }
     if (!messageLanguage) {
-      Alert.alert("Error", "Message language is required");
+      Alert.alert(t('error'), t('messageLanguageRequired'));
       return false;
     }
     return true;
@@ -303,7 +301,6 @@ export default function AgentCreateScreen({ navigation, route }) {
 
       const response = await createDownlineAgent(payload);
       
-      // Prepare agent data for success modal
       const createdAgentData = {
         agentName: `${firstName} ${lastName}`.trim(),
         email: email.trim(),
@@ -323,8 +320,8 @@ export default function AgentCreateScreen({ navigation, route }) {
     } catch (error) {
       console.error("Create agent error:", error);
       Alert.alert(
-        "Error", 
-        error.response?.data?.error || "Failed to create agent. Please try again."
+        t('error'), 
+        error.response?.data?.error || t('createAgentFailed')
       );
     } finally {
       setLoading(false);
@@ -340,36 +337,36 @@ export default function AgentCreateScreen({ navigation, route }) {
   const handleShareAgent = async () => {
     try {
       if (!agentData) {
-        Alert.alert("Error", "No agent data available to share");
+        Alert.alert(t('error'), t('noAgentDataAvailable'));
         return;
       }
 
-      const shareMessage = `👤 New Agent Created Successfully!
+      const shareMessage = `${t('newAgentCreatedSuccessfully')}
 
-🤝 Agent Information:
-• Name: ${agentData.agentName}
-• Email: ${agentData.email}
-• Mobile: ${agentData.mobileNumber}
-• Account Type: ${agentData.accountType}
-• Status: ${agentData.status}
-• Location: ${agentData.location}
-• Language: ${agentData.language}
-• Agent ID: ${agentData.agentId}
+${t('agentInformation')}:
+• ${t('name')}: ${agentData.agentName}
+• ${t('email')}: ${agentData.email}
+• ${t('mobile')}: ${agentData.mobileNumber}
+• ${t('accountType')}: ${agentData.accountType}
+• ${t('status')}: ${agentData.status}
+• ${t('location')}: ${agentData.location}
+• ${t('language')}: ${agentData.language}
+• ${t('agentId')}: ${agentData.agentId}
 
-📍 Address: ${agentData.address}
+📍 ${t('address')}: ${agentData.address}
 
-📅 Created: ${new Date(agentData.timestamp).toLocaleDateString()}
+📅 ${t('created')}: ${new Date(agentData.timestamp).toLocaleDateString()}
 
-Welcome to our network! 🎉`;
+${t('welcomeToNetwork')} 🎉`;
 
       await Share.share({
         message: shareMessage,
-        title: 'New Agent Created'
+        title: t('newAgentCreated')
       });
 
     } catch (error) {
       console.log('Error sharing agent details:', error);
-      Alert.alert("Share Error", "Failed to share agent details. Please try again.");
+      Alert.alert(t('shareError'), t('failedToShareAgent'));
     }
   };
 
@@ -379,15 +376,14 @@ Welcome to our network! 🎉`;
     return [
       {
         type: "agent",
-        label: "Agent Name",
+        label: t('agentName'),
         value: agentData.agentName
       },
       {
         type: "email",
-        label: "Email Address",
+        label: t('emailAddress'),
         value: agentData.email
       },
-    
     ];
   };
 
@@ -469,10 +465,48 @@ Welcome to our network! 🎉`;
     }
   };
 
+  const getModalTitle = (type) => {
+    switch (type) {
+      case "country":
+        return t('selectCountry');
+      case "province":
+        return t('selectProvince');
+      case "district":
+        return t('selectDistrict');
+      case "lang":
+        return t('selectLanguage');
+      case "status":
+        return t('selectStatus');
+      case "accountType":
+        return t('selectAccountType');
+      default:
+        return t('select');
+    }
+  };
+
+  const getPlaceholderText = (type) => {
+    switch (type) {
+      case "country":
+        return t('selectCountry');
+      case "province":
+        return t('selectProvince');
+      case "district":
+        return t('selectDistrict');
+      case "lang":
+        return t('selectLanguage');
+      case "status":
+        return t('selectStatus');
+      case "accountType":
+        return t('selectAccountType');
+      default:
+        return t('select');
+    }
+  };
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
       <ServiceHeader
-        title="Create Agent"
+        title={t('createAgent')}
         onBack={() => (step === 0 ? navigation.goBack() : back())}
       />
       
@@ -488,49 +522,49 @@ Welcome to our network! 🎉`;
         >
           {step === 0 && (
             <>
-              <Text style={styles.sectionTitle}>Personal Information</Text>
+              <Text style={styles.sectionTitle}>{t('personalInformation')}</Text>
 
               <LabeledInput
-                label="First Name"
+                label={t('firstName')}
                 value={firstName}
                 onChangeText={setFirstName}
-                placeholder="Enter First Name"
+                placeholder={t('enterFirstName')}
                 required
               />
               <LabeledInput
-                label="Last Name"
+                label={t('lastName')}
                 value={lastName}
                 onChangeText={setLastName}
-                placeholder="Enter Last Name"
+                placeholder={t('enterLastName')}
                 required
               />
               <LabeledInput
-                label="Email"
+                label={t('email')}
                 value={email}
                 onChangeText={setEmail}
-                placeholder="Enter Email Address"
+                placeholder={t('enterEmailAddress')}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 required
               />
               <LabeledInput
-                label="Mobile Number"
+                label={t('mobileNumber')}
                 value={mobileNumber}
                 onChangeText={setMobileNumber}
-                placeholder="Enter Mobile Number"
+                placeholder={t('enterMobileNumber')}
                 keyboardType="phone-pad"
                 required
               />
               <LabeledInput
-                label="Alternative Contact"
+                label={t('alternativeContact')}
                 value={alternativeContact}
                 onChangeText={setAlternativeContact}
-                placeholder="Enter Alternative Contact"
+                placeholder={t('enterAlternativeContact')}
                 keyboardType="phone-pad"
               />
 
               <PrimaryButton
-                label="Continue"
+                label={t('continue')}
                 onPress={next}
                 style={styles.fullButton}
               />
@@ -539,49 +573,49 @@ Welcome to our network! 🎉`;
 
           {step === 1 && (
             <>
-              <Text style={styles.sectionTitle}>Location Information</Text>
+              <Text style={styles.sectionTitle}>{t('locationInformation')}</Text>
 
               <DropField
-                label="Country"
+                label={t('country')}
                 value={getSelectedValue("country")}
-                onPress={() => openModal("country", "Select Country", countries)}
+                onPress={() => openModal("country", t('selectCountry'), countries)}
                 leftIcon={renderFlag(country?.countryCode)}
                 required
               />
               <DropField
-                label="Province"
+                label={t('province')}
                 value={getSelectedValue("province")}
-                onPress={() => openModal("province", "Select Province", provinces)}
+                onPress={() => openModal("province", t('selectProvince'), provinces)}
                 required
               />
               <DropField
-                label="District"
+                label={t('district')}
                 value={getSelectedValue("district")}
-                onPress={() => openModal("district", "Select District", districts)}
+                onPress={() => openModal("district", t('selectDistrict'), districts)}
                 required
               />
               <LabeledInput
-                label="Full Address"
+                label={t('fullAddress')}
                 value={address}
                 onChangeText={setAddress}
-                placeholder="Enter Full Address"
+                placeholder={t('enterFullAddress')}
                 required
               />
               <DropField
-                label="Message Language"
+                label={t('messageLanguage')}
                 value={getSelectedValue("lang")}
-                onPress={() => openModal("lang", "Select Language", LANGS)}
+                onPress={() => openModal("lang", t('selectLanguage'), LANGS)}
                 required
               />
 
               <View style={styles.rowButtons}>
                 <DarkButton
-                  label="Back"
+                  label={t('back')}
                   onPress={back}
                   style={styles.halfButton}
                 />
                 <PrimaryButton
-                  label="Continue"
+                  label={t('continue')}
                   onPress={next}
                   style={styles.halfButton}
                 />
@@ -592,28 +626,28 @@ Welcome to our network! 🎉`;
           {step === 2 && (
             <>
               <View style={styles.infoBox}>
-                <Text style={styles.infoTitle}>Agent Summary</Text>
-                <InfoRow label="Name" value={`${firstName} ${lastName}`} />
-                <InfoRow label="Email" value={email} />
-                <InfoRow label="Mobile" value={mobileNumber} />
-                <InfoRow label="Country" value={country?.countryName} />
-                <InfoRow label="Province" value={province?.provinceName} />
-                <InfoRow label="District" value={district?.districtName} />
-                <InfoRow label="Address" value={address} />
-                <InfoRow label="Language" value={getSelectedValue("lang")} />
-                <InfoRow label="Account Type" value={getSelectedValue("accountType")} />
-                <InfoRow label="Status" value={getSelectedValue("status")} />
+                <Text style={styles.infoTitle}>{t('agentSummary')}</Text>
+                <InfoRow label={t('name')} value={`${firstName} ${lastName}`} />
+                <InfoRow label={t('email')} value={email} />
+                <InfoRow label={t('mobile')} value={mobileNumber} />
+                <InfoRow label={t('country')} value={country?.countryName} />
+                <InfoRow label={t('province')} value={province?.provinceName} />
+                <InfoRow label={t('district')} value={district?.districtName} />
+                <InfoRow label={t('address')} value={address} />
+                <InfoRow label={t('language')} value={getSelectedValue("lang")} />
+                <InfoRow label={t('accountType')} value={getSelectedValue("accountType")} />
+                <InfoRow label={t('status')} value={getSelectedValue("status")} />
               </View>
 
               <View style={styles.rowButtons}>
                 <DarkButton
-                  label="Back"
+                  label={t('back')}
                   onPress={back}
                   style={styles.halfButton}
                   disabled={loading}
                 />
                 <PrimaryButton
-                  label={loading ? "Creating..." : "Create Agent"}
+                  label={loading ? t('creating') : t('createAgent')}
                   onPress={submit}
                   style={styles.halfButton}
                   disabled={loading}
@@ -624,21 +658,18 @@ Welcome to our network! 🎉`;
         </ScrollView>
       </KeyboardAwareScrollView>
 
-
       <SuccessModal
         visible={isSuccessVisible}
         onClose={handleSuccessClose}
-        title="Agent Created Successfully!"
-        subtitle="The new agent has been added to your network successfully. Credentials have been sent to the agent's email."
+        title={t('agentCreatedSuccessfully')}
+        subtitle={t('agentAddedToNetwork')}
         details={getSuccessDetails()}
-        primaryButtonText="Continue"
-  
+        primaryButtonText={t('continue')}
         showConfetti={true}
         showAnimation={true}
         animationSize={120}
       />
 
-   
       <Modal
         visible={modal.open}
         transparent={true}
@@ -675,7 +706,7 @@ Welcome to our network! 🎉`;
             <View style={styles.searchContainer}>
               <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
               <TextInput
-                placeholder={`Search ${modal.title.toLowerCase()}...`}
+                placeholder={`${t('search')} ${modal.title.toLowerCase()}...`}
                 value={modal.searchQuery}
                 onChangeText={(text) => setModal(prev => ({ ...prev, searchQuery: text }))}
                 style={styles.searchInput}
@@ -699,6 +730,8 @@ Welcome to our network! 🎉`;
 }
 
 function LabeledInput({ label, placeholder, required, ...rest }) {
+  const { t } = useTranslation();
+  
   return (
     <View style={{ marginBottom: GAP }}>
       <Text style={styles.label}>
@@ -711,6 +744,23 @@ function LabeledInput({ label, placeholder, required, ...rest }) {
 }
 
 function DropField({ label, value, onPress, leftIcon, required }) {
+  const { t } = useTranslation();
+  
+  const getPlaceholderText = () => {
+    switch (label) {
+      case t('country'):
+        return t('selectCountry');
+      case t('province'):
+        return t('selectProvince');
+      case t('district'):
+        return t('selectDistrict');
+      case t('messageLanguage'):
+        return t('selectLanguage');
+      default:
+        return `${t('select')} ${label}`;
+    }
+  };
+
   return (
     <View style={{ marginBottom: GAP }}>
       <Text style={styles.label}>
@@ -725,7 +775,7 @@ function DropField({ label, value, onPress, leftIcon, required }) {
         <View style={styles.selectedContent}>
           {leftIcon && <View style={{ marginRight: 12 }}>{leftIcon}</View>}
           <Text style={[styles.dropFieldText, !value && styles.placeholderText]}>
-            {value || `Select ${label}`}
+            {value || getPlaceholderText()}
           </Text>
         </View>
         <Ionicons name="chevron-down" size={20} color="#7A7A7A" />
@@ -748,113 +798,115 @@ function DarkButton({ label, onPress, style, disabled }) {
 }
 
 function InfoRow({ label, value }) {
+  const { t } = useTranslation();
+  
   return (
     <View style={styles.infoRow}>
       <Text style={styles.infoLabel}>{label}:</Text>
-      <Text style={styles.infoValue}>{value || "Not set"}</Text>
+      <Text style={styles.infoValue}>{value || t('notSet')}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 140,
+    paddingHorizontal: scale.wp(5.8),
+    paddingTop: scale.hp(2.6),
+    paddingBottom: scale.hp(18),
     backgroundColor: Colors.white,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: scale.hp(2.3),
     color: Colors.textPrimary,
-    marginBottom: 20,
+    marginBottom: scale.hp(2.6),
     fontWeight: "700",
   },
-  label: { 
-    fontSize: 14, 
-    color: Colors.textPrimary, 
-    marginBottom: 8,
-    fontWeight: '600'
+  label: {
+    fontSize: scale.hp(1.8),
+    color: Colors.textPrimary,
+    marginBottom: scale.hp(1),
+    fontWeight: '600',
   },
   dropField: {
-    height: 56,
-    borderRadius: 12,
+    height: scale.hp(7.2),
+    borderRadius: scale.hp(1.55),
     borderWidth: 1,
     borderColor: "#E5E7EB",
-    paddingHorizontal: 16,
+    paddingHorizontal: scale.wp(3.9),
     backgroundColor: "#fff",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
   selectedContent: {
-    flexDirection: "row", 
-    alignItems: "center", 
-    flex: 1
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
   },
   dropFieldText: {
-    color: Colors.textPrimary, 
-    fontSize: 16,
-    fontWeight: '500'
+    color: Colors.textPrimary,
+    fontSize: scale.hp(2.1),
+    fontWeight: '500',
   },
   placeholderText: {
     color: "#6B7280",
   },
-  fullButton: { 
-    marginTop: 20 
+  fullButton: {
+    marginTop: scale.hp(2.6),
   },
   rowButtons: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 20,
+    marginTop: scale.hp(2.6),
   },
-  halfButton: { 
-    width: "48%" 
+  halfButton: {
+    width: "48%",
   },
   darkBtn: {
-    height: 50,
-    borderRadius: 12,
+    height: scale.hp(6.5),
+    borderRadius: scale.hp(1.55),
     backgroundColor: "#2B2B2B",
     alignItems: "center",
     justifyContent: "center",
   },
-  darkBtnText: { 
-    color: "#fff", 
-    fontSize: 16, 
-    fontWeight: "600" 
+  darkBtnText: {
+    color: "#fff",
+    fontSize: scale.hp(2.1),
+    fontWeight: "600",
   },
   infoBox: {
     backgroundColor: "#f8f9fa",
-    borderRadius: 12,
-    padding: 20,
-    marginVertical: 16,
+    borderRadius: scale.hp(1.55),
+    padding: scale.hp(2.6),
+    marginVertical: scale.hp(2.1),
   },
   infoTitle: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     fontWeight: "600",
     color: Colors.textPrimary,
-    marginBottom: 16,
+    marginBottom: scale.hp(2.1),
   },
   infoRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 6,
+    paddingVertical: scale.hp(0.8),
   },
   infoLabel: {
-    fontSize: 14,
+    fontSize: scale.hp(1.8),
     color: Colors.textSecondary,
     fontWeight: "500",
   },
   infoValue: {
-    fontSize: 14,
+    fontSize: scale.hp(1.8),
     color: Colors.textPrimary,
     fontWeight: "600",
     textAlign: "right",
     flex: 1,
-    marginLeft: 8,
+    marginLeft: scale.wp(2),
   },
-  
+
   // Modal Styles
   modalOverlay: {
     flex: 1,
@@ -871,68 +923,68 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: '#fff',
-    borderTopLeftRadius: 25,
-    borderTopRightRadius: 25,
-    padding: 16,
+    borderTopLeftRadius: scale.hp(3.2),
+    borderTopRightRadius: scale.hp(3.2),
+    padding: scale.hp(2.1),
     elevation: 5,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
+    shadowOffset: { width: 0, height: -scale.hp(0.25) },
     shadowOpacity: 0.25,
-    shadowRadius: 4,
+    shadowRadius: scale.hp(0.5),
   },
   modalHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 16,
-    paddingBottom: 12,
+    marginBottom: scale.hp(2.1),
+    paddingBottom: scale.hp(1.55),
     borderBottomWidth: 1,
     borderBottomColor: "#F0F0F0",
   },
-  modalTitle: { 
-    fontSize: 18, 
-    fontWeight: "700", 
-    color: Colors.textPrimary 
+  modalTitle: {
+    fontSize: scale.hp(2.3),
+    fontWeight: "700",
+    color: Colors.textPrimary,
   },
   closeButton: {
-    padding: 4,
+    padding: scale.hp(0.5),
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F5F5F5',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    marginBottom: 16,
-    height: 44,
+    borderRadius: scale.hp(1.3),
+    paddingHorizontal: scale.wp(2.9),
+    marginBottom: scale.hp(2.1),
+    height: scale.hp(5.7),
   },
   searchIcon: {
-    marginRight: 8,
+    marginRight: scale.wp(2),
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     color: Colors.textPrimary,
   },
   modalContent: {
-    paddingBottom: 20,
+    paddingBottom: scale.hp(2.6),
   },
   modalRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderRadius: 8,
+    paddingVertical: scale.hp(1.55),
+    paddingHorizontal: scale.wp(2),
+    borderRadius: scale.hp(1),
   },
   modalItemTitle: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     color: Colors.textPrimary,
     fontWeight: '500',
   },
   modalItemSubtitle: {
-    fontSize: 14,
+    fontSize: scale.hp(1.8),
     color: Colors.textSecondary,
-    marginTop: 2,
+    marginTop: scale.hp(0.25),
   },
   modalSeparator: {
     height: 1,

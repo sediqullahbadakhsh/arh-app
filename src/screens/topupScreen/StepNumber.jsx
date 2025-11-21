@@ -6,6 +6,7 @@ import { Colors } from "../../theme/colors";
 import formatLocal from "../../utils/formatLocal";
 import { isRTL } from "../../utils/rtl";
 import { useTranslation } from "react-i18next";
+import { scale } from "../../utils/normalizeSize";
 
 const OPERATOR_LOGOS = {
   'AWCC': require('../../../assets/mnos/awcc.png'),
@@ -346,7 +347,7 @@ const StepNumber = forwardRef(({
           </Text>
         </View>
       ) : (
-        <View style={{ marginTop: 10, minHeight: 24 }}>
+        <View style={{ marginTop: 0, minHeight: 24 }}>
         
         </View>
       )}
@@ -361,9 +362,9 @@ const StepNumber = forwardRef(({
   );
 });
 const styles = {
-  watermarkContainer: {
+ watermarkContainer: {
     position: 'absolute',
-    top: 300,
+    top: scale.hp(53), 
     left: 0,
     right: 0,
     bottom: 0,
@@ -372,10 +373,11 @@ const styles = {
     zIndex: -1,
   },
   watermarkLogo: {
-    width: 270,
-    height: 270,
-    opacity: 0.1, 
-  }
+    width: scale.wp(67.5),  
+    height: scale.wp(67.5),
+    opacity: 0.1,
+  },
+
 };
 
 

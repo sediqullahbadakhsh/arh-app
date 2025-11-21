@@ -17,13 +17,13 @@ export default function LanguageScreen({ navigation }) {
   const [updatingBackend, setUpdatingBackend] = useState(false);
   const { t } = useTranslation();
 
-  // Modal states
+
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Modal handlers
+
   const showCustomSuccessModal = (message) => {
     setSuccessMessage(message);
     setShowSuccessModal(true);
@@ -70,12 +70,10 @@ export default function LanguageScreen({ navigation }) {
   };
 
   const handleLanguageChangeSuccess = () => {
-    // Optional: Additional actions after successful language change
     console.log('Language change completed successfully');
   };
 
   const handleLanguageChangeError = () => {
-    // Optional: Additional actions after failed language change
     console.log('Language change failed');
   };
 

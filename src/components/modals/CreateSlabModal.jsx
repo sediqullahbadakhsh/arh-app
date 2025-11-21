@@ -21,6 +21,7 @@ import {
 } from "../../services/merchantProfileService";
 import SuccessModal from "./SuccessModal";
 import ErrorModal from "./ErrorModal";
+import { scale } from "../../utils/normalizeSize";
 
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -55,7 +56,6 @@ const CreateSlabModal = ({ visible, onClose, onSuccess, userInfo }) => {
 
   const slabTypes = slabTypesData?.data || [];
 
-  // Modal handlers
   const showCustomSuccessModal = (message) => {
     setSuccessMessage(message);
     setShowSuccessModal(true);
@@ -451,45 +451,45 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: "#fff",
-    borderRadius: 12,
+    borderRadius: scale.hp(1.55),
     width: screenWidth * 0.9,
     maxHeight: screenHeight * 0.8,
     overflow: "hidden",
-    margin: 20,
+    margin: scale.hp(2.6),
   },
   modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 16,
+    padding: scale.hp(2.1),
     borderBottomWidth: 1,
     borderBottomColor: "#e5e7eb",
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: scale.hp(2.35),
     fontWeight: "600",
     color: Colors.textPrimary,
   },
   closeButton: {
-    padding: 4,
+    padding: scale.hp(0.5),
   },
   modalBody: {
-    maxHeight: 400,
+    maxHeight: scale.hp(52),
   },
   stepContent: {
-    padding: 16,
+    padding: scale.hp(2.1),
   },
   typeSelection: {
     flexDirection: "row",
-    marginBottom: 16,
-    borderRadius: 8,
+    marginBottom: scale.hp(2.1),
+    borderRadius: scale.hp(1.05),
     borderWidth: 1,
     borderColor: "#e5e7eb",
     overflow: "hidden",
   },
   typeOption: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: scale.hp(1.55),
     alignItems: "center",
   },
   typeOptionActive: {
@@ -503,36 +503,36 @@ const styles = StyleSheet.create({
     color: "#fff",
   },
   sectionLabel: {
-    fontSize: 14,
+    fontSize: scale.hp(1.8),
     fontWeight: "600",
     color: Colors.textPrimary,
-    marginBottom: 8,
+    marginBottom: scale.hp(1.05),
   },
   slabTypeList: {
-    marginBottom: 16,
+    marginBottom: scale.hp(2.1),
   },
   slabTypeItem: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 12,
+    padding: scale.hp(1.55),
     borderWidth: 1,
     borderColor: "#e5e7eb",
-    borderRadius: 8,
-    marginBottom: 8,
+    borderRadius: scale.hp(1.05),
+    marginBottom: scale.hp(1.05),
   },
   slabTypeItemSelected: {
     borderColor: Colors.primary,
     backgroundColor: "#fef2f2",
   },
   slabTypeName: {
-    fontSize: 14,
+    fontSize: scale.hp(1.8),
     color: Colors.textPrimary,
   },
   radio: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: scale.wp(5.2),
+    height: scale.wp(5.2),
+    borderRadius: scale.wp(2.6),
     borderWidth: 2,
     borderColor: "#d1d5db",
     alignItems: "center",
@@ -542,20 +542,20 @@ const styles = StyleSheet.create({
     borderColor: Colors.primary,
   },
   radioInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: scale.wp(2.6),
+    height: scale.wp(2.6),
+    borderRadius: scale.wp(1.3),
     backgroundColor: Colors.primary,
   },
   createTypeForm: {
-    marginBottom: 16,
+    marginBottom: scale.hp(2.1),
   },
   textInput: {
     borderWidth: 1,
     borderColor: "#e5e7eb",
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 14,
+    borderRadius: scale.hp(1.05),
+    padding: scale.hp(1.55),
+    fontSize: scale.hp(1.8),
     color: Colors.textPrimary,
   },
   inputError: {
@@ -563,39 +563,39 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: "#dc2626",
-    fontSize: 12,
-    marginTop: 4,
+    fontSize: scale.hp(1.55),
+    marginTop: scale.hp(0.5),
   },
   selectedTypeInfo: {
     backgroundColor: "#f8f9fa",
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
+    padding: scale.hp(1.55),
+    borderRadius: scale.hp(1.05),
+    marginBottom: scale.hp(2.1),
   },
   infoLabel: {
-    fontSize: 12,
+    fontSize: scale.hp(1.55),
     color: Colors.textSecondary,
-    marginBottom: 4,
+    marginBottom: scale.hp(0.5),
   },
   infoValue: {
-    fontSize: 14,
+    fontSize: scale.hp(1.8),
     color: Colors.textPrimary,
     fontWeight: "600",
   },
   formGroup: {
-    marginBottom: 16,
+    marginBottom: scale.hp(2.1),
   },
   modalFooter: {
     flexDirection: "row",
-    padding: 16,
+    padding: scale.hp(2.1),
     borderTopWidth: 1,
     borderTopColor: "#e5e7eb",
-    gap: 8,
+    gap: scale.wp(2.1),
   },
   button: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
+    paddingVertical: scale.hp(1.55),
+    borderRadius: scale.hp(1.05),
     alignItems: "center",
     justifyContent: "center",
   },

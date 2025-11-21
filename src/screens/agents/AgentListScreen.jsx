@@ -17,19 +17,22 @@ import { getChildUsers, deleteDownlineAgent } from "../../services/merchantApi";
 import DeleteConfirmationModal from "../../components/modals/DeleteConfirmationModal";
 import SuccessModal from "../../components/modals/SuccessModal";
 import ErrorModal from "../../components/modals/ErrorModal";
+import { scale } from "../../utils/normalizeSize";
+import { useTranslation } from "react-i18next";
 
 const FILTERS = ["All", "Active", "Inactive"];
 
 export default function AgentListScreen({ navigation }) {
   const { user } = useUser();
-  console.log(user, 'this is user of agent')
+  const { t } = useTranslation();
+  console.log(user, 'this is user of agent');
+  
   const [filter, setFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [childUsers, setChildUsers] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   
-  // Modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
@@ -64,7 +67,6 @@ export default function AgentListScreen({ navigation }) {
       setChildUsers(res?.data || []);
     } catch (error) {
       console.error("Load agents error:", error);
-      // We'll use error modal instead of Alert
     } finally {
       setLoading(false);
     }
@@ -130,6 +132,14 @@ export default function AgentListScreen({ navigation }) {
     });
   }, [childUsers, searchQuery, filter]);
 
+  const getStatusLabel = (status) => {
+    switch (status) {
+      case 'active': return t('active');
+      case 'inactive': return t('inactive');
+      default: return status;
+    }
+  };
+
   const renderItem = ({ item }) => {
     return (
       <View style={styles.card}>
@@ -144,27 +154,27 @@ export default function AgentListScreen({ navigation }) {
 
         <View style={styles.cardBody}>
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Commission:</Text>
+            <Text style={styles.detailLabel}>{t('commission')}:</Text>
             <Text style={styles.detailValue}>
               {item?.commissionRateDetails?.percentage 
                 ? `${item.commissionRateDetails.percentage}%` 
-                : "Not set"}
+                : t('notSet')}
             </Text>
           </View>
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Current Slab:</Text>
+            <Text style={styles.detailLabel}>{t('currentSlab')}:</Text>
             <Text style={styles.detailValue}>
-              {item?.commissionRateDetails?.slabTypeDetails?.title || "Not assigned"}
+              {item?.commissionRateDetails?.slabTypeDetails?.title || t('notAssigned')}
             </Text>
           </View>
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Address:</Text>
+            <Text style={styles.detailLabel}>{t('address')}:</Text>
             <Text style={styles.detailValue} numberOfLines={1}>
-              {item?.address || "Not set"}
+              {item?.address || t('notSet')}
             </Text>
           </View>
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Created:</Text>
+            <Text style={styles.detailLabel}>{t('created')}:</Text>
             <Text style={styles.detailValue}>
               {item?.createdAt ? new Date(item.createdAt).toLocaleDateString() : "-"}
             </Text>
@@ -177,7 +187,7 @@ export default function AgentListScreen({ navigation }) {
             onPress={() => navigation.navigate("AgentView", { agent: item, refreshAgentList })}
           >
             <Ionicons name="eye-outline" size={16} color={Colors.primary} />
-            <Text style={[styles.actionText, styles.viewText]}>View</Text>
+            <Text style={[styles.actionText, styles.viewText]}>{t('view')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -185,7 +195,7 @@ export default function AgentListScreen({ navigation }) {
             onPress={() => navigation.navigate("AgentEdit", { agent: item, refreshAgentList })}
           >
             <Ionicons name="create-outline" size={16} color="#16A34A" />
-            <Text style={[styles.actionText, styles.editText]}>Edit</Text>
+            <Text style={[styles.actionText, styles.editText]}>{t('edit')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -193,7 +203,7 @@ export default function AgentListScreen({ navigation }) {
             onPress={() => handleAssignSlab(item)}
           >
             <Ionicons name="add-circle-outline" size={16} color="#8B5CF6" />
-            <Text style={[styles.actionText, styles.slabText]}>Slab</Text>
+            <Text style={[styles.actionText, styles.slabText]}>{t('slab')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -202,7 +212,7 @@ export default function AgentListScreen({ navigation }) {
             disabled={deleteLoading}
           >
             <Ionicons name="trash-outline" size={16} color="#DC2626" />
-            <Text style={[styles.actionText, styles.deleteText]}>Delete</Text>
+            <Text style={[styles.actionText, styles.deleteText]}>{t('delete')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -210,8 +220,8 @@ export default function AgentListScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white, paddingBottom: 100, }}>
-      <ServiceHeader title="Manage Agents" />
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white, paddingBottom: 100 }}>
+      <ServiceHeader title={t('manageAgents')} />
 
       <View style={styles.container}>
         <View style={styles.pillsRow}>
@@ -237,7 +247,7 @@ export default function AgentListScreen({ navigation }) {
                 style={[styles.filterPill, btnStyle]}
               >
                 <Text style={[styles.filterPillText, textStyle]}>
-                  {f}
+                  {t(f.toLowerCase())}
                 </Text>
               </TouchableOpacity>
             );
@@ -251,7 +261,7 @@ export default function AgentListScreen({ navigation }) {
               style={styles.searchInput}
               value={searchQuery}
               onChangeText={setSearchQuery}
-              placeholder="Search by name, email or phone..."
+              placeholder={t('searchPlaceholder')}
               placeholderTextColor="#9E9E9E"
               autoCapitalize="none"
             />
@@ -266,21 +276,21 @@ export default function AgentListScreen({ navigation }) {
             onPress={() => navigation.navigate("AgentCreate", { refreshAgentList })}
           >
             <Ionicons name="add" size={20} color="#fff" />
-            <Text style={styles.addBtnText}>Add Agent</Text>
+            <Text style={styles.addBtnText}>{t('addAgent')}</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.resultsInfo}>
           <Text style={styles.resultsText}>
-            {filteredData.length} agent{filteredData.length !== 1 ? 's' : ''} found
-            {searchQuery ? ` for "${searchQuery}"` : ''}
-            {filter !== 'All' ? ` (${filter})` : ''}
+            {filteredData.length} {t('agentFound', { count: filteredData.length })}
+            {searchQuery ? ` ${t('for')} "${searchQuery}"` : ''}
+            {filter !== 'All' ? ` (${t(filter.toLowerCase())})` : ''}
           </Text>
         </View>
 
         {loading && !refreshing ? (
           <View style={styles.loadingContainer}>
-            <Text>Loading agents...</Text>
+            <Text>{t('loadingAgents')}</Text>
           </View>
         ) : (
           <FlatList
@@ -302,13 +312,13 @@ export default function AgentListScreen({ navigation }) {
                 <Ionicons name="people-outline" size={48} color="#9E9E9E" />
                 <Text style={styles.emptyText}>
                   {searchQuery 
-                    ? `No agents found for "${searchQuery}"`
-                    : "No agents found"}
+                    ? t('noAgentsFoundForSearch', { query: searchQuery })
+                    : t('noAgentsFound')}
                 </Text>
                 <Text style={styles.emptySubtext}>
                   {searchQuery 
-                    ? "Try adjusting your search terms"
-                    : "Get started by creating your first agent"}
+                    ? t('tryAdjustingSearch')
+                    : t('getStartedByCreatingAgent')}
                 </Text>
               </View>
             }
@@ -316,43 +326,39 @@ export default function AgentListScreen({ navigation }) {
         )}
       </View>
 
-      {/* Delete Confirmation Modal */}
       <DeleteConfirmationModal
         visible={showDeleteModal}
         onCancel={cancelDelete}
         onConfirm={confirmDelete}
-        title="Delete Agent"
-        message="Are you sure you want to delete this agent? This action cannot be undone and all associated data will be permanently removed."
+        title={t('deleteAgent')}
+        message={t('deleteAgentConfirmation')}
         itemName={agentToDelete?.user?.username}
         isLoading={deleteLoading}
-        confirmText="Delete Agent"
-        cancelText="Cancel"
+        confirmText={t('deleteAgent')}
+        cancelText={t('cancel')}
       />
 
-      {/* Success Modal */}
       <SuccessModal
         visible={showSuccessModal}
         onClose={handleSuccessClose}
-        title="Agent Deleted Successfully"
-        message="The agent has been permanently removed from the system. All associated data has been deleted."
-        buttonText="Continue"
+        title={t('agentDeletedSuccessfully')}
+        message={t('agentPermanentlyRemoved')}
+        buttonText={t('continue')}
         autoHideDuration={0}
       />
 
-      {/* Error Modal */}
       <ErrorModal
         visible={showErrorModal}
         onClose={handleErrorClose}
-        title="Failed to Delete Agent"
-        message="There was an error while deleting the agent. Please check your connection and try again."
-        buttonText="Try Again"
+        title={t('failedToDeleteAgent')}
+        message={t('deleteAgentError')}
+        buttonText={t('tryAgain')}
         showRetryButton={true}
       />
 
-      {/* Global Loading Overlay for Delete */}
       {deleteLoading && (
         <View style={styles.loadingOverlay}>
-          <Text style={styles.loadingText}>Deleting Agent...</Text>
+          <Text style={styles.loadingText}>{t('deletingAgent')}</Text>
         </View>
       )}
     </SafeAreaView>
@@ -360,9 +366,11 @@ export default function AgentListScreen({ navigation }) {
 }
 
 function StatusPill({ status }) {
+  const { t } = useTranslation();
+  
   const statusConfig = {
-    active: { color: "#16A34A", label: "Active" },
-    inactive: { color: "#6B7280", label: "Inactive" },
+    active: { color: "#16A34A", label: t('active') },
+    inactive: { color: "#6B7280", label: t('inactive') },
   };
 
   const config = statusConfig[status] || statusConfig.inactive;
@@ -385,28 +393,31 @@ function StatusPill({ status }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 24, paddingTop: 10 },
-  pillsRow: { 
-    flexDirection: "row", 
-    gap: 10, 
-    marginBottom: 12,
-    justifyContent: "space-between"
+  container: {
+    flex: 1,
+    paddingHorizontal: scale.wp(5.8),
+    paddingTop: scale.hp(1.3),
+  },
+  pillsRow: {
+    flexDirection: "row",
+    gap: scale.wp(2.4),
+    marginBottom: scale.hp(1.55),
+    justifyContent: "space-between",
   },
   filterPill: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 4,
-    paddingVertical: 8,
-    borderRadius: 6,
+    gap: scale.wp(1),
+    paddingVertical: scale.hp(1),
+    borderRadius: scale.hp(0.8),
     borderWidth: 1,
   },
   filterPillText: {
-    fontSize: 12,
+    fontSize: scale.hp(1.55),
     fontWeight: "600",
   },
-  // All filter button styles
   allBtn: {
     borderColor: Colors.primary,
     backgroundColor: `${Colors.primary}15`,
@@ -421,7 +432,6 @@ const styles = StyleSheet.create({
   allTextActive: {
     color: "#fff",
   },
-  // Active filter button styles
   activeBtn: {
     borderColor: "#16A34A",
     backgroundColor: "#16A34A15",
@@ -436,7 +446,6 @@ const styles = StyleSheet.create({
   activeTextActive: {
     color: "#fff",
   },
-  // Inactive filter button styles
   inactiveBtn: {
     borderColor: "#6B7280",
     backgroundColor: "#6B728015",
@@ -451,44 +460,55 @@ const styles = StyleSheet.create({
   inactiveTextActive: {
     color: "#fff",
   },
-  searchRow: { flexDirection: "row", gap: 10, marginBottom: 12 },
+  searchRow: {
+    flexDirection: "row",
+    gap: scale.wp(2.4),
+    marginBottom: scale.hp(1.55),
+  },
   searchBox: {
     flex: 1,
-    height: 44,
-    borderRadius: 10,
+    height: scale.hp(5.7),
+    borderRadius: scale.hp(1.3),
     borderWidth: 1,
     borderColor: "#E5E7EB",
-    paddingHorizontal: 10,
+    paddingHorizontal: scale.wp(2.4),
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#fff",
   },
-  searchInput: { marginLeft: 8, flex: 1, color: Colors.textPrimary },
+  searchInput: {
+    marginLeft: scale.wp(2),
+    flex: 1,
+    color: Colors.textPrimary,
+  },
   addBtn: {
-    height: 44,
-    paddingHorizontal: 14,
-    borderRadius: 10,
+    height: scale.hp(5.7),
+    paddingHorizontal: scale.wp(3.4),
+    borderRadius: scale.hp(1.3),
     backgroundColor: Colors.primary,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
-    gap: 6,
+    gap: scale.wp(1.5),
   },
-  addBtnText: { color: "#fff", fontWeight: "700" },
+  addBtnText: {
+    color: "#fff",
+    fontWeight: "700",
+  },
   resultsInfo: {
-    marginBottom: 12,
+    marginBottom: scale.hp(1.55),
   },
   resultsText: {
-    fontSize: 12,
+    fontSize: scale.hp(1.55),
     color: Colors.textSecondary,
   },
   card: {
     borderWidth: 1,
     borderColor: "#EEE",
     backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 16,
-    gap: 12,
+    borderRadius: scale.hp(1.55),
+    padding: scale.hp(2.1),
+    gap: scale.hp(1.55),
   },
   cardHeader: {
     flexDirection: "row",
@@ -498,20 +518,35 @@ const styles = StyleSheet.create({
   agentInfo: {
     flex: 1,
   },
-  name: { fontSize: 16, color: Colors.textPrimary, fontWeight: "700" },
-  email: { fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
-  phone: { fontSize: 12, color: Colors.textSecondary, marginTop: 1 },
+  name: {
+    fontSize: scale.hp(2.1),
+    color: Colors.textPrimary,
+    fontWeight: "700",
+  },
+  email: {
+    fontSize: scale.hp(1.55),
+    color: Colors.textSecondary,
+    marginTop: scale.hp(0.25),
+  },
+  phone: {
+    fontSize: scale.hp(1.55),
+    color: Colors.textSecondary,
+    marginTop: scale.hp(0.15),
+  },
   statusPill: {
-    paddingHorizontal: 10,
-    height: 24,
-    borderRadius: 12,
+    paddingHorizontal: scale.wp(2.4),
+    height: scale.hp(3.1),
+    borderRadius: scale.hp(1.55),
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
   },
-  statusText: { fontSize: 10, fontWeight: "700" },
+  statusText: {
+    fontSize: scale.hp(1.3),
+    fontWeight: "700",
+  },
   cardBody: {
-    gap: 6,
+    gap: scale.hp(0.8),
   },
   detailRow: {
     flexDirection: "row",
@@ -519,31 +554,31 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   detailLabel: {
-    fontSize: 12,
+    fontSize: scale.hp(1.55),
     color: Colors.textSecondary,
     fontWeight: "500",
   },
   detailValue: {
-    fontSize: 12,
+    fontSize: scale.hp(1.55),
     color: Colors.textPrimary,
     fontWeight: "600",
     flex: 1,
     textAlign: "right",
-    marginLeft: 8,
+    marginLeft: scale.wp(2),
   },
   cardActions: {
     flexDirection: "row",
     justifyContent: "space-between",
-    gap: 8,
+    gap: scale.wp(2),
   },
   actionBtn: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 4,
-    paddingVertical: 8,
-    borderRadius: 6,
+    gap: scale.wp(1),
+    paddingVertical: scale.hp(1),
+    borderRadius: scale.hp(0.8),
     borderWidth: 1,
   },
   viewBtn: {
@@ -563,13 +598,21 @@ const styles = StyleSheet.create({
     backgroundColor: "#DC262615",
   },
   actionText: {
-    fontSize: 12,
+    fontSize: scale.hp(1.55),
     fontWeight: "600",
   },
-  viewText: { color: Colors.primary },
-  editText: { color: "#16A34A" },
-  slabText: { color: "#8B5CF6" },
-  deleteText: { color: "#DC2626" },
+  viewText: {
+    color: Colors.primary,
+  },
+  editText: {
+    color: "#16A34A",
+  },
+  slabText: {
+    color: "#8B5CF6",
+  },
+  deleteText: {
+    color: "#DC2626",
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
@@ -578,18 +621,18 @@ const styles = StyleSheet.create({
   emptyContainer: {
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 48,
+    paddingVertical: scale.hp(6.2),
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     color: Colors.textSecondary,
-    marginTop: 12,
+    marginTop: scale.hp(1.55),
     textAlign: "center",
   },
   emptySubtext: {
-    fontSize: 12,
+    fontSize: scale.hp(1.55),
     color: Colors.textSecondary,
-    marginTop: 4,
+    marginTop: scale.hp(0.5),
     textAlign: "center",
   },
   loadingOverlay: {
@@ -600,7 +643,7 @@ const styles = StyleSheet.create({
     zIndex: 999,
   },
   loadingText: {
-    fontSize: 16,
+    fontSize: scale.hp(2.1),
     color: Colors.textPrimary,
     fontWeight: "600",
   },

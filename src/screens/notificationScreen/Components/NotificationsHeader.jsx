@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
+import { scale } from '../../../utils/normalizeSize';
 
 export default function NotificationsHeader({ title, onBack, onOpenModal }) {
     const { t } = useTranslation();
@@ -47,56 +48,56 @@ export default function NotificationsHeader({ title, onBack, onOpenModal }) {
 }
 
 const styles = StyleSheet.create({
-    gradient: {
-        width: '100%',
-        height: 180,
-        paddingHorizontal: 24,
-    },
-    centerContainer: {
-        flex: 1,
-        justifyContent: 'center', 
-        marginBottom: 12,
-    },
-    headerContent: {
-        flexDirection: 'row',
-        alignItems: 'center', 
-        justifyContent: 'space-between',
-        width: '100%',
-        height: 40, 
-    },
-    backBtn: {
-        width: 40,
-        height: 40,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderRadius: 20,
-    },
-    filterBtn: {
-        width: 40,
-        height: 40,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderRadius: 20,
-    },
-    titleWrapper: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    title: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: '#fff',
-        textAlign: 'center',
-        lineHeight: 24,
-        includeFontPadding: false,
-        textAlignVertical: 'center',
-    },
-    roundedTop: {
-        height: 24,
-        backgroundColor: '#fff',
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        marginTop: -24,
-    },
+  gradient: {
+    width: '100%',
+    height: scale.hp(23.2),
+    paddingHorizontal: scale.wp(5.8),
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    marginBottom: scale.hp(1.55),
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    height: scale.hp(5.2),
+  },
+  backBtn: {
+    width: scale.wp(9.75),
+    height: scale.wp(9.75),
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: scale.wp(4.9),
+  },
+  filterBtn: {
+    width: scale.wp(9.75),
+    height: scale.wp(9.75),
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: scale.wp(4.9),
+  },
+  titleWrapper: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  title: {
+    fontSize: scale.hp(2.35),
+    fontWeight: '600',
+    color: '#fff',
+    textAlign: 'center',
+    lineHeight: scale.hp(3.1),
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+  },
+  roundedTop: {
+    height: scale.hp(3.1),
+    backgroundColor: '#fff',
+    borderTopLeftRadius: scale.hp(3.1),
+    borderTopRightRadius: scale.hp(3.1),
+    marginTop: -scale.hp(3.1),
+  },
 });

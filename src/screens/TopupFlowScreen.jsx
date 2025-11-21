@@ -1134,7 +1134,7 @@ function StepPay({
   );
 }
 
-/* ---------- utils ---------- */
+
 
 function hexFade(hex, op) {
   const n = hex.replace("#", "");

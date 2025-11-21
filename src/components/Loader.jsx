@@ -8,6 +8,7 @@ import Animated, {
   withSequence,
   Easing,
 } from 'react-native-reanimated';
+import { scale } from '../utils/normalizeSize';
 
 const AnimatedView = Animated.createAnimatedComponent(View);
 
@@ -114,46 +115,40 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)', 
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 9999, 
+    zIndex: 9999,
   },
-//   loaderContainer: {
-//     backgroundColor: 'rgba(255, 255, 255, 0.1)', 
-//     borderRadius: 16,
-//     padding: 30,
-//     alignItems: 'center',
-//     justifyContent: 'center',
-//   },
+
   loader: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: scale.hp(2.6),
   },
   circle: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 20,
-    height: 20,
+    width: scale.wp(5.2),
+    height: scale.wp(5.2),
     borderWidth: 2,
-    borderRadius: 10,
-    marginHorizontal: 10,
+    borderRadius: scale.wp(2.6),
+    marginHorizontal: scale.wp(2.6),
     backgroundColor: 'transparent',
   },
   dot: {
     position: 'absolute',
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    width: scale.wp(4.2),
+    height: scale.wp(4.2),
+    borderRadius: scale.wp(2.1),
   },
   outline: {
     position: 'absolute',
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 10,
+    width: scale.wp(5.2),
+    height: scale.wp(5.2),
+    borderRadius: scale.wp(2.6),
+    borderWidth: scale.wp(2.6),
   },
 });
 

@@ -1,8 +1,0 @@
-
-
-
-const SetCommissionScreen = ({navigator})=>{
-
-    return 
-
-}
