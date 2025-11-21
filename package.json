@@ -34,7 +34,6 @@
     "expo-dev-client": "~6.0.16",
     "expo-device": "~8.0.9",
     "expo-document-picker": "14.0.7",
-    "expo-facebook": "^12.2.0",
     "expo-file-system": "~19.0.17",
     "expo-font": "~14.0.8",
     "expo-image-picker": "17.0.8",

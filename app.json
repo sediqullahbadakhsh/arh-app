@@ -82,8 +82,7 @@
           }
         }
       ],
-      "expo-web-browser",
-      "expo-facebook"
+      "expo-web-browser"
     ]
   }
 }
