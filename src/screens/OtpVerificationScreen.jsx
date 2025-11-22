@@ -25,7 +25,7 @@ import { scale } from "../utils/normalizeSize";
 const CODE_LENGTH = 6;
 const RESEND_SECONDS = 120;
 
-// Fixed Timer Hook that works even when app is in background
+
 const useTimer = (initialTime) => {
   const [timeLeft, setTimeLeft] = useState(initialTime);
   const timerRef = useRef(null);
@@ -33,7 +33,6 @@ const useTimer = (initialTime) => {
   const endTimeRef = useRef(null);
 
   useEffect(() => {
-    // Set the end time when timer starts
     if (!endTimeRef.current) {
       endTimeRef.current = Date.now() + initialTime * 1000;
     }
@@ -58,7 +57,6 @@ const useTimer = (initialTime) => {
         appStateRef.current.match(/inactive|background/) &&
         nextAppState === "active"
       ) {
-        // App came to foreground - recalculate time
         const remaining = calculateTimeLeft();
         setTimeLeft(remaining);
         
@@ -69,10 +67,9 @@ const useTimer = (initialTime) => {
       appStateRef.current = nextAppState;
     };
 
-    // Start the timer
+
     updateTimer();
 
-    // Subscribe to app state changes
     const subscription = AppState.addEventListener("change", handleAppStateChange);
 
     return () => {
@@ -87,7 +84,6 @@ const useTimer = (initialTime) => {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
     }
-    // Reset end time
     endTimeRef.current = Date.now() + initialTime * 1000;
     setTimeLeft(initialTime);
   };
@@ -95,7 +91,6 @@ const useTimer = (initialTime) => {
   return { timeLeft, resetTimer };
 };
 
-// Move HelpModal to a separate component to prevent recreation
 const HelpModal = ({ 
   visible, 
   onClose, 

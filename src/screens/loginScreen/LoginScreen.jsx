@@ -518,9 +518,8 @@ export default function LoginScreen({ navigation }) {
     </TouchableOpacity>
   );
 
-  // Choose which Google sign-in function to use
+
   const handleGoogleSignInPress = () => {
-    // Use mock for development, real for production
     if (__DEV__) {
       handleMockGoogleSignIn();
     } else {

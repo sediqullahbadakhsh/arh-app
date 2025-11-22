@@ -31,7 +31,7 @@ const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 export default function CountrySelectScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { t, i18n } = useTranslation();
-  const { selectedLang, LANGS, changeLanguage, isChangingLanguage } = useLanguage();
+  const { selectedLang, LANGS, changeLanguage, isChangingLanguage, needsRestart } = useLanguage();
   
   const [booting, setBooting] = useState(true);
   const [selectedCountry, setSelectedCountry] = useState(null);
@@ -39,7 +39,6 @@ export default function CountrySelectScreen({ navigation }) {
   const [countryModalVisible, setCountryModalVisible] = useState(false);
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [changingLanguage, setChangingLanguage] = useState(false);
 
   const countryModalAnim = useRef(new Animated.Value(screenHeight)).current;
   const languageModalAnim = useRef(new Animated.Value(screenHeight)).current;
@@ -58,24 +57,27 @@ export default function CountrySelectScreen({ navigation }) {
     })();
   }, [navigation]);
 
-  const handleLanguageChange = async (lang) => {
-    if (isChangingLanguage || changingLanguage) return;
-    
-    setChangingLanguage(true);
-    try {
-      const languageChanged = await changeLanguage(lang);
-      
-      if (!languageChanged) {
-        throw new Error('Failed to change app language');
-      }
-      
-      // Language change successful, close modal
+  // Handle app restart after language change
+  useEffect(() => {
+    if (needsRestart) {
+      // The app will restart automatically due to the LanguageAwareApp component
+      // Just close the modal and reset states
       setLanguageModalVisible(false);
+      setSearchQuery('');
+    }
+  }, [needsRestart]);
+
+  const handleLanguageChange = async (lang) => {
+    if (isChangingLanguage || selectedLang?.code === lang.code) return;
+    
+    try {
+      await changeLanguage(lang);
+      // Don't close modal immediately - let the LanguageAwareApp handle the restart
+      // The modal will be closed in the needsRestart effect above
     } catch (error) {
       console.error('Error changing language:', error);
-      // You might want to show an error message here
-    } finally {
-      setChangingLanguage(false);
+      // If there's an error, ensure modal can be closed
+      setLanguageModalVisible(false);
     }
   };
 
@@ -114,9 +116,19 @@ export default function CountrySelectScreen({ navigation }) {
   }, [languageModalVisible]);
 
   const onContinue = useCallback(async () => {
-    // No need to change language here since it's already handled by handleLanguageChange
-    navigation.replace("Onboarding");
-  }, [navigation]);
+    if (!selectedLang) return;
+    
+    try {
+      // Save selected country if needed
+      if (selectedCountry) {
+        await AsyncStorage.setItem("countryCode", selectedCountry.code);
+      }
+      
+      navigation.replace("Onboarding");
+    } catch (error) {
+      console.error('Error continuing:', error);
+    }
+  }, [navigation, selectedLang, selectedCountry]);
 
   const filteredCountries = useMemo(() => {
     if (!searchQuery) return COUNTRIES || [];
@@ -184,7 +196,7 @@ export default function CountrySelectScreen({ navigation }) {
       <TouchableOpacity
         onPress={() => handleLanguageChange(item)}
         activeOpacity={0.8}
-        disabled={isChangingLanguage || changingLanguage}
+        disabled={isChangingLanguage}
         style={[
           styles.modalRow,
           index === 0 && styles.modalRowFirst,
@@ -196,14 +208,14 @@ export default function CountrySelectScreen({ navigation }) {
           <Text style={styles.languageName}>{item.label}</Text>
           <Text style={styles.languageCode}>{(item.code || item.value).toUpperCase()}</Text>
         </View>
-        {(isChangingLanguage || changingLanguage) && selectedLang?.code === item.code ? (
+        {isChangingLanguage && active ? (
           <ActivityIndicator size="small" color={Colors.primary} />
         ) : active ? (
           <Ionicons name="checkmark-circle" size={20} color={Colors.primary} />
         ) : null}
       </TouchableOpacity>
     );
-  }, [selectedLang, filteredLanguages.length, isChangingLanguage, changingLanguage]);
+  }, [selectedLang, filteredLanguages.length, isChangingLanguage]);
 
   const CountryModal = () => (
     <Modal
@@ -268,13 +280,21 @@ export default function CountrySelectScreen({ navigation }) {
       transparent={true}
       animationType="none"
       statusBarTranslucent={true}
-      onRequestClose={() => setLanguageModalVisible(false)}
+      onRequestClose={() => {
+        if (!isChangingLanguage) {
+          setLanguageModalVisible(false);
+        }
+      }}
     >
       <View style={styles.modalOverlay}>
         <TouchableOpacity 
           style={styles.modalBackdrop}
           activeOpacity={1}
-          onPress={() => setLanguageModalVisible(false)}
+          onPress={() => {
+            if (!isChangingLanguage) {
+              setLanguageModalVisible(false);
+            }
+          }}
         />
         <Animated.View 
           style={[
@@ -289,8 +309,13 @@ export default function CountrySelectScreen({ navigation }) {
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{t('selectLanguage') || "Select Language"}</Text>
             <TouchableOpacity 
-              onPress={() => setLanguageModalVisible(false)}
+              onPress={() => {
+                if (!isChangingLanguage) {
+                  setLanguageModalVisible(false);
+                }
+              }}
               style={styles.closeButton}
+              disabled={isChangingLanguage}
             >
               <Ionicons name="close" size={24} color="#666" />
             </TouchableOpacity>
@@ -304,10 +329,11 @@ export default function CountrySelectScreen({ navigation }) {
               onChangeText={setSearchQuery}
               style={styles.searchInput}
               placeholderTextColor="#999"
+              editable={!isChangingLanguage}
             />
           </View>
 
-          {(isChangingLanguage || changingLanguage) && (
+          {isChangingLanguage && (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color={Colors.primary} />
               <Text style={styles.loadingText}>
@@ -363,14 +389,13 @@ export default function CountrySelectScreen({ navigation }) {
              
           <Text style={styles.title}>{t("welcome") || "Welcome"}</Text>
        
-
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>{t('selectLanguage1') || "Language"}</Text>
             <TouchableOpacity
               style={styles.selectionField}
               onPress={() => setLanguageModalVisible(true)}
               activeOpacity={0.8}
-              disabled={isChangingLanguage || changingLanguage}
+              disabled={isChangingLanguage}
             >
               <View style={styles.selectionContent}>
                 {selectedLang ? (
@@ -395,7 +420,7 @@ export default function CountrySelectScreen({ navigation }) {
                   <Text style={styles.placeholder}>{t('selectLanguage1') || "Select Language"}</Text>
                 )}
               </View>
-              {(isChangingLanguage || changingLanguage) ? (
+              {isChangingLanguage ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
                 <Ionicons name="chevron-down" size={20} color="#fff" />
@@ -411,7 +436,7 @@ export default function CountrySelectScreen({ navigation }) {
           ]}
         >
           <TouchableOpacity
-            disabled={!selectedLang || isChangingLanguage || changingLanguage}
+            disabled={!selectedLang || isChangingLanguage}
             onPress={onContinue}
             activeOpacity={0.9}
           >
@@ -432,7 +457,6 @@ export default function CountrySelectScreen({ navigation }) {
     </SafeAreaView>
   );
 }
-
 
 const GRADIENT = ["#E20E02", "#9F0901"];
 const CTA_GRADIENT = ["#F6B12A", "#E59A12"];

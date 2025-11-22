@@ -55,7 +55,6 @@ const ORDER_STATUS = {
   PENDING: 'pending'
 };
 
-// Order Status Screen Component
 const OrderStatusScreen = ({ 
   orderStatus, 
   orderDetails, 
@@ -164,7 +163,7 @@ const OrderStatusScreen = ({
   );
 };
 
-// Contacts Modal Component
+
 const ContactsModal = ({ 
   contactsModalVisible, 
   setContactsModalVisible, 
