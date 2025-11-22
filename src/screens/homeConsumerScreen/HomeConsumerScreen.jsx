@@ -176,11 +176,11 @@ const ReceiptModal = ({ visible, onClose, transaction }) => {
     }
   };
 
-  const getServiceName = (source) => {
-    switch (source) {
-      case 'stripe_card':
+  const getServiceName = (type) => {
+    switch (type) {
+      case 'recharge':
         return t('services.mobileTopup');
-      case 'data_bundle':
+      case 'bundle':
         return t('services.dataBundle');
       case 'game_coins':
         return t('services.gameCoins');
@@ -241,7 +241,7 @@ Thank you for your business!
   const generatePDFHtml = () => {
     const statusColor = getStatusColor(transaction.status);
     const statusText = getStatusText(transaction.status);
-    const serviceName = getServiceName(transaction.source);
+    const serviceName = getServiceName(transaction.type);
     
     return `
       <!DOCTYPE html>
@@ -546,7 +546,7 @@ Thank you for your business!
               <View style={HomeStyles.detailItem}>
                 <Text style={HomeStyles.detailLabel}>Service</Text>
                 <Text style={HomeStyles.detailValue}>
-                  {getServiceName(transaction.source)}
+                  {getServiceName(transaction.type)}
                 </Text>
               </View>
             </View>
@@ -708,11 +708,11 @@ export default function HomeConsumerScreen({ navigation }) {
     }
   };
   
-  const getServiceName = (source) => {
-    switch (source) {
-      case 'stripe_card':
+  const getServiceName = (type) => {
+    switch (type) {
+      case 'recharge':
         return t('services.mobileTopup');
-      case 'data_bundle':
+      case 'bundle':
         return t('services.dataBundle');
       case 'game_coins':
         return t('services.gameCoins');
@@ -720,6 +720,7 @@ export default function HomeConsumerScreen({ navigation }) {
         return t('transaction');
     }
   };
+
   
   const getServiceIcon = (source) => {
     switch (source) {
@@ -923,7 +924,7 @@ const TransactionRow = ({ item }) => (
       </View>
       <View style={HomeStyles.txInfo}>
         <Text style={HomeStyles.txTitle}>
-          {getServiceName(item.source)}
+          {getServiceName(item.type)}
         </Text>
         <Text style={HomeStyles.txSub}>{formatDate(item.createdAt)}</Text>
         <Text style={HomeStyles.txPhone}>{item.receiver}</Text>

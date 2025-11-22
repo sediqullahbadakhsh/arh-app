@@ -90,7 +90,7 @@ const useTimer = (initialTime) => {
   return { timeLeft, resetTimer };
 };
 
-// HelpModal Component (same as original)
+// HelpModal Component
 const HelpModal = ({ 
   visible, 
   onClose, 
@@ -179,11 +179,7 @@ const HelpModal = ({
 export default function MerchantOtpVerificationScreen({ route, navigation }) {
   const {
     email = "",
-    firstName = "",
-    lastName = "",
-    mobileNumber = "",
-    alternativeContact = "",
-    step1Data = {}
+    mode = "signup_merchant"
   } = route?.params || {};
 
   const [codes, setCodes] = useState(Array(CODE_LENGTH).fill(""));
@@ -236,40 +232,28 @@ export default function MerchantOtpVerificationScreen({ route, navigation }) {
 
     try {
       setVerifying(true);
-      
-      // Prepare signup data
-      const signupData = {
-        firstName,
-        lastName,
-        email: email.trim(),
-        mobileNumber,
-        alternativeContact,
-        username: `${firstName} ${lastName}`.toLowerCase().replace(/\s+/g, '_')
-      };
 
-      const response = await verifyOtpForMerchantSignup(email.trim(), code, signupData);
+      // For merchant signup, we only need to verify the OTP and get the verification token
+      // The personal information will be collected in the next steps
+      const response = await verifyOtpForMerchantSignup(email.trim(), code);
       
       if (response.success) {
         Alert.alert("Success", "Email verified successfully!");
-        
-        // Navigate back to merchant signup with verification data
+    
+        // Navigate back to SignUpMerchant with verification token
+        // The merchant form will start from step 1 (personal information)
         navigation.navigate("SignUpMerchant", {
           otpVerified: true,
           verificationToken: response.verificationToken,
-          step1Data: signupData,
-          // Pass all the form data back
-          firstName,
-          lastName,
-          email,
-          mobileNumber,
-          alternativeContact
+          // Only pass the verified email back
+          email: email.trim()
         });
       } else {
         Alert.alert("Error", response.message || "Invalid OTP. Please try again.");
       }
     } catch (error) {
       console.error("OTP verification error:", error);
-      const errorMsg = error.response?.data?.message || "OTP verification failed. Please try again.";
+      const errorMsg = error.response?.data?.message || error.message || "OTP verification failed. Please try again.";
       Alert.alert("Error", errorMsg);
     } finally {
       setVerifying(false);
@@ -277,8 +261,15 @@ export default function MerchantOtpVerificationScreen({ route, navigation }) {
   };
 
   const resendOtp = async () => {
-    resetTimer();
-    Alert.alert("Success", "OTP has been resent to your email.");
+    try {
+      // You might want to call the resend OTP API here
+      // For now, just reset the timer and show success message
+      resetTimer();
+      Alert.alert("Success", "OTP has been resent to your email.");
+    } catch (error) {
+      console.error("Resend OTP error:", error);
+      Alert.alert("Error", "Failed to resend OTP. Please try again.");
+    }
   };
 
   const handleGoBackToEditEmail = () => {
@@ -301,6 +292,8 @@ export default function MerchantOtpVerificationScreen({ route, navigation }) {
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
+  const isVerifyDisabled = codes.join("").length !== CODE_LENGTH || verifying;
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
       <AuthHeader 
@@ -321,7 +314,11 @@ export default function MerchantOtpVerificationScreen({ route, navigation }) {
               <TextInput
                 key={idx}
                 ref={(r) => (inputsRef.current[idx] = r)}
-                style={styles.codeBox}
+                style={[
+                  styles.codeBox,
+                  c && styles.codeBoxFilled,
+                  isVerifyDisabled && styles.codeBoxDisabled
+                ]}
                 value={c}
                 onChangeText={(t) =>
                   handleChange(t.replace(/[^0-9]/g, ""), idx)
@@ -345,8 +342,12 @@ export default function MerchantOtpVerificationScreen({ route, navigation }) {
                 Resend in {formatTime(timeLeft)}
               </Text>
             ) : (
-              <TouchableOpacity onPress={resendOtp}>
-                <Text style={[styles.resendText, { color: Colors.primary }]}>
+              <TouchableOpacity onPress={resendOtp} disabled={verifying}>
+                <Text style={[
+                  styles.resendText, 
+                  { color: Colors.primary },
+                  verifying && { opacity: 0.5 }
+                ]}>
                   Resend OTP
                 </Text>
               </TouchableOpacity>
@@ -364,8 +365,12 @@ export default function MerchantOtpVerificationScreen({ route, navigation }) {
           <TouchableOpacity 
             style={styles.helpLink}
             onPress={() => setShowHelpModal(true)}
+            disabled={verifying}
           >
-            <Text style={styles.helpLinkText}>
+            <Text style={[
+              styles.helpLinkText,
+              verifying && { opacity: 0.5 }
+            ]}>
               Didn't receive the verification code?
             </Text>
           </TouchableOpacity>
@@ -374,8 +379,15 @@ export default function MerchantOtpVerificationScreen({ route, navigation }) {
             label={verifying ? "Verifying..." : "Verify Email"}
             onPress={verifyOtp}
             style={{ marginTop: 28 }}
-            disabled={codes.join("").length !== CODE_LENGTH || verifying}
+            disabled={isVerifyDisabled}
           />
+
+          {verifying && (
+            <View style={styles.loadingOverlay}>
+              <ActivityIndicator size="large" color={Colors.primary} />
+              <Text style={styles.loadingText}>Verifying your email...</Text>
+            </View>
+          )}
         </View>
       </KeyboardAvoidingView>
 
@@ -409,6 +421,24 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: scale.hp(1.5),
   },
+  codeBox: {
+    width: scale.wp(12),
+    height: scale.hp(7),
+    borderRadius: scale.hp(1.25),
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    textAlign: 'center',
+    fontSize: scale.hp(2.25),
+    color: Colors.textPrimary,
+    backgroundColor: '#fff',
+  },
+  codeBoxFilled: {
+    borderColor: Colors.primary,
+    backgroundColor: '#F8F9FF',
+  },
+  codeBoxDisabled: {
+    opacity: 0.6,
+  },
   watermarkContainer: {
     position: 'absolute',
     top: scale.hp(25),
@@ -423,17 +453,6 @@ const styles = StyleSheet.create({
     width: scale.wp(67.5),
     height: scale.hp(33.75),
     opacity: 0.1,
-  },
-  codeBox: {
-    width: scale.wp(12),
-    height: scale.hp(7),
-    borderRadius: scale.hp(1.25),
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    textAlign: 'center',
-    fontSize: scale.hp(2.25),
-    color: Colors.textPrimary,
-    backgroundColor: '#fff',
   },
   resendRow: {
     flexDirection: 'row',
@@ -454,6 +473,22 @@ const styles = StyleSheet.create({
     fontSize: scale.hp(1.75),
     color: Colors.primary,
     textDecorationLine: 'underline',
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  loadingText: {
+    marginTop: scale.hp(1),
+    fontSize: scale.hp(1.75),
+    color: Colors.textSecondary,
   },
   modalOverlay: {
     flex: 1,

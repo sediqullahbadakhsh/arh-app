@@ -842,6 +842,7 @@ const styles = StyleSheet.create({
   },
   welcomeModalButtons: {
     marginTop: scale.hp(3),
+    marginBottom: scale.hp(4.5),
     gap: scale.hp(1.5),
   },
   welcomeModalButton: {

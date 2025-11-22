@@ -72,25 +72,29 @@ const changeLanguage = useCallback(async (lang) => {
       
       await AsyncStorage.setItem('userLanguage', JSON.stringify(lang));
       
-  
-      if (result.rtlChanged) {
+      // Only force restart if RTL actually changes
+      if (previousRTL !== newRTL) {
         setNeedsRestart(true);
         if (onLanguageChange) {
-          onLanguageChange(lang.code, result.rtlChanged);
+          onLanguageChange(lang.code, true);
         }
+        return true;
       } else {
         setNeedsRestart(false);
+        if (onLanguageChange) {
+          onLanguageChange(lang.code, false);
+        }
       }
     }
     return result ? result.success : false;
   } catch (error) {
     console.error('Error in changeLanguage:', error);
+    setNeedsRestart(false);
     return false;
   } finally {
     setIsChangingLanguage(false);
   }
 }, [isChangingLanguage, currentLanguage, onLanguageChange]);
-
   const value = {
     currentLanguage,
     selectedLang,

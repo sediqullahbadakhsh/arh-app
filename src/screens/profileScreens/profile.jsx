@@ -29,7 +29,7 @@ import { useTranslation } from "react-i18next";
 
 const { height: screenHeight } = Dimensions.get('window');
 
-// Skeleton Loader Component
+
 const SkeletonLoader = () => (
   <View style={ProfileStyles.skeletonContainer}>
     <LinearGradient
@@ -59,7 +59,7 @@ const SkeletonLoader = () => (
   </View>
 );
 
-// Shimmer Effect Component
+
 const Shimmer = () => (
   <View style={ProfileStyles.shimmerContainer}>
     <Animated.View style={ProfileStyles.shimmer} />
@@ -558,8 +558,6 @@ export default function ProfileDetailsScreen({ navigation }) {
           </TouchableOpacity>
         </ScrollView>
       </View>
-
- 
       <ImagePickerModal />
       <SuccessModal />
     </View>
