@@ -1,15 +1,21 @@
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
-import io from 'socket.io-client';
+import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 import { Platform, Alert, AppState, Vibration } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device'; 
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useTranslation } from 'react-i18next';
+import socketManager from '../utils/socketManager';
 
-const NOTIFICATIONS_STORAGE_KEY = 'notifications_data';
-const UNREAD_COUNT_STORAGE_KEY = 'unread_count';
+// Constants
+const NOTIFICATIONS_STORAGE_KEY = 'yescharge_notifications';
+const UNREAD_COUNT_STORAGE_KEY = 'yescharge_unread_count';
+const PUSH_TOKEN_STORAGE_KEY = 'yescharge_push_token';
+const USER_PUSH_REGISTERED_KEY = 'yescharge_push_registered';
+const SOCKET_URL = 'http://3.67.144.22';
+const BACKEND_URL = 'http://3.67.144.22';
 
+// Notification handler
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -28,47 +34,380 @@ export const useSocket = () => {
   return context;
 };
 
-export const SocketProvider = ({ children }) => {
+export const SocketProvider = ({ children, navigation }) => {
   const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [notificationsAvailable, setNotificationsAvailable] = useState(false);
-  const reconnectAttempts = useRef(0);
-  const maxReconnectAttempts = 5;
-  const { user, authed } = useAuth();
-  const { i18n } = useTranslation();
+  const [expoPushToken, setExpoPushToken] = useState(null);
+  const [isPushTokenRegistered, setIsPushTokenRegistered] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
   
-  const listenersRegisteredRef = useRef(false);
-  const socketRef = useRef(null);
-  const notificationListener = useRef(null);
-  const responseListener = useRef(null);
+  const { user, authed } = useAuth();
+  
+  // Use refs for subscriptions
+  const notificationSubscriptionRef = useRef(null);
+  const responseSubscriptionRef = useRef(null);
+  const isMountedRef = useRef(true);
+  const hasAttemptedPushRegistrationRef = useRef(false);
+  const socketConnectedRef = useRef(false);
+  const lastRegistrationAttemptRef = useRef(0);
+
+  // Ref to track the actual current state
+  const currentStateRef = useRef({
+    user: null,
+    authed: false,
+    expoPushToken: null,
+    isPushTokenRegistered: false,
+    socketConnected: false,
+  });
 
   const isExpoGo = Constants.appOwnership === 'expo';
 
-  // Load notifications from storage on mount
+  // Update the ref whenever state changes
   useEffect(() => {
-    loadNotificationsFromStorage();
+    currentStateRef.current = {
+      user,
+      authed,
+      expoPushToken,
+      isPushTokenRegistered,
+      socketConnected: socketConnectedRef.current,
+    };
+    
+    console.log('🔄 Updated currentStateRef:', {
+      userId: user?.id,
+      authed,
+      hasExpoPushToken: !!expoPushToken,
+      isPushTokenRegistered
+    });
+  }, [user, authed, expoPushToken, isPushTokenRegistered]);
+
+  // ========== FIXED PUSH TOKEN REGISTRATION FUNCTION ==========
+  const registerPushTokenWithServer = useCallback(async (token) => {
+    console.log('🎯 ========== REGISTER PUSH TOKEN CALLED ==========');
+    
+    const currentState = currentStateRef.current;
+    const currentUser = currentState.user;
+    
+    console.log('🔍 Registration prerequisites:', {
+      hasUserId: !!currentUser?.id,
+      userId: currentUser?.id,
+      authed: currentState.authed,
+      hasToken: !!token,
+      tokenLength: token?.length,
+      tokenPreview: token?.substring(0, 30) + '...',
+      hasUserToken: !!currentUser?.token
+    });
+
+    if (!currentUser?.id || !currentState.authed || !token || !currentUser?.token) {
+      console.log('🚫 Cannot register push token: Missing requirements');
+      return false;
+    }
+
+    try {
+      // Use /backend prefix since NGINX doesn't strip it
+      const endpoint = `${BACKEND_URL}/backend/v1/notifications/register-push-token`;
+      console.log('🌐 Using endpoint:', endpoint);
+      
+      const requestBody = {
+        userId: currentUser.id.toString(), // Ensure string
+        pushToken: token,
+        platform: Platform.OS,
+        deviceId: Device.deviceName || 'Unknown',
+        appName: 'Yes Charge',
+        appVersion: '1.0.0'
+      };
+      
+      console.log('📦 Request body:', JSON.stringify(requestBody, null, 2));
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${currentUser.token}`,
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      console.log('📡 Response status:', response.status);
+      
+      const result = await response.json();
+      console.log('📦 Response data:', result);
+      
+      if (response.ok && result.success) {
+        console.log('✅ Push token registered with server successfully!');
+        setIsPushTokenRegistered(true);
+        await AsyncStorage.setItem(USER_PUSH_REGISTERED_KEY, 'true');
+        lastRegistrationAttemptRef.current = Date.now();
+        console.log('💾 Registration status saved locally');
+        return true;
+      } else {
+        console.warn('⚠️ Failed to register push token with server:', result);
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Error registering push token:', error);
+      return false;
+    }
   }, []);
 
-  // Save notifications to storage when they change
-  useEffect(() => {
-    saveNotificationsToStorage();
-  }, [notifications, unreadCount]);
+  // ========== IMPROVED TRIGGER PUSH REGISTRATION ==========
+  const triggerPushTokenRegistration = useCallback(async (force = false) => {
+    console.log('🚀 ===== TRIGGERING PUSH TOKEN REGISTRATION =====');
+    
+    const currentState = currentStateRef.current;
+    const currentUser = currentState.user;
+    
+    console.log('🔍 CURRENT LIVE STATE from ref:', {
+      userId: currentUser?.id,
+      authed: currentState.authed,
+      userToken: !!currentUser?.token,
+      isPushTokenRegistered: currentState.isPushTokenRegistered,
+      hasExpoPushToken: !!currentState.expoPushToken,
+      forceMode: force
+    });
+    
+    // Get token
+    let actualToken = currentState.expoPushToken;
+    if (!actualToken) {
+      try {
+        const storedToken = await AsyncStorage.getItem(PUSH_TOKEN_STORAGE_KEY);
+        if (storedToken) {
+          actualToken = storedToken;
+        }
+      } catch (error) {
+        console.error('❌ Error checking AsyncStorage:', error);
+      }
+    }
+    
+    if (!actualToken) {
+      console.log('❌ No push token available');
+      return false;
+    }
+    
+    // Verify all requirements
+    if (!currentUser?.id || !currentState.authed || !currentUser?.token) {
+      console.log('⏸️ Missing requirements:', {
+        missingUserId: !currentUser?.id,
+        notAuthed: !currentState.authed,
+        missingUserToken: !currentUser?.token
+      });
+      return false;
+    }
+    
+    // Check if we should skip (unless forced)
+    const timeSinceLastAttempt = Date.now() - lastRegistrationAttemptRef.current;
+    const shouldSkip = !force && timeSinceLastAttempt < 30000; // 30 seconds cooldown
+    
+    if (shouldSkip) {
+      console.log('⏭️ Skipping registration - attempted recently');
+      return false;
+    }
+    
+    console.log('🎯 All conditions met! Registering push token...');
+    
+    try {
+      const success = await registerPushTokenWithServer(actualToken);
+      
+      if (success) {
+        console.log('🎉 Push token registered successfully!');
+        return true;
+      } else {
+        console.log('⚠️ Push token registration failed');
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Registration error:', error);
+      return false;
+    }
+  }, [registerPushTokenWithServer]);
 
-  // Handle language changes
+  // ========== AUTH EFFECT ==========
   useEffect(() => {
-    const handleLanguageChange = () => {
-      console.log('🌐 Language changed, refreshing notifications');
-      refreshNotifications();
+    if (isInitializing) {
+      return;
+    }
+    
+    console.log('🔐 Auth state changed:', {
+      authed,
+      userId: user?.id,
+      userToken: !!user?.token,
+      isPushTokenRegistered,
+      socketConnected: socketConnectedRef.current
+    });
+    
+    if (authed && user?.id && user?.token) {
+      console.log('🔐 User authenticated, connecting socket...');
+      connectSocket();
+    } else {
+      console.log('🔐 User not authenticated, disconnecting socket...');
+      disconnectSocket();
+    }
+  }, [authed, user?.id, user?.token, isInitializing]);
+
+  // ========== SOCKET CONNECTION HANDLER ==========
+  const connectSocket = useCallback(() => {
+    console.log('🔗 Attempting socket connection via manager...');
+    
+    const currentState = currentStateRef.current;
+    const currentUser = currentState.user;
+    
+    if (!currentUser?.id || !currentState.authed || !currentUser?.token) {
+      console.log('🚫 No valid user, skipping socket connection');
+      return;
+    }
+    
+    console.log('🔗 Connecting with user:', {
+      userId: currentUser.id,
+      tokenPreview: currentUser.token.substring(0, 20) + '...'
+    });
+    
+    try {
+      socketManager.disconnect();
+      
+      const socketInstance = socketManager.connect(SOCKET_URL, {
+        transports: ['websocket', 'polling'],
+        auth: {
+          token: currentUser.token,
+          userId: currentUser.id.toString(),
+        },
+        reconnection: true,
+        reconnectionAttempts: 10,
+        reconnectionDelay: 1000,
+        timeout: 10000,
+        forceNew: true,
+      });
+      
+      setSocket(socketInstance);
+      console.log('🔗 Socket connection initiated');
+    } catch (error) {
+      console.error('❌ Error connecting socket:', error);
+    }
+  }, []);
+
+  // ========== INITIALIZE ON MOUNT ==========
+  useEffect(() => {
+    console.log('🔧 ========== SOCKET PROVIDER MOUNTED ==========');
+    isMountedRef.current = true;
+    
+   const initialize = async () => {
+  try {
+    console.log('📂 Loading initial data from storage...');
+    await loadNotificationsFromStorage();
+    await loadPushTokenStatus();
+    await setupNotifications();
+    await checkBackgroundNotifications();
+    
+    // FORCE re-registration for standalone apps
+    if (!isExpoGo) {
+      console.log('🚀 Standalone app detected - forcing push registration');
+      // Clear any old registration status
+      await AsyncStorage.setItem(USER_PUSH_REGISTERED_KEY, 'false');
+      setIsPushTokenRegistered(false);
+      hasAttemptedPushRegistrationRef.current = false;
+    }
+    
+    setIsInitializing(false);
+    console.log('✅ SocketProvider initialization complete');
+  } catch (error) {
+    console.error('❌ Error initializing SocketProvider:', error);
+    setIsInitializing(false);
+  }
+};
+    
+    initialize();
+    
+    // ========== SOCKET EVENT HANDLERS ==========
+    const handleConnect = (socketId) => {
+      if (!isMountedRef.current) return;
+      
+      console.log('✅ Socket connected via manager - ID:', socketId);
+      setIsConnected(true);
+      socketConnectedRef.current = true;
+      currentStateRef.current.socketConnected = true;
+      setSocket(socketManager.getSocket());
+      
+      // Get notifications
+      setTimeout(() => {
+        getNotifications();
+      }, 500);
+      
+      // ALWAYS try to register push token when socket connects
+      console.log('🔔 Socket connected - attempting push token registration');
+      
+      const currentState = currentStateRef.current;
+      const currentUser = currentState.user;
+      
+      if (!currentUser?.id || !currentState.authed || !currentUser?.token) {
+        console.log('⏸️ Cannot register push token - user not authenticated');
+        return;
+      }
+      
+      // Always try to register on socket connect (with cooldown)
+      setTimeout(() => {
+        triggerPushTokenRegistration();
+      }, 1000);
     };
-
-    i18n.on('languageChanged', handleLanguageChange);
-
+    
+    const handleDisconnect = (reason) => {
+      if (!isMountedRef.current) return;
+      
+      console.log('❌ Socket disconnected via manager:', reason);
+      setIsConnected(false);
+      socketConnectedRef.current = false;
+      currentStateRef.current.socketConnected = false;
+      setSocket(null);
+    };
+    
+    const handleSystemNotification = (notification) => {
+      if (!isMountedRef.current) return;
+      
+      console.log('📨 Socket notification received:', notification?.id);
+      if (notification) {
+        addNotification(notification);
+      }
+    };
+    
+    const handleAllNotifications = (notificationsList) => {
+      if (!isMountedRef.current) return;
+      
+      console.log('📋 Received notifications:', notificationsList?.length || 0);
+      if (Array.isArray(notificationsList)) {
+        handleNotificationsUpdate(notificationsList);
+      }
+    };
+    
+    // Add listeners
+    socketManager.on('connect', handleConnect);
+    socketManager.on('disconnect', handleDisconnect);
+    socketManager.on('system_notification', handleSystemNotification);
+    socketManager.on('all_notifications', handleAllNotifications);
+    
     return () => {
-      i18n.off('languageChanged', handleLanguageChange);
+      console.log('🧹 SocketProvider cleanup');
+      isMountedRef.current = false;
+      cleanupNotificationListeners();
+      
+      // Remove listeners
+      socketManager.off('connect', handleConnect);
+      socketManager.off('disconnect', handleDisconnect);
+      socketManager.off('system_notification', handleSystemNotification);
+      socketManager.off('all_notifications', handleAllNotifications);
+      
+      disconnectSocket();
     };
-  }, [i18n]);
+  }, [triggerPushTokenRegistration]);
+
+  // ========== HELPER FUNCTIONS ==========
+  const cleanupNotificationListeners = () => {
+    if (notificationSubscriptionRef.current) {
+      notificationSubscriptionRef.current.remove();
+    }
+    if (responseSubscriptionRef.current) {
+      responseSubscriptionRef.current.remove();
+    }
+  };
 
   const loadNotificationsFromStorage = async () => {
     try {
@@ -78,347 +417,224 @@ export const SocketProvider = ({ children }) => {
       ]);
 
       if (savedNotifications) {
-        const parsedNotifications = JSON.parse(savedNotifications);
-        setNotifications(parsedNotifications);
-        console.log('📂 Loaded notifications from storage:', parsedNotifications.length);
+        setNotifications(JSON.parse(savedNotifications));
       }
-
       if (savedUnreadCount) {
-        const parsedCount = parseInt(savedUnreadCount, 10);
-        setUnreadCount(parsedCount);
-        console.log('📂 Loaded unread count from storage:', parsedCount);
+        setUnreadCount(parseInt(savedUnreadCount, 10));
       }
     } catch (error) {
-      console.error('❌ Error loading notifications from storage:', error);
+      console.error('❌ Error loading notifications:', error);
     }
   };
 
-  const saveNotificationsToStorage = async () => {
+  const loadPushTokenStatus = async () => {
     try {
-      await Promise.all([
-        AsyncStorage.setItem(NOTIFICATIONS_STORAGE_KEY, JSON.stringify(notifications)),
-        AsyncStorage.setItem(UNREAD_COUNT_STORAGE_KEY, unreadCount.toString())
+      const [savedToken, isRegistered] = await Promise.all([
+        AsyncStorage.getItem(PUSH_TOKEN_STORAGE_KEY),
+        AsyncStorage.getItem(USER_PUSH_REGISTERED_KEY)
       ]);
-      console.log('💾 Saved notifications to storage:', notifications.length);
+      
+      if (savedToken) {
+        setExpoPushToken(savedToken);
+      }
+      
+      if (isRegistered === 'true') {
+        setIsPushTokenRegistered(true);
+        hasAttemptedPushRegistrationRef.current = true;
+      }
     } catch (error) {
-      console.error('❌ Error saving notifications to storage:', error);
+      console.error('❌ Error loading push token status:', error);
     }
   };
 
-  // Clear storage when user logs out
-  useEffect(() => {
-    if (!authed) {
-      clearStorage();
-    }
-  }, [authed]);
-
-  const clearStorage = async () => {
+  const setupNotifications = async () => {
     try {
-      await Promise.all([
-        AsyncStorage.removeItem(NOTIFICATIONS_STORAGE_KEY),
-        AsyncStorage.removeItem(UNREAD_COUNT_STORAGE_KEY)
-      ]);
-      console.log('🧹 Cleared notification storage');
-    } catch (error) {
-      console.error('❌ Error clearing storage:', error);
-    }
-  };
-
-  // Initialize notifications
-  useEffect(() => {
-    console.log('🔧 Initializing Expo notifications...');
-    console.log('🏠 App ownership:', Constants.appOwnership);
-    
-    if (isExpoGo) {
-      console.log('🚫 Running in Expo Go - push notifications disabled, using local notifications only');
-    }
-
-    const initializeNotifications = async () => {
-      try {
-        const { status } = await Notifications.requestPermissionsAsync();
-        console.log('🔧 Notification permission status:', status);
-        
-        if (status !== 'granted') {
-          console.log('🚫 Notification permissions not granted');
-          setNotificationsAvailable(false);
-          return;
-        }
-
-        let token = null;
-        if (!isExpoGo) {
-          try {
-            token = await Notifications.getExpoPushTokenAsync();
-            console.log('📱 Expo push token:', token);
-          } catch (tokenError) {
-            console.error('❌ Push token fetch failed, using local notifications only:', tokenError);
-          }
-        } else {
-          console.log('📱 Skipping push token (Expo Go)');
-        }
-
-        notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
-          console.log('📱 Notification received in foreground:', notification);
-          Vibration.vibrate(500);
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync({
+          ios: { allowAlert: true, allowBadge: true, allowSound: true },
         });
-
-        responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
-          console.log('👆 Notification tapped:', response);
-          handleNotificationTap(response.notification.request.content.data || {});
-        });
-
-        setNotificationsAvailable(true);
-        console.log('✅ Expo notifications initialized successfully');
-
-        setTimeout(() => {
-          testLocalNotification();
-        }, 2000);
-
-      } catch (error) {
-        console.error('💥 Error initializing notifications:', error);
-        console.error('💥 Error details:', error.message);
+        finalStatus = status;
+      }
+      
+      if (finalStatus !== 'granted') {
         setNotificationsAvailable(false);
-      }
-    };
-
-    initializeNotifications();
-
-    return () => {
-      if (notificationListener.current) {
-        notificationListener.current.remove();
-      }
-      if (responseListener.current) {
-        responseListener.current.remove();
-      }
-    };
-  }, []);
-
-  const testLocalNotification = async () => {
-    console.log('🧪 Testing local notification capability...');
-    
-    if (!notificationsAvailable) {
-      console.log('🚫 Cannot test: Notifications not available');
-      return;
-    }
-
-    try {
-      console.log('🧪 Sending local test notification...');
-      
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: "AFH App",
-          body: "Local notifications are working!",
-          data: { 
-            id: 'test-local-notification',
-            type: 'test'
-          },
-          sound: true,
-          badge: 1,
-        },
-        trigger: null, 
-      });
-      
-      console.log('✅ Local test notification sent successfully');
-    } catch (error) {
-      console.error('❌ Local test notification failed:', error);
-      console.error('❌ Error details:', error.message);
-    }
-  };
-
-  const testPushNotification = async () => {
-    if (isExpoGo) {
-      console.log('🚫 Push notifications not available in Expo Go');
-      Alert.alert(
-        'Push Notifications',
-        'Push notifications are not available in Expo Go. Please use a development build for full functionality.',
-        [{ text: 'OK' }]
-      );
-      return;
-    }
-
-    console.log('🧪 Testing push notification capability...');
-    
-    if (!notificationsAvailable) {
-      console.log('🚫 Cannot test: Notifications not available');
-      return;
-    }
-
-    try {
-      console.log('🧪 Sending push test notification...');
-      
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: "AFH App",
-          body: "Push notifications are working!",
-          data: { 
-            id: 'test-push-notification',
-            type: 'test'
-          },
-          sound: true,
-          badge: 1,
-        },
-        trigger: null,
-      });
-      
-      console.log('✅ Push test notification sent successfully');
-    } catch (error) {
-      console.error('❌ Push test notification failed:', error);
-      console.error('❌ Error details:', error.message);
-    }
-  };
-
-  const playNotificationSound = async () => {
-    try {
-      const { Audio } = require('expo-av');
-      const soundObject = new Audio.Sound();
-      
-      try {
-        await soundObject.loadAsync(
-          require('../../assets/sounds/notification.mp3') 
-        );
-        await soundObject.playAsync();
-        
-        setTimeout(() => {
-          soundObject.unloadAsync();
-        }, 2000);
-        
-      } catch (soundError) {
-        console.log('Custom sound not found, using system sound');
-        Vibration.vibrate(500);
-      }
-    } catch (error) {
-      console.log('Error playing notification sound:', error);
-      Vibration.vibrate(500);
-    }
-  };
-
-  const showNotification = async (notification) => {
-    console.log('📱 Showing notification:', {
-      id: notification.id,
-      notificationsAvailable,
-      isExpoGo
-    });
-
-    let title = 'New Notification';
-    let message = '';
-    
-    if (typeof notification.title === 'object') {
-      title = notification.title.en || notification.title.ar || title;
-    } else if (typeof notification.title === 'string') {
-      title = notification.title;
-    }
-    
-    if (typeof notification.description === 'object') {
-      message = notification.description.en || notification.description.ar || message;
-    } else if (typeof notification.description === 'string') {
-      message = notification.description;
-    }
-
-    console.log('📱 Notification content:', { title, message });
-
-    await playNotificationSound();
-
-    if (notificationsAvailable) {
-      try {
-        console.log('📱 Attempting local notification...');
-        
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title: title,
-            body: message,
-            data: {
-              id: notification.id,
-              type: getNotificationType(notification),
-            },
-            sound: true,
-            badge: unreadCount + 1,
-          },
-          trigger: null,
-        });
-        
-        console.log('✅ Local notification shown successfully');
         return;
-        
-      } catch (error) {
-        console.error('❌ Local notification failed:', error);
-        console.error('❌ Error details:', error.message);
-      }
-    }
-
-    console.log('📱 Using fallback notification');
-    showFallbackNotification(title, message);
-  };
-
-  const showFallbackNotification = (title, message) => {
-    Vibration.vibrate(500);
-    
-    Alert.alert(
-      title,
-      message,
-      [{ text: 'OK', onPress: () => console.log('Notification alert closed') }],
-      { cancelable: true }
-    );
-  };
-
-  const handleNotificationTap = (notificationData) => {
-    console.log('👆 Notification tapped:', notificationData);
-  };
-
-  const updateBadgeCount = async (count) => {
-    if (!notificationsAvailable) {
-      return;
-    }
-    
-    try {
-      await Notifications.setBadgeCountAsync(count);
-      console.log('📱 Badge count updated:', count);
-    } catch (error) {
-      console.log('Error updating badge count:', error);
-    }
-  };
-
-  const getNotificationType = (notification) => {
-    try {
-      const notiType = notification.notificationType?.name;
-      
-      if (typeof notiType === 'string') {
-        return notiType.toLowerCase();
-      } else if (typeof notiType === 'object' && notiType !== null) {
-        return (notiType.en || notiType.ar || 'system').toLowerCase();
       }
       
-      return (notification.notiType || 'system').toString().toLowerCase();
+      if (Platform.OS === 'android') {
+        await Notifications.setNotificationChannelAsync('yescharge-default', {
+          name: 'Yes Charge',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#FF231F7C',
+          sound: 'default',
+        });
+      }
+      
+     let token;
+    if (isExpoGo) {
+      token = (await Notifications.getExpoPushTokenAsync({
+        projectId: Constants.expoConfig.extra.eas.projectId,
+      })).data;
+    } else {
+      token = (await Notifications.getExpoPushTokenAsync()).data;
+    }
+    
+    console.log('📱 Expo push token received:', token);
+    console.log('📱 Token length:', token.length);
+    console.log('📱 Is Expo Go?', isExpoGo);
+    console.log('📱 Is Standalone?', !isExpoGo);
+    
+    // Check if token changed from what's stored
+    const storedToken = await AsyncStorage.getItem(PUSH_TOKEN_STORAGE_KEY);
+    if (storedToken !== token) {
+      console.log('🔄 Push token changed! Clearing registration status.');
+      console.log('Old token:', storedToken?.substring(0, 20) + '...');
+      console.log('New token:', token.substring(0, 20) + '...');
+      
+      // Clear registration status when token changes
+      await AsyncStorage.setItem(USER_PUSH_REGISTERED_KEY, 'false');
+      setIsPushTokenRegistered(false);
+      hasAttemptedPushRegistrationRef.current = false;
+    }
+    
+    setExpoPushToken(token);
+    await AsyncStorage.setItem(PUSH_TOKEN_STORAGE_KEY, token);
+      
+      setNotificationsAvailable(true);
+      setupNotificationListeners();
+      
     } catch (error) {
-      return 'system';
+      console.error('💥 Error setting up notifications:', error);
+      setNotificationsAvailable(false);
     }
   };
 
-  // Notification management
+  const setupNotificationListeners = () => {
+    cleanupNotificationListeners();
+    
+    notificationSubscriptionRef.current = Notifications.addNotificationReceivedListener(notification => {
+      const data = notification.request.content.data;
+      if (data) {
+        addNotificationFromPush(data);
+      }
+      Vibration.vibrate(300);
+    });
+    
+    responseSubscriptionRef.current = Notifications.addNotificationResponseReceivedListener(response => {
+      const data = response.notification.request.content.data;
+      if (data?.id) {
+        markAsRead(data.id);
+      }
+      if (data) {
+        handleNotificationTap(data);
+      }
+    });
+  };
+
+  const checkBackgroundNotifications = async () => {
+    try {
+      const initialNotification = await Notifications.getLastNotificationResponseAsync();
+      if (initialNotification) {
+        const data = initialNotification.notification.request.content.data;
+        if (data) {
+          addNotificationFromPush(data);
+          if (data.id) {
+            markAsRead(data.id);
+          }
+          handleNotificationTap(data);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error checking background notifications:', error);
+    }
+  };
+
+  const disconnectSocket = () => {
+    socketManager.disconnect();
+    setSocket(null);
+    setIsConnected(false);
+    socketConnectedRef.current = false;
+    currentStateRef.current.socketConnected = false;
+  };
+
+  const getNotifications = () => {
+    const currentSocket = socketManager.getSocket();
+    if (currentSocket && socketManager.getIsConnected() && user?.id) {
+      currentSocket.emit('get_notifications', { 
+        userId: user.id,
+        role: user.role || 'customer' 
+      });
+    }
+  };
+
+  const refreshNotifications = () => {
+    getNotifications();
+  };
+
+  const handleNotificationsUpdate = (notificationsList) => {
+    setNotifications(prev => {
+      const merged = [...prev];
+      notificationsList.forEach(serverNotif => {
+        const exists = merged.some(local => local.id === serverNotif.id);
+        if (!exists) {
+          merged.unshift({
+            ...serverNotif,
+            isRead: serverNotif.read || serverNotif.isRead || false
+          });
+        }
+      });
+      return merged.slice(0, 100);
+    });
+    
+    const unread = notificationsList.filter(n => !(n.read || n.isRead)).length;
+    setUnreadCount(unread);
+    updateBadgeCount(unread);
+  };
+
   const addNotification = (notification) => {
+    if (!isMountedRef.current || !notification) return;
+    
     setNotifications(prev => {
       const exists = prev.some(notif => notif.id === notification.id);
-      if (exists) {
-        console.log('🔄 Notification already exists, skipping duplicate');
-        return prev;
-      }
+      if (exists) return prev;
       
       const newNotification = {
         ...notification,
-        isRead: false,
-        createdAt: notification.createdAt || notification.created_at || new Date().toISOString()
+        isRead: notification.isRead || false,
+        createdAt: notification.createdAt || new Date().toISOString()
       };
       
-      const newNotifications = [newNotification, ...prev];
-      console.log('📋 Notifications count after add:', newNotifications.length);
-      return newNotifications;
+      return [newNotification, ...prev].slice(0, 100);
     });
     
-    setUnreadCount(prev => prev + 1);
-    showNotification(notification);
+    if (!notification.isRead) {
+      setUnreadCount(prev => prev + 1);
+    }
   };
 
-  const markAsRead = async (notificationId) => {
-    console.log('📝 Marking notification as read:', notificationId);
+  const addNotificationFromPush = (notificationData) => {
+    if (!notificationData) return;
     
+    const newNotification = {
+      id: notificationData.id || `push-${Date.now()}`,
+      title: notificationData.title || { en: "Yes Charge" },
+      description: notificationData.body || notificationData.description || { en: "New notification" },
+      from: notificationData.from || "Yes Charge",
+      isRead: notificationData.isRead || false,
+      createdAt: notificationData.createdAt || new Date().toISOString(),
+      notificationType: notificationData.notificationType || { name: "General" },
+      data: notificationData,
+      receivedViaPush: true,
+    };
+
+    addNotification(newNotification);
+  };
+
+  const markAsRead = (notificationId) => {
     setNotifications(prev =>
       prev.map(notif =>
         notif.id === notificationId ? { ...notif, isRead: true } : notif
@@ -427,378 +643,234 @@ export const SocketProvider = ({ children }) => {
     
     setUnreadCount(prev => Math.max(0, prev - 1));
     
-    updateBadgeCount(Math.max(0, unreadCount - 1));
-    
-    if (socket && isConnected) {
-      socket.emit('mark_as_read', { notificationId });
+    const currentSocket = socketManager.getSocket();
+    if (currentSocket && socketManager.getIsConnected()) {
+      currentSocket.emit('mark_as_read', { notificationId });
     }
-    
-    return true;
   };
 
-  const deleteNotification = async (notificationId) => {
-    console.log('🗑️ Deleting notification:', notificationId);
-    
-    setNotifications(prev => {
-      const notificationToDelete = prev.find(notif => notif.id === notificationId);
-      const newNotifications = prev.filter(notif => notif.id !== notificationId);
-      
-      if (notificationToDelete && !notificationToDelete.isRead) {
-        setUnreadCount(prev => Math.max(0, prev - 1));
-      }
-      
-      return newNotifications;
-    });
-    
-    if (socket && isConnected) {
-      socket.emit('delete_notification', { notificationId });
-    }
-    
-    return true;
-  };
-
-  const markAllAsRead = async () => {
-    console.log('📝 Marking all notifications as read');
-    
+  const markAllAsRead = () => {
     setUnreadCount(0);
     setNotifications(prev => prev.map(notif => ({ ...notif, isRead: true })));
     
-    updateBadgeCount(0);
-    
-    if (socket && isConnected && user?.id) {
-      socket.emit('mark_all_read', { userId: user.id });
+    const currentSocket = socketManager.getSocket();
+    if (currentSocket && socketManager.getIsConnected() && user?.id) {
+      currentSocket.emit('mark_all_read', { userId: user.id });
     }
-    
-    return true;
   };
 
-  const clearNotifications = () => {
-    console.log('🗑️ Clearing all notifications');
+  const updateBadgeCount = async (count) => {
+    if (!notificationsAvailable) return;
+    try {
+      await Notifications.setBadgeCountAsync(count);
+    } catch (error) {
+      console.log('Error updating badge count:', error);
+    }
+  };
+
+  const handleNotificationTap = (notificationData) => {
+    if (!notificationData || !navigation) return;
+    
+    const type = notificationData.type || notificationData.notificationType?.name?.toLowerCase();
+    
+    switch(type) {
+      case 'order':
+      case 'booking':
+        if (notificationData.orderId) {
+          navigation.navigate('OrderDetails', { orderId: notificationData.orderId });
+        } else if (notificationData.bookingId) {
+          navigation.navigate('BookingDetails', { bookingId: notificationData.bookingId });
+        }
+        break;
+      default:
+        navigation.navigate('Notifications');
+        break;
+    }
+  };
+
+  const testSocketNotification = () => {
+    const currentSocket = socketManager.getSocket();
+    if (currentSocket && socketManager.getIsConnected()) {
+      currentSocket.emit('test_notification', { userId: user?.id });
+    } else {
+      Alert.alert('Error', 'Socket not connected');
+    }
+  };
+
+  // ========== CONTEXT VALUE ==========
+  const value = {
+  socket: socketManager.getSocket(),
+  isConnected: socketManager.getIsConnected(),
+  notifications,
+  unreadCount,
+  notificationsAvailable,
+  expoPushToken,
+  isPushTokenRegistered,
+  getNotifications,
+  refreshNotifications,
+  markAsRead,
+  markAllAsRead,
+  deleteNotification: (notificationId) => {
+    setNotifications(prev => prev.filter(n => n.id !== notificationId));
+    const notification = notifications.find(n => n.id === notificationId);
+    if (notification && !notification.isRead) {
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    }
+    const currentSocket = socketManager.getSocket();
+    if (currentSocket && socketManager.getIsConnected()) {
+      currentSocket.emit('delete_notification', { notificationId });
+    }
+  },
+  clearNotifications: () => {
     setNotifications([]);
     setUnreadCount(0);
-    updateBadgeCount(0);
-    clearStorage();
-  };
-
-  // Socket connection and event handlers
-  const setupSocketListeners = (socketInstance) => {
-    socketInstance.removeAllListeners();
-
-    socketInstance.on('connect', () => {
-      console.log('✅ Socket connected');
-      setIsConnected(true);
-      reconnectAttempts.current = 0;
-      
-      if (user?.id && user?.token) {
-        console.log('👤 Registering user with socket server');
-        
-        const userId = user.id.toString();
-        const userRole = user.role || 'b2c'; 
-        
- 
-       let userType = 'customer';
-if (userRole === 'b2b' || userRole === 'merchant') {
-  userType = 'merchant';
-} else if (userRole === 'b2c') {
-  userType = 'customer'; 
-}
-
-
-        
-       socketInstance.emit('register', {
-  userId: userId,
-  role: userType,
-  username: user.username || user.fullName || (userType === 'merchant' ? 'Merchant' : 'Customer'),
-  email: user.email || '',
-  type: userType,
-});
-
-
-        
-        console.log('📨 User registration sent:', { userId, role: userRole, type: userType });
-        
-        socketInstance.once('registered', () => {
-  console.log('✅ User registered with socket server');
-  getNotifications(); // Now safe to fetch
-});
-
-        // Get notifications after registration
-   
-      }
-    });
-
-    socketInstance.on('disconnect', (reason) => {
-      console.log('❌ Socket disconnected:', reason);
-      setIsConnected(false);
-    });
-
-    socketInstance.on('connect_error', (error) => {
-      console.log('⚠️ Socket connection error:', error.message);
-      setIsConnected(false);
-    });
-
-    socketInstance.on('reconnect_attempt', (attempt) => {
-      console.log('🔁 Socket reconnect attempt:', attempt);
-      reconnectAttempts.current = attempt;
-    });
-
-    socketInstance.on('reconnect_failed', () => {
-      console.log('🚫 Socket reconnection failed');
-      if (reconnectAttempts.current >= maxReconnectAttempts) {
-        Alert.alert(
-          'Connection Issue',
-          'Unable to connect to server. Some features may not work properly.',
-          [{ text: 'OK' }]
-        );
-      }
-    });
-
-socketInstance.on('system_notification', (notification) => {
-  console.log('📨 New notification received:', {
-    id: notification.id,
-    title: notification.title,
-    receiver: notification.receiver,
-    type: notification.notificationType?.name
-  });
-
-  // Normalize user role to match receiver format
-  const rawRole = user?.role || 'customer';
-  const normalizedRole = (rawRole === 'b2c') ? 'customer'
-                      : (rawRole === 'b2b' || rawRole === 'merchant') ? 'merchant'
-                      : rawRole;
-
-  const isForCurrentUser =
-    notification.receiver === normalizedRole ||
-    notification.receiver === 'all' ||
-    (notification.receiverDetails && notification.receiverDetails.id === user?.id);
-
-  if (isForCurrentUser) {
-    addNotification(notification);
-  } else {
-    console.log('📭 Notification not for current user, skipping. User role:', normalizedRole, 'Receiver:', notification.receiver);
-  }
-});
-
-    socketInstance.on('new_notification', (notification) => {
-      console.log('📨 New notification (legacy event):', notification);
-      addNotification(notification);
-    });
-
-    socketInstance.on('notification_read', (data) => {
-      console.log('📖 Notification read confirmed by server:', data);
-    });
-
-    socketInstance.on('all_notifications', (notificationsList) => {
-      console.log('📋 Received all notifications from server:', notificationsList.length);
-      
-      setNotifications(prev => {
-        const mergedNotifications = [...prev];
-        
-        notificationsList.forEach(serverNotif => {
-          const exists = mergedNotifications.some(localNotif => localNotif.id === serverNotif.id);
-          if (!exists) {
-            mergedNotifications.unshift({
-              ...serverNotif,
-              isRead: serverNotif.read || serverNotif.isRead || false
-            });
-          }
-        });
-        
-        return mergedNotifications.sort((a, b) => {
-          const dateA = new Date(a.createdAt || a.created_at || a.time);
-          const dateB = new Date(b.createdAt || b.created_at || b.time);
-          return dateB - dateA;
-        });
-      });
-      
-      const unread = notificationsList.filter(n => !n.read && !n.isRead).length;
-      setUnreadCount(unread);
-      updateBadgeCount(unread);
-    });
-
-    socketInstance.on('online_users', (users) => {
-      console.log('👥 Online users:', users.length);
-    });
-
-    socketInstance.on('test_response', (data) => {
-      console.log('🧪 Test response:', data);
-    });
-  };
-
-  const connectSocket = async () => {
-    console.log('🧪 connectSocket() called');
-
-    // Check if we have a valid user - updated for merchant support
-    const hasValidUser = Boolean(authed && user?.token);
-    const userId = user?.id;
+    AsyncStorage.removeItem(NOTIFICATIONS_STORAGE_KEY);
+    AsyncStorage.removeItem(UNREAD_COUNT_STORAGE_KEY);
+  },
+  reconnect: connectSocket,
+  disconnect: disconnectSocket,
+  sendTestNotification: testSocketNotification,
+  
+  // Push registration functions
+  triggerPushRegistrationNow: async (force = false) => {
+    return await triggerPushTokenRegistration(force);
+  },
+  
+  // ADD THIS MISSING FUNCTION:
+  getPushTokenStatus: () => {
+    const currentState = currentStateRef.current;
+    const currentUser = currentState.user;
     
-    console.log('🔐 Socket connection check:', {
-      authed,
-      hasToken: !!user?.token,
-      userId: userId,
-      userRole: user?.role,
-      hasValidUser
-    });
-
-    if (!hasValidUser) {
-      console.warn('🚫 Missing authentication, skipping socket connection');
-      return;
+    return {
+      hasToken: !!currentState.expoPushToken,
+      token: currentState.expoPushToken,
+      userId: currentUser?.id,
+      authed: currentState.authed,
+      isRegistered: currentState.isPushTokenRegistered,
+      hasUserToken: !!currentUser?.token,
+      socketConnected: currentState.socketConnected
+    };
+  },
+  
+  // Also add this function that your test screen might be using:
+  sendTestPushNotification: async () => {
+    return await testDirectPushAPI();
+  },
+  
+  // Rename the existing function to match what your test expects
+  testDirectPushAPI: async () => {
+    const currentState = currentStateRef.current;
+    const currentUser = currentState.user;
+    
+    if (!currentUser?.token) {
+      Alert.alert('Error', 'No authentication token available');
+      return { success: false, error: 'No token' };
     }
-
+    
     try {
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-        socketRef.current = null;
-      }
-
-      const serverUrl = 'http://3.67.144.22';
-      console.log('🔗 Connecting to socket server:', serverUrl);
-
-      const socketInstance = io(serverUrl, {
-        transports: ['websocket', 'polling'],
-        auth: {
-          token: user.token,
+      const response = await fetch('http://3.67.144.22/backend/v1/notifications/test-push', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${currentUser.token}`,
         },
-        reconnection: true,
-        reconnectionAttempts: maxReconnectAttempts,
-        reconnectionDelay: 1000,
-        reconnectionDelayMax: 5000,
-        timeout: 20000,
+        body: JSON.stringify({
+          userId: currentUser.id,
+          title: 'Direct API Test',
+          body: 'This is a test from direct API call',
+          data: {
+            type: 'test',
+            timestamp: new Date().toISOString(),
+            testId: `api-test-${Date.now()}`
+          }
+        }),
       });
-
-      console.log('🧱 Socket instance created:', !!socketInstance);
-
-      setupSocketListeners(socketInstance);
-      setSocket(socketInstance);
-      socketRef.current = socketInstance;
-      listenersRegisteredRef.current = true;
-
-    } catch (error) {
-      console.error('💥 Socket connection error:', error);
-    }
-  };
-
-  const disconnectSocket = () => {
-    if (socketRef.current) {
-      console.log('🔌 Disconnecting socket');
-      socketRef.current.removeAllListeners();
-      socketRef.current.disconnect();
-      socketRef.current = null;
-    }
-    setSocket(null);
-    setIsConnected(false);
-    listenersRegisteredRef.current = false;
-  };
-
-  const getNotifications = () => {
-    if (socket && isConnected && user?.id) {
-      console.log('📋 Requesting notifications from server for user:', user.id);
-      socket.emit('get_notifications', { 
-        userId: user.id,
-        role: user.role || 'customer' 
-      });
-    } else {
-      console.log('⚠️ Cannot get notifications: socket not connected or no user');
-    }
-  };
-
-  const refreshNotifications = async () => {
-    console.log('🔄 Refreshing notifications');
-    if (socket && isConnected) {
-      getNotifications();
-    } else {
-      // If offline, just reload from local storage
-      await loadNotificationsFromStorage();
-    }
-  };
-
-  const testSocketConnection = () => {
-    if (socket && isConnected) {
-      socket.emit('test', { 
-        message: 'Test from React Native app',
-        timestamp: Date.now(),
-        userId: user?.id,
-        role: user?.role || 'customer'
-      });
-    }
-  };
-
-  // Fetch notifications when connected and user is available
-  useEffect(() => {
-    if (isConnected && user?.id) {
-      console.log('📋 Fetching initial notifications for user:', user.id);
-      getNotifications();
-    }
-  }, [isConnected, user?.id]);
-
-  // Main socket connection effect - UPDATED FOR MERCHANT SUPPORT
-  useEffect(() => {
-    const hasValidUser = Boolean(authed && user?.token);
-    
-    console.log('🔐 Socket Provider - Auth State:', {
-      authed,
-      hasToken: !!user?.token,
-      userId: user?.id,
-      userRole: user?.role,
-      hasValidUser
-    });
-
-    if (hasValidUser) {
-      console.log('🧪 connectSocket() conditions met');
-      connectSocket();
-    } else {
-      console.log('🚫 Missing authentication, skipping socket connection');
-      disconnectSocket();
-      setNotifications([]);
-      setUnreadCount(0);
-    }
-
-    return () => {
-      disconnectSocket();
-    };
-  }, [authed, user?.token, user?.id, user?.role]);
-
-  // Reconnect when app comes to foreground
-  useEffect(() => {
-    const handleAppStateChange = (nextAppState) => {
-      if (nextAppState === 'active' && !isConnected && authed && user?.token) {
-        console.log('🔄 App came to foreground, reconnecting socket');
-        connectSocket();
+      
+      const result = await response.json();
+      
+      if (response.ok && result.success) {
+        Alert.alert('Success', 'Direct push test sent! Check device.');
+        return { success: true, data: result };
+      } else {
+        Alert.alert('Failed', result.error || 'Unknown error');
+        return { success: false, error: result.error };
       }
+    } catch (error) {
+      Alert.alert('Error', error.message);
+      return { success: false, error: error.message };
+    }
+  },
+  
+  debugPushRegistration: () => {
+    const currentState = currentStateRef.current;
+    const currentUser = currentState.user;
+    
+    console.log('🔍 ===== PUSH REGISTRATION DEBUG =====');
+    console.log('📱 Expo Push Token:', currentState.expoPushToken);
+    console.log('👤 User ID:', currentUser?.id);
+    console.log('🔐 Authenticated:', currentState.authed);
+    console.log('🏷️ Already Registered:', currentState.isPushTokenRegistered);
+    console.log('🔑 User Token:', currentUser?.token ? 'Present' : 'Missing');
+    console.log('🔌 Socket Connected:', currentState.socketConnected);
+    console.log('====================================');
+    
+    return {
+      expoPushToken: currentState.expoPushToken,
+      userId: currentUser?.id,
+      authed: currentState.authed,
+      isPushTokenRegistered: currentState.isPushTokenRegistered,
+      hasUserToken: !!currentUser?.token,
+      socketConnected: currentState.socketConnected,
     };
+  },
+  
+  manuallyRegisterPushToken: async () => {
+    const currentState = currentStateRef.current;
+    const currentUser = currentState.user;
+    
+    if (!currentState.expoPushToken) {
+      Alert.alert('Error', 'No push token available');
+      return false;
+    }
+    
+    if (!currentUser?.id || !currentState.authed) {
+      Alert.alert('Error', 'User not authenticated');
+      return false;
+    }
+    
+    const success = await registerPushTokenWithServer(currentState.expoPushToken);
+    
+    if (success) {
+      Alert.alert('Success', 'Push token registered with backend!');
+    } else {
+      Alert.alert('Failed', 'Could not register push token');
+    }
+    
+    return success;
+  },
+  
+  forceReRegisterPushToken: async () => {
+    await AsyncStorage.setItem(USER_PUSH_REGISTERED_KEY, 'false');
+    setIsPushTokenRegistered(false);
+    hasAttemptedPushRegistrationRef.current = false;
+    return await triggerPushTokenRegistration(true);
+  },
 
-    const subscription = AppState.addEventListener('change', handleAppStateChange);
-    return () => subscription.remove();
-  }, [isConnected, authed, user?.token]);
-
-  const value = {
-    socket,
-    isConnected,
-    notifications,
-    unreadCount,
-    pushNotificationAvailable: notificationsAvailable && !isExpoGo,
-    localNotificationAvailable: notificationsAvailable,
-    isExpoGo,
-    getNotifications,
-    refreshNotifications,
-    markAsRead,
-    markAllAsRead,
-    deleteNotification,
-    clearNotifications,
-    reconnect: connectSocket,
-    testConnection: testSocketConnection,
-    testLocalNotification,
-    testPushNotification,
+    
+    debugPushRegistration: () => {
+      const currentState = currentStateRef.current;
+      const currentUser = currentState.user;
+      
+      return {
+        expoPushToken: currentState.expoPushToken,
+        userId: currentUser?.id,
+        authed: currentState.authed,
+        isPushTokenRegistered: currentState.isPushTokenRegistered,
+        hasUserToken: !!currentUser?.token,
+        socketConnected: currentState.socketConnected,
+      };
+    },
   };
-
-  console.log('🔌 SocketProvider render - State:', {
-    isConnected,
-    notificationsCount: notifications.length,
-    unreadCount,
-    pushNotificationAvailable: notificationsAvailable && !isExpoGo,
-    localNotificationAvailable: notificationsAvailable,
-    isExpoGo
-  });
 
   return (
     <SocketContext.Provider value={value}>

@@ -1,6 +1,21 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { View, SafeAreaView, Text, StyleSheet, Alert, TouchableOpacity, FlatList, Modal, Animated, Dimensions, TextInput, ActivityIndicator, Platform } from "react-native";
-
+import {
+  View,
+  SafeAreaView,
+  Text,
+  StyleSheet,
+  Alert,
+  TouchableOpacity,
+  FlatList,
+  Modal,
+  Animated,
+  Dimensions,
+  TextInput,
+  ActivityIndicator,
+  Platform,
+  ScrollView,
+  Image
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../theme/colors";
 import PrimaryButton from "../../components/PrimaryButton";
@@ -10,24 +25,21 @@ import { useAuth } from "../../auth/AuthProvider";
 import RoundedInput from "../../components/RoundedInput";
 import WhiteSpinner from "../../components/Spinner";
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
-import { ScrollView, Image } from "react-native";
 import { useTranslation } from "react-i18next";
 import Loader from "../../components/Loader";
 import AuthHeaderSignIn from "../../components/AuthHeaderSignIn";
 import { useLanguage } from "../../context/LanguageContext";
 import { scale } from "../../utils/normalizeSize";
 
-
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
 
 const { height: screenHeight } = Dimensions.get('window');
 
-
 WebBrowser.maybeCompleteAuthSession();
 
 export default function LoginScreen({ navigation }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { selectedLang, LANGS, changeLanguage, isChangingLanguage } = useLanguage();
   
   const [email, setEmail] = useState("");
@@ -42,7 +54,6 @@ export default function LoginScreen({ navigation }) {
   const [emailSuggestions, setEmailSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   
-
   const [googleLoading, setGoogleLoading] = useState(false);
 
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
@@ -62,7 +73,6 @@ export default function LoginScreen({ navigation }) {
     webClientId: '586500268839-5fvgp3l6s5n4ma3lqk0i2t0n3l6b6l6q.apps.googleusercontent.com', 
     scopes: ['openid', 'profile', 'email'],
   });
-
 
   useEffect(() => {
     if (response?.type === 'success') {
@@ -96,7 +106,6 @@ export default function LoginScreen({ navigation }) {
         throw new Error('No access token received');
       }
 
-
       const userInfoResponse = await fetch('https://www.googleapis.com/userinfo/v2/me', {
         headers: { Authorization: `Bearer ${authentication.accessToken}` },
       });
@@ -107,7 +116,6 @@ export default function LoginScreen({ navigation }) {
 
       const userInfo = await userInfoResponse.json();
       
-
       const googleEmail = userInfo.email;
       
       if (!googleEmail) {
@@ -116,7 +124,6 @@ export default function LoginScreen({ navigation }) {
 
       console.log('Google Sign-In Successful:', { email: googleEmail, userInfo });
 
-   
       navigation.navigate("OtpVerification", {
         channel: "email",
         target: googleEmail,
@@ -135,11 +142,9 @@ export default function LoginScreen({ navigation }) {
     }
   };
 
-
   const handleMockGoogleSignIn = () => {
     setGoogleLoading(true);
     
-
     setTimeout(() => {
       const mockEmail = "test.user@gmail.com";
       setEmail(mockEmail);
@@ -165,7 +170,6 @@ export default function LoginScreen({ navigation }) {
     }, 1000);
   };
 
-
   useEffect(() => {
     if (languageModalVisible) {
       Animated.timing(languageModalAnim, {
@@ -184,15 +188,12 @@ export default function LoginScreen({ navigation }) {
   }, [languageModalVisible]);
 
   const handleLanguageChange = async (lang) => {
-    if (isChangingLanguage || changingLanguage) return;
+    if (isChangingLanguage || changingLanguage || selectedLang?.code === lang.code) return;
     
     setChangingLanguage(true);
     try {
-      const languageChanged = await changeLanguage(lang);
-      
-      if (!languageChanged) {
-        throw new Error('Failed to change app language');
-      }
+      await changeLanguage(lang);
+      await i18n.changeLanguage(lang.code);
       
       setLanguageModalVisible(false);
     } catch (error) {
@@ -208,7 +209,7 @@ export default function LoginScreen({ navigation }) {
     return (LANGS || []).filter(lang =>
       lang.label?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       lang.code?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      lang.value?.toLowerCase().includes(searchQuery.toLowerCase())
+      (lang.nativeName && lang.nativeName.toLowerCase().includes(searchQuery.toLowerCase()))
     );
   }, [searchQuery, LANGS]);
 
@@ -242,7 +243,9 @@ export default function LoginScreen({ navigation }) {
         {renderFlag()}
         <View style={loginStyles.languageInfo}>
           <Text style={loginStyles.languageName}>{item.label}</Text>
-          <Text style={loginStyles.languageCode}>{(item.code || item.value).toUpperCase()}</Text>
+          <Text style={loginStyles.languageCode}>
+            {item.nativeName || item.code.toUpperCase()}
+          </Text>
         </View>
         {(isChangingLanguage || changingLanguage) && selectedLang?.code === item.code ? (
           <ActivityIndicator size="small" color={Colors.primary} />
@@ -259,13 +262,22 @@ export default function LoginScreen({ navigation }) {
       transparent={true}
       animationType="none"
       statusBarTranslucent={true}
-      onRequestClose={() => setLanguageModalVisible(false)}
+      onRequestClose={() => {
+        if (!isChangingLanguage && !changingLanguage) {
+          setLanguageModalVisible(false);
+        }
+      }}
     >
       <View style={loginStyles.modalOverlay}>
         <TouchableOpacity 
           style={loginStyles.modalBackdrop}
           activeOpacity={1}
-          onPress={() => setLanguageModalVisible(false)}
+          onPress={() => {
+            if (!isChangingLanguage && !changingLanguage) {
+              setLanguageModalVisible(false);
+            }
+          }}
+          disabled={isChangingLanguage || changingLanguage}
         />
         <Animated.View 
           style={[
@@ -279,8 +291,13 @@ export default function LoginScreen({ navigation }) {
           <View style={loginStyles.modalHeader}>
             <Text style={loginStyles.modalTitle}>{t('selectLanguage') || "Select Language"}</Text>
             <TouchableOpacity 
-              onPress={() => setLanguageModalVisible(false)}
+              onPress={() => {
+                if (!isChangingLanguage && !changingLanguage) {
+                  setLanguageModalVisible(false);
+                }
+              }}
               style={loginStyles.closeButton}
+              disabled={isChangingLanguage || changingLanguage}
             >
               <Ionicons name="close" size={24} color="#666" />
             </TouchableOpacity>
@@ -294,6 +311,7 @@ export default function LoginScreen({ navigation }) {
               onChangeText={setSearchQuery}
               style={loginStyles.searchInput}
               placeholderTextColor="#999"
+              editable={!isChangingLanguage && !changingLanguage}
             />
           </View>
 
@@ -301,7 +319,7 @@ export default function LoginScreen({ navigation }) {
             <View style={loginStyles.loadingContainer}>
               <ActivityIndicator size="small" color={Colors.primary} />
               <Text style={loginStyles.loadingText}>
-                {t("ChangingLanguage") || "Changing language..."}
+                {t("changingLanguage") || "Changing language..."}
               </Text>
             </View>
           )}
@@ -312,6 +330,8 @@ export default function LoginScreen({ navigation }) {
             renderItem={renderLanguageItem}
             ItemSeparatorComponent={() => <View style={loginStyles.modalSeparator} />}
             showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 20 }}
+            keyboardShouldPersistTaps="handled"
           />
         </Animated.View>
       </View>
@@ -518,7 +538,6 @@ export default function LoginScreen({ navigation }) {
     </TouchableOpacity>
   );
 
-
   const handleGoogleSignInPress = () => {
     if (__DEV__) {
       handleMockGoogleSignIn();
@@ -545,6 +564,7 @@ export default function LoginScreen({ navigation }) {
               title={t('signInToAccount')}
               onLanguagePress={() => setLanguageModalVisible(true)}
               selectedLang={selectedLang}
+              isChangingLanguage={isChangingLanguage || changingLanguage}
             />
 
             <View style={styles.container}>
@@ -573,7 +593,19 @@ export default function LoginScreen({ navigation }) {
                         setShowSuggestions(true);
                       }
                     }}
+                    editable={!loading}
                   />
+                  
+                  {showSuggestions && emailSuggestions.length > 0 && (
+                    <View style={styles.suggestionsContainer}>
+                      <FlatList
+                        data={emailSuggestions}
+                        renderItem={renderSuggestionItem}
+                        keyExtractor={(item, index) => `suggestion-${index}`}
+                        scrollEnabled={false}
+                      />
+                    </View>
+                  )}
                 </View>
 
                 {showEmailError && emailError ? (
@@ -597,7 +629,7 @@ export default function LoginScreen({ navigation }) {
                   label={loading ? <WhiteSpinner /> : t('continue')}
                   onPress={start}
                   style={{ marginTop: 6, marginBottom: 14 }}
-                  disabled={loading}
+                  disabled={loading || isChangingLanguage || changingLanguage}
                 />
               ) : (
                 <>
@@ -606,14 +638,14 @@ export default function LoginScreen({ navigation }) {
                       label={t('continueWithPassword')}
                       onPress={goPassword}
                       style={{ marginTop: 24, marginBottom: canUseOtp ? 10 : 20 }}
-                      disabled={loading}
+                      disabled={loading || isChangingLanguage || changingLanguage}
                     />
                   )}
                   {canUseOtp && (
                     <OutlineButton
                       label={loading ? t('sendingOtp') : t('signInWithOtp')}
                       onPress={goOtp}
-                      disabled={loading}
+                      disabled={loading || isChangingLanguage || changingLanguage}
                     />
                   )}
                 </>
@@ -629,7 +661,7 @@ export default function LoginScreen({ navigation }) {
                 label={t('signInWithEmailPassword')}
                 onPress={goPassword}
                 style={{ marginTop: 10, marginBottom: 10 }}
-                disabled={loading}
+                disabled={loading || isChangingLanguage || changingLanguage}
               />
 
               <View style={{ height: 16 }} />
@@ -637,6 +669,7 @@ export default function LoginScreen({ navigation }) {
                 style={{ borderColor: "#DB8510", fontFamily: "dmsansRegulars", color: "#E20E02" }}
                 label={t('registerAsCustomerMerchant')}
                 onPress={goSignupChooser}
+                disabled={isChangingLanguage || changingLanguage}
               />
 
               <View style={styles.dividerRow}>
@@ -656,17 +689,17 @@ export default function LoginScreen({ navigation }) {
                     )
                   }
                   onPress={handleGoogleSignInPress}
-                  disabled={googleLoading}
+                  disabled={googleLoading || isChangingLanguage || changingLanguage}
                 />
                 <View style={{ width: 16 }} />
                 <SocialButton
                   label={t('facebook')}
                   icon={<Ionicons name="logo-facebook" size={22} color={"#1877F2"} />}
                   onPress={() => { }}
+                  disabled={isChangingLanguage || changingLanguage}
                 />
               </View>
 
-              {/* Development info - remove in production */}
               {__DEV__ && (
                 <Text style={styles.devInfo}>
                   Development: Using mock Google authentication
@@ -681,7 +714,6 @@ export default function LoginScreen({ navigation }) {
     </SafeAreaView>
   );
 }
-
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.white },
@@ -778,94 +810,6 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
 });
-// const styles = StyleSheet.create({
-//   safeArea: { flex: 1, backgroundColor: Colors.white },
-//   container: {
-//     flex: 1,
-//     paddingHorizontal: scale.wp(10),
-//     paddingTop: scale.hp(2.25),
-//     backgroundColor: Colors.pageBackColor,
-//   },
-//   helperText: {
-//     marginTop: scale.hp(0.75),
-//     fontSize: scale.hp(1.5),
-//     color: Colors.textSecondary,
-//   },
-//   errorText: {
-//     marginTop: scale.hp(0.75),
-//     fontSize: scale.hp(1.5),
-//     color: '#E20E02',
-//     fontFamily: 'dmsansRegular',
-//   },
-//   helperLink: {
-//     color: Colors.primary,
-//     fontWeight: '600',
-//     textDecorationLine: 'underline',
-//   },
-//   dividerRow: {
-//     flexDirection: 'row',
-//     alignItems: 'center',
-//     marginTop: scale.hp(2.2),
-//     marginBottom: scale.hp(2.2),
-//   },
-//   divider: {
-//     flex: 1,
-//     height: scale.hp(0.125),
-//     backgroundColor: Colors.divider,
-//   },
-//   dividerText: {
-//     marginHorizontal: scale.wp(3.2),
-//     color: '#666666',
-//     fontSize: scale.hp(1.6),
-//     fontFamily: 'dmsansMedium',
-//   },
-//   socialRow: {
-//     flexDirection: 'row',
-//     justifyContent: 'center',
-//     marginBottom: scale.hp(2.5),
-//   },
-//   label: {
-//     fontFamily: 'dmsansRegular',
-//     marginBottom: scale.hp(1),
-//     fontSize: scale.hp(2),
-//     lineHeight: scale.hp(3),
-//     color: Colors.textTitle,
-//   },
-//   suggestionsContainer: {
-//     position: 'absolute',
-//     top: scale.hp(6),
-//     left: 0,
-//     right: 0,
-//     backgroundColor: Colors.white,
-//     borderWidth: 1,
-//     borderColor: Colors.divider,
-//     borderRadius: 8,
-//     shadowColor: '#000',
-//     shadowOffset: {
-//       width: 0,
-//       height: 2,
-//     },
-//     shadowOpacity: 0.1,
-//     shadowRadius: 3,
-//     elevation: 3,
-//     zIndex: 1000,
-//     maxHeight: scale.hp(15),
-//   },
-//   suggestionItem: {
-//     flexDirection: 'row',
-//     alignItems: 'center',
-//     paddingHorizontal: scale.wp(4),
-//     paddingVertical: scale.hp(1.2),
-//     borderBottomWidth: 1,
-//     borderBottomColor: Colors.divider,
-//   },
-//   suggestionText: {
-//     marginLeft: scale.wp(2),
-//     fontSize: scale.hp(1.6),
-//     color: Colors.textTitle,
-//     fontFamily: 'dmsansRegular',
-//   },
-// });
 
 const loginStyles = StyleSheet.create({
   modalOverlay: {
@@ -949,13 +893,13 @@ const loginStyles = StyleSheet.create({
   languageFlag: {
     width: scale.wp(6),
     height: scale.hp(2.25),
-    marginRight: scale.wp(3),
+    marginEnd: scale.wp(3),
     borderRadius: scale.hp(0.5),
   },
   flagPlaceholder: {
     width: scale.wp(6),
     height: scale.hp(2.25),
-    marginRight: scale.wp(3),
+    marginEnd: scale.wp(3), 
     backgroundColor: '#F0F0F0',
     borderRadius: scale.hp(0.5),
   },
@@ -971,6 +915,7 @@ const loginStyles = StyleSheet.create({
   languageCode: {
     fontSize: scale.hp(1.75),
     color: Colors.textSecondary,
+    fontStyle: 'italic',
   },
   loadingContainer: {
     flexDirection: 'row',
@@ -978,6 +923,8 @@ const loginStyles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: scale.hp(1.25),
     marginBottom: scale.hp(1.25),
+    backgroundColor: '#f8f8f8',
+    borderRadius: 8,
   },
   loadingText: {
     marginLeft: scale.wp(2),

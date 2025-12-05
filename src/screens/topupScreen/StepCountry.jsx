@@ -34,7 +34,7 @@ function StepCountry({ country, onOpen }) {
         onPressOut={() => setIsFocused(false)}
       >
         <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
-          <Text style={{ fontSize: 24, marginRight: 12 }}>
+          <Text style={{ fontSize: 24, marginEnd: 12 }}>
             {codeToFlag(country?.countryCode)}
           </Text>
           <View>

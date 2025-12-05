@@ -12,7 +12,7 @@ export const getOrdersC = async (filters = {}) => {
       }
     });
     
-    const res = await api.get(`orders/customer/customer?${params.toString()}`);
+    const res = await api.get(`/orders/customer/customer?${params.toString()}`);
     return res.data;
   } catch (error) {
     console.error("Error fetching orders:", error);

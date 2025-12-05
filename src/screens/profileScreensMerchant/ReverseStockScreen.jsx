@@ -21,7 +21,7 @@ import { Colors } from "../../theme/colors";
 import ServiceHeader from "../../components/ServiceHeader";
 import PrimaryButton from "../../components/PrimaryButton";
 import { getDownlineAgents, createReverseStockByMerchant } from "../../services/reverseStockApi";
-import { useAuth } from "../../auth/AuthProvider";
+import { useUser } from "../../context/userContext";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import SuccessModal from "../../components/modals/SuccessModal";
 import ErrorModal from "../../components/modals/ErrorModal";
@@ -31,7 +31,7 @@ const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 const STEPS = { FORM: 0, CONFIRM: 1, DONE: 2 };
 
 export default function ReverseStockScreen({ navigation }) {
-  const { user } = useAuth();
+  const { user } = useUser();
   const [step, setStep] = useState(STEPS.FORM);
   const [loading, setLoading] = useState(false);
   
@@ -91,7 +91,7 @@ export default function ReverseStockScreen({ navigation }) {
     }
   }, [agentPickerOpen]);
 
-  // Modal handlers
+
   const showCustomSuccessModal = (message) => {
     setSuccessMessage(message);
     setShowSuccessModal(true);
@@ -114,7 +114,7 @@ export default function ReverseStockScreen({ navigation }) {
     setErrorMessage("");
   };
 
-  // parsed & computed
+
   const amount = useMemo(
     () => Math.max(0, parseNumber(amountText)),
     [amountText]
@@ -323,7 +323,6 @@ export default function ReverseStockScreen({ navigation }) {
           >
             {step === STEPS.FORM && (
               <>
-                {/* Agent Selection */}
                 <View style={{ marginBottom: 20 }}>
                   <View style={styles.editHeader}>
                     <Text style={styles.label}>Select Agent</Text>

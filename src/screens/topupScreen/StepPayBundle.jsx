@@ -1,22 +1,13 @@
 import React, { useState, useEffect } from "react";
-import { 
-  Text, 
-  TouchableOpacity, 
-  ScrollView, 
-  StyleSheet, 
-  Image, 
-  Alert, 
-  View,
-  ActivityIndicator
-} from "react-native";
+import { Text, TouchableOpacity, ScrollView, StyleSheet, Image, Alert } from "react-native";
+import { View } from "react-native";
 import { CardField, useStripe } from "@stripe/stripe-react-native";
-import TopUpStyles from "./TopupStyle";
 import { Colors } from "../../theme/colors";
 import { useTranslation } from "react-i18next";
 import { scale } from "../../utils/normalizeSize";
-import { Ionicons } from "@expo/vector-icons";
+import TopUpStyles from "../topupScreen/TopupStyle";
 
-function StepPay({
+function StepPayBundle({
   summary,
   onEditAmount,
   onCardDetailsChange,
@@ -27,16 +18,6 @@ function StepPay({
   const [cardDetails, setCardDetails] = useState(null);
   const [isCreatingPaymentMethod, setIsCreatingPaymentMethod] = useState(false);
   const [paymentMethodId, setPaymentMethodId] = useState(null);
-  
-
-  const {
-    appliedPromoCode,
-    discountAmount,
-    finalAmount,
-    onApplyPromoCode,
-    onRemovePromoCode,
-    openPromoModal
-  } = summary;
 
   const paymentMethods = [
     { 
@@ -58,11 +39,6 @@ function StepPay({
       showCardDetails: false
     },
   ];
-
-
-  const getSummaryValue = (key, defaultValue = 0) => {
-    return summary && summary[key] !== undefined ? summary[key] : defaultValue;
-  };
 
   useEffect(() => {
     const createStripePaymentMethod = async () => {
@@ -121,6 +97,7 @@ function StepPay({
 
   const handleCardFieldChange = (cardDetails) => {
     setCardDetails(cardDetails);
+    
     if (!cardDetails.complete && paymentMethodId) {
       setPaymentMethodId(null);
       onCardDetailsChange(false, null);
@@ -133,35 +110,13 @@ function StepPay({
     onCardDetailsChange(false, null);
   };
 
-
-  const getBaseAmount = () => {
-    if (summary?.calculateBaseAmount && typeof summary.calculateBaseAmount === 'function') {
-      return summary.calculateBaseAmount();
-    }
-    return getSummaryValue('baseAmount', 0);
-  };
-
-  const getFeeAmount = () => {
-    if (summary?.calculateFeeAmount && typeof summary.calculateFeeAmount === 'function') {
-      return summary.calculateFeeAmount();
-    }
-    return getSummaryValue('feeAmount', 0);
-  };
-
-  const getAfnAmount = () => {
-    return getSummaryValue('afn', 0);
-  };
-
-  const getTotalAfnAmount = () => {
-    return getSummaryValue('totalAfn', getSummaryValue('afn', 0));
-  };
-
   return (
     <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
       <View style={{ marginTop: 12 }}>
         <Text style={TopUpStyles.sectionTitle}>
           {t('paymentMethod')}
         </Text>
+
         <View style={styles.paymentMethodContainer}>
           {paymentMethods.map((method) => (
             <TouchableOpacity
@@ -192,29 +147,7 @@ function StepPay({
             </TouchableOpacity>
           ))}
         </View>
-        <View style={styles.promoSection}>
-          {appliedPromoCode ? (
-            <View style={styles.appliedPromoContainer}>
-              <View style={styles.appliedPromoInfo}>
-                <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-                <Text style={styles.appliedPromoText}>
-                  {t('promoCode.applied')}: {appliedPromoCode.code}
-                </Text>
-                <Text style={styles.discountText}>
-                  -${appliedPromoCode.discount_amount?.toFixed(2) || discountAmount.toFixed(2)}
-                </Text>
-              </View>
-              <TouchableOpacity onPress={onRemovePromoCode} style={styles.removePromoButton}>
-                <Text style={styles.removePromoText}>{t('promoCode.remove')}</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <TouchableOpacity style={styles.promoButton} onPress={openPromoModal}>
-              <Ionicons name="pricetag-outline" size={20} color={Colors.primary} />
-              <Text style={styles.promoButtonText}>{t('promoCode.havePromoCode')}</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+
         {selectedPaymentMethod === 'card' && (
           <View style={styles.cardDetailsContainer}>
             <View style={styles.fieldContainer}>
@@ -226,6 +159,7 @@ function StepPay({
                   </TouchableOpacity>
                 )}
               </View>
+              
               <CardField
                 postalCodeEnabled={false}
                 placeholders={{
@@ -248,83 +182,47 @@ function StepPay({
                 }}
                 onCardChange={handleCardFieldChange}
               />
+
               {cardDetails?.error && (
                 <Text style={styles.errorText}>
                   {cardDetails.error.message || t('cardError')}
                 </Text>
               )}
+
+              <Text style={[TopUpStyles.smallLabel, { marginTop: 16 }]}>
+                {t('securePaymentNotice')}
+              </Text>
             </View>
-            <Text style={[TopUpStyles.smallLabel, { marginTop: 16 }]}>
-              {t('securePaymentNotice')}
-            </Text>
           </View>
         )}
-        {selectedPaymentMethod === 'paypal' && (
-          <View style={styles.altPaymentContainer}>
-            <Image 
-              source={require('../../../assets/images/paypal.png')} 
-              style={styles.paymentLogo} 
-              resizeMode="contain"
-            />
-            <Text style={styles.altPaymentText}>
-              {t('paypalRedirect')}
-            </Text>
-            <TouchableOpacity style={[styles.paymentButton, { backgroundColor: '#CD0202' }]}>
-              <Image 
-                source={require('../../../assets/images/paypal.png')} 
-                style={styles.buttonIcon} 
-                resizeMode="contain"
-              />
-              <Text style={styles.paymentButtonText}>{t('continueWithPaypal')}</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-        {selectedPaymentMethod === 'googlepay' && (
-          <View style={styles.altPaymentContainer}>
-            <Image 
-              source={require('../../../assets/images/google-pay.png')} 
-              style={styles.paymentLogo} 
-              resizeMode="contain"
-            />
-            <Text style={styles.altPaymentText}>
-              {t('googlePayRedirect')}
-            </Text>
-            <TouchableOpacity style={[styles.paymentButton, { backgroundColor: '#CD0202' }]}>
-              <Image 
-                source={require('../../../assets/images/google-pay.png')} 
-                style={styles.buttonIcon} 
-                resizeMode="contain"
-              />
-              <Text style={styles.paymentButtonText}>{t('payWithGooglePay')}</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+
         <View style={TopUpStyles.summaryCard}>
           <View style={TopUpStyles.summaryRow}>
-            <Text style={TopUpStyles.summaryKey}>{t('mobileNumber')}</Text>
-            <Text style={TopUpStyles.summaryValue}>{getSummaryValue('mobile', 'N/A')}</Text>
+            <Text style={TopUpStyles.summaryKey}>Receiver Number</Text>
+            <Text style={TopUpStyles.summaryValue}>{summary.mobile}</Text>
           </View>
+         
           <View style={TopUpStyles.summaryRow}>
-            <Text style={TopUpStyles.summaryKey}>{t('amountToSend')}</Text>
-            <Text style={TopUpStyles.summaryValue}>{getAfnAmount()} AFN</Text>
+            <Text style={TopUpStyles.summaryKey}>Bundle Plan</Text>
+            <Text style={TopUpStyles.summaryValue}>
+              {summary.product?.productName?.en || summary.product?.productName}
+            </Text>
           </View>
+
           <View style={TopUpStyles.summaryRow}>
-            <Text style={TopUpStyles.summaryKey}>{t('baseAmount')}</Text>
-            <Text style={TopUpStyles.summaryValue}>${getBaseAmount().toFixed(2)} USD</Text>
+            <Text style={TopUpStyles.summaryKey}>Amount</Text>
+            <Text style={TopUpStyles.summaryValue}>{summary.afn} AFN</Text>
           </View>
-          {getSummaryValue('slabPercentage', 0) > 0 && (
+
+          <View style={TopUpStyles.summaryRow}>
+            <Text style={TopUpStyles.summaryKey}>Base Amount</Text>
+            <Text style={TopUpStyles.summaryValue}>${summary.calculateBaseAmount()} USD</Text>
+          </View>
+
+          {summary.slabPercentage > 0 && (
             <View style={TopUpStyles.summaryRow}>
-              <Text style={TopUpStyles.summaryKey}>{t('fee')}</Text>
-              <Text style={TopUpStyles.summaryValue}>${getFeeAmount().toFixed(2)} USD</Text>
-            </View>
-          )}
-          
-          {appliedPromoCode && (
-            <View style={TopUpStyles.summaryRow}>
-              <Text style={TopUpStyles.summaryKey}>{t('promoCode.discount')}</Text>
-              <Text style={[TopUpStyles.summaryValue, { color: '#10B981' }]}>
-                -${appliedPromoCode.discount_amount?.toFixed(2) || discountAmount.toFixed(2)} USD
-              </Text>
+              <Text style={TopUpStyles.summaryKey}>Fee</Text>
+              <Text style={TopUpStyles.summaryValue}>${summary.calculateFeeAmount()} USD</Text>
             </View>
           )}
 
@@ -340,7 +238,7 @@ function StepPay({
             ]}
           >
             <Text style={[TopUpStyles.summaryKey, { fontWeight: "700" }]}>
-              {t('totalAmount')}
+              Total Amount
             </Text>
             <Text
               style={[
@@ -348,13 +246,12 @@ function StepPay({
                 { color: Colors.primary, fontWeight: "700" },
               ]}
             >
-              ${finalAmount.toFixed(2)} USD
+              ${summary.usd} USD
             </Text>
           </View>
-          
           <TouchableOpacity onPress={onEditAmount} style={{ marginTop: 8 }}>
             <Text style={[TopUpStyles.editLink, { alignSelf: "flex-end" }]}>
-              {t('changeAmount')}
+              Change Bundle
             </Text>
           </TouchableOpacity>
         </View>
@@ -409,62 +306,6 @@ const styles = StyleSheet.create({
   paymentMethodTextSelected: {
     color: Colors.primary,
   },
-  promoSection: {
-    marginVertical: scale.hp(2),
-  },
-  promoButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: scale.hp(1.5),
-    paddingHorizontal: scale.wp(4),
-    borderRadius: scale.hp(1),
-    borderWidth: 2,
-    borderColor: Colors.primary,
-    borderStyle: 'dashed',
-    backgroundColor: 'rgba(59, 130, 246, 0.05)',
-  },
-  promoButtonText: {
-    color: Colors.primary,
-    fontSize: scale.hp(1.75),
-    fontWeight: '600',
-    marginLeft: scale.wp(2),
-  },
-  appliedPromoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: scale.hp(1.5),
-    borderRadius: scale.hp(1),
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    borderWidth: 1,
-    borderColor: '#10B981',
-  },
-  appliedPromoInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  appliedPromoText: {
-    color: '#065F46',
-    fontSize: scale.hp(1.75),
-    fontWeight: '600',
-    marginLeft: scale.wp(2),
-    marginRight: scale.wp(2),
-  },
-  discountText: {
-    color: '#10B981',
-    fontSize: scale.hp(1.75),
-    fontWeight: '700',
-  },
-  removePromoButton: {
-    padding: scale.hp(0.5),
-  },
-  removePromoText: {
-    color: '#EF4444',
-    fontSize: scale.hp(1.5),
-    fontWeight: '500',
-  },
   cardDetailsContainer: {
     marginTop: scale.hp(1),
   },
@@ -490,53 +331,12 @@ const styles = StyleSheet.create({
     fontSize: scale.hp(1.5),
     fontWeight: '500',
   },
-  altPaymentContainer: {
-    alignItems: 'center',
-    padding: scale.hp(2.5),
-    borderWidth: 1,
-    borderColor: '#F2DAD7',
-    borderRadius: scale.hp(1.5),
-    backgroundColor: '#FFF',
-    marginTop: scale.hp(2),
-  },
-  paymentLogo: {
-    width: scale.wp(15),
-    height: scale.wp(15),
-    marginBottom: scale.hp(2),
-  },
-  altPaymentText: {
-    fontSize: scale.hp(1.75),
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: scale.hp(2),
-    lineHeight: scale.hp(2.5),
-  },
-  paymentButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: scale.hp(1.5),
-    paddingHorizontal: scale.wp(6),
-    borderRadius: scale.hp(1),
-    width: '100%',
-  },
-  buttonIcon: {
-    width: scale.wp(5),
-    height: scale.wp(5),
-    marginRight: scale.wp(2.5),
-    tintColor: '#FFFFFF',
-  },
-  paymentButtonText: {
-    color: '#FFFFFF',
-    fontSize: scale.hp(2),
-    fontWeight: '600',
-  },
   errorText: {
-    color: '#DC2626',
+    color: '#EF4444',
     fontSize: scale.hp(1.5),
-    fontWeight: '500',
-    marginTop: scale.hp(0.5),
+    marginTop: scale.hp(1),
+    marginLeft: scale.wp(1),
   },
 });
 
-export default StepPay;
+export default StepPayBundle;

@@ -290,14 +290,14 @@ export default function ProfileScreen({ navigation }) {
                 subtitle={t('services.title')}
                 onPress={goMerchant}
               />
-              {/* <ProfileRow
+              <ProfileRow
   icon={
     <Ionicons name="pricetag-outline" size={22} color={Colors.primary} />
   }
   title={t('promoCodes')}
   subtitle={t('services.title')}
   onPress={() => navigation.navigate('PromoCodes')}
-/> */}
+/>
               <ProfileRow
                 icon={
                   <Ionicons name="refresh-circle-outline" size={22} color={Colors.primary} />

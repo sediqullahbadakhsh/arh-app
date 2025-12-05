@@ -93,7 +93,7 @@ export default function AgentViewScreen({ navigation, route }) {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white, paddingBottom: 65, }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white, paddingBottom: 120, }}>
       <ServiceHeader title="Agent Details" onBack={() => navigation.goBack()} />
       
       <ScrollView style={styles.container}>

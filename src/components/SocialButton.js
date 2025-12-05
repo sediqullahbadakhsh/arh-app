@@ -6,7 +6,7 @@ import { scale } from '../utils/normalizeSize';
 export default function SocialButton({ label, icon, onPress }) {
     return (
         <TouchableOpacity style={styles.button} onPress={onPress} activeOpacity={0.9}>
-            <View style={{ marginRight: 8 }}>{icon}</View>
+            <View style={{ marginEnd: 8 }}>{icon}</View>
             <Text style={styles.label}>{label}</Text>
         </TouchableOpacity>
     );

@@ -68,12 +68,12 @@ export const getDataProductsCustomer = async (filters = {}) => {
   }
 };
 
-// Get Bundle Categories for Customer
+
 export const getBundleCategories = () => {
   return api.get('/product-categories/customer').then((r) => r.data);
 };
 
-// Get Bundle Types for Customer
+
 export const getBundleTypes = () => {
   return api.get('/product-types/customer').then((r) => r.data);
 };

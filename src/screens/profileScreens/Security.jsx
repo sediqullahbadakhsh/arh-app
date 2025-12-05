@@ -215,7 +215,31 @@ const SecurityScreen = ({ navigation }) => {
                     </View>
                     <CustomToggle isEnabled={isBiometricEnabled} onToggle={handleBiometricToggle} />
                 </Pressable>
-
+<Pressable 
+  style={styles.optionRow}
+  onPress={changePassword}
+>
+  <View style={styles.optionLeft}>
+    <View style={[styles.iconWrapper, styles.passwordIcon]}>
+      <MaterialIcons 
+        name="lock" 
+        size={22} 
+        color="#fff" 
+      />
+    </View>
+    <View style={styles.optionText}>
+      <Text style={styles.optionTitle}>{t("changePassword")}</Text>
+      <Text style={styles.optionSubtitle}>
+        {t('updateYourPasswordRegularly')}
+      </Text>
+    </View>
+  </View>
+  <MaterialIcons 
+    name="chevron-right" 
+    size={24} 
+    color="#BDBDBD" 
+  />
+</Pressable>
              
             </View>
 
@@ -277,6 +301,9 @@ const styles = {
     shadowRadius: scale.hp(1.55),
     elevation: 3,
   },
+  passwordIcon: {
+  backgroundColor: '#CD0202',
+},
   optionLeft: {
     display: "flex",
     flexDirection: "row",

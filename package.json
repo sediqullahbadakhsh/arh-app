@@ -11,6 +11,7 @@
   "dependencies": {
     "@babel/runtime": "^7.28.4",
     "@expo/vector-icons": "^15.0.3",
+    "@gorhom/bottom-sheet": "^5.2.6",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/datetimepicker": "8.4.4",
     "@react-native-community/netinfo": "^11.4.1",
@@ -24,6 +25,7 @@
     "@tanstack/react-query": "^5.85.2",
     "axios": "^1.11.0",
     "buffer": "^6.0.3",
+    "date-fns": "^4.1.0",
     "engine.io-client": "^6.5.2",
     "events": "^3.3.0",
     "expo": "^54.0.6",
@@ -82,7 +84,9 @@
     "react-redux": "^9.2.0",
     "readable-stream": "^4.7.0",
     "socket.io-client": "^4.7.2",
-    "stream-browserify": "^3.0.0"
+    "stream-browserify": "^3.0.0",
+    "expo-haptics": "~15.0.7",
+    "expo-task-manager": "~14.0.8"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",

@@ -25,6 +25,7 @@ import { useTranslation } from "react-i18next";
 import { useLanguage } from "../../context/LanguageContext";
 import { DIAL_CODES } from "../../constants/dialing";
 import { scale } from "../../utils/normalizeSize";
+import { isRTL } from "../../utils/rtl";
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 
@@ -32,14 +33,11 @@ export default function CountrySelectScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { t, i18n } = useTranslation();
   const { selectedLang, LANGS, changeLanguage, isChangingLanguage, needsRestart } = useLanguage();
-  
   const [booting, setBooting] = useState(true);
   const [selectedCountry, setSelectedCountry] = useState(null);
-  
   const [countryModalVisible, setCountryModalVisible] = useState(false);
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-
   const countryModalAnim = useRef(new Animated.Value(screenHeight)).current;
   const languageModalAnim = useRef(new Animated.Value(screenHeight)).current;
   const lottieRef = useRef(null);
@@ -57,11 +55,9 @@ export default function CountrySelectScreen({ navigation }) {
     })();
   }, [navigation]);
 
-  // Handle app restart after language change
+
   useEffect(() => {
     if (needsRestart) {
-      // The app will restart automatically due to the LanguageAwareApp component
-      // Just close the modal and reset states
       setLanguageModalVisible(false);
       setSearchQuery('');
     }
@@ -72,11 +68,8 @@ export default function CountrySelectScreen({ navigation }) {
     
     try {
       await changeLanguage(lang);
-      // Don't close modal immediately - let the LanguageAwareApp handle the restart
-      // The modal will be closed in the needsRestart effect above
     } catch (error) {
       console.error('Error changing language:', error);
-      // If there's an error, ensure modal can be closed
       setLanguageModalVisible(false);
     }
   };
@@ -119,7 +112,6 @@ export default function CountrySelectScreen({ navigation }) {
     if (!selectedLang) return;
     
     try {
-      // Save selected country if needed
       if (selectedCountry) {
         await AsyncStorage.setItem("countryCode", selectedCountry.code);
       }
@@ -206,7 +198,7 @@ export default function CountrySelectScreen({ navigation }) {
         {renderFlag()}
         <View style={styles.languageInfo}>
           <Text style={styles.languageName}>{item.label}</Text>
-          <Text style={styles.languageCode}>{(item.code || item.value).toUpperCase()}</Text>
+          {/* <Text style={styles.languageCode}>{(item.code || item.value).toUpperCase()}</Text> */}
         </View>
         {isChangingLanguage && active ? (
           <ActivityIndicator size="small" color={Colors.primary} />
@@ -411,9 +403,9 @@ export default function CountrySelectScreen({ navigation }) {
                     )}
                     <View style={styles.fieldInfo}>
                       <Text style={styles.fieldPrimary}>{selectedLang.label}</Text>
-                      <Text style={styles.fieldSecondary}>
+                      {/* <Text style={styles.fieldSecondary}>
                         {(selectedLang.code || selectedLang.value).toUpperCase()}
-                      </Text>
+                      </Text> */}
                     </View>
                   </>
                 ) : (
@@ -556,13 +548,13 @@ const styles = StyleSheet.create({
   languageFlagSmall: {
     width: scale.wp(7),
     height: scale.hp(2.625),
-    marginRight: scale.wp(3),
+    marginEnd: scale.wp(3), 
     borderRadius: scale.hp(0.5),
   },
   flagPlaceholderSmall: {
     width: scale.wp(7),
     height: scale.hp(2.625),
-    marginRight: scale.wp(3),
+    marginEnd: scale.wp(3),
     backgroundColor: 'rgba(255,255,255,0.2)',
     borderRadius: scale.hp(0.5),
   },
@@ -679,13 +671,13 @@ const styles = StyleSheet.create({
   languageFlag: {
     width: scale.wp(6),
     height: scale.hp(2.25),
-    marginRight: scale.wp(3),
+     marginEnd: scale.wp(3), 
     borderRadius: scale.hp(0.375),
   },
   flagPlaceholder: {
     width: scale.wp(6),
     height: scale.hp(2.25),
-    marginRight: scale.wp(3),
+     marginEnd: scale.wp(3), 
     backgroundColor: '#F0F0F0',
     borderRadius: scale.hp(0.375),
   },

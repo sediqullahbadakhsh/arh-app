@@ -10,9 +10,11 @@ import MerchantApplicationScreen from "../screens/profileScreens/MerchantApllica
 import ApplicationResultScreen from "../screens/profileScreens/ApplicationResultScreen";
 import ProfileScreenMerchant from "../screens/ProfileScreenMerchant";
 import ReverseStockScreen from "../screens/profileScreensMerchant/ReverseStockScreen";
-import SupportScreen from "../screens/profileScreensMerchant/SupportScreen";
+// import SupportScreen from "../screens/profileScreensMerchant/SupportScreen";
 import ProfileDetailsScreenMerchant from "../screens/profileScreensMerchant/profile";
 import ReverseStockReportScreen from "../screens/profileScreensMerchant/ReverseStockReportScreen";
+import CreateTicketScreen from "../screens/profileScreensMerchant/CreateTicketScreen";
+import TicketsReportScreen from "../screens/profileScreensMerchant/TicketReportScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -26,6 +28,14 @@ export default function ProfileStackNavigatorMerchant() {
        <Stack.Screen
         name="ReverseStockScreen"
         component={ReverseStockScreen}
+      />
+       <Stack.Screen
+        name="CreateTicket"
+        component={CreateTicketScreen}
+      />
+         <Stack.Screen
+        name="TicketsReportScreen"
+        component={TicketsReportScreen}
       />
       <Stack.Screen 
   name="ReverseStockReportScreen" 
@@ -50,11 +60,11 @@ export default function ProfileStackNavigatorMerchant() {
   name="ApplicationResult" 
   component={ApplicationResultScreen} 
 />
-<Stack.Screen 
+{/* <Stack.Screen 
   name="SupportScreen" 
   component={SupportScreen}
   options={{ headerShown: false }}
-/>
+/> */}
       <Stack.Screen
         name="aboutAppScreen"
         component={AboutAppScreen}

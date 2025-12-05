@@ -17,12 +17,79 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import PrimaryButton from "../../components/PrimaryButton";
 import { useTranslation } from "react-i18next";
-import { getProductCategories, getDataProductsCustomer, activateDataBundleCustomer } from "../../services/merchantApi";
+import { getDataProducts, getDataProductsCustomer, getBundleCategories, getBundleTypes } from "../../services/merchantApi";
 import { getSetaraganMnoId } from "../../utils/getCompanyIdForSetaragan";
 import formatLocal from "../../utils/formatLocal";
 import { scale } from "../../utils/normalizeSize";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+// Skeleton Loader Component
+const SkeletonLoader = ({ type = 'card', count = 3 }) => {
+  if (type === 'card') {
+    return (
+      <View>
+        {Array.from({ length: count }).map((_, index) => (
+          <View key={index} style={ProductStyles.skeletonCard}>
+            {/* Card Header Skeleton */}
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 16 }}>
+              <View style={ProductStyles.skeletonImage} />
+              <View style={{ flex: 1 }}>
+                <View style={[ProductStyles.skeletonLine, { width: '70%', marginBottom: 8 }]} />
+                <View style={[ProductStyles.skeletonLine, { width: '90%', marginBottom: 8 }]} />
+                <View style={[ProductStyles.skeletonLine, { width: '80%' }]} />
+              </View>
+            </View>
+            
+            {/* Card Footer Skeleton */}
+            <View style={{ 
+              flexDirection: "row", 
+              justifyContent: "space-between", 
+              alignItems: "center",
+              paddingTop: 16,
+              borderTopWidth: 1,
+              borderTopColor: '#F5F5F5'
+            }}>
+              <View>
+                <View style={[ProductStyles.skeletonLine, { width: 100, height: 24 }]} />
+                <View style={[ProductStyles.skeletonLine, { width: 80, height: 14, marginTop: 4 }]} />
+              </View>
+              <View style={ProductStyles.skeletonChip} />
+            </View>
+          </View>
+        ))}
+      </View>
+    );
+  }
+
+  if (type === 'category') {
+    return (
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false} 
+        style={ProductStyles.categoriesScroll}
+      >
+        <View style={ProductStyles.categoriesContainer}>
+          {Array.from({ length: 5 }).map((_, index) => (
+            <View key={index} style={ProductStyles.skeletonCategoryChip} />
+          ))}
+        </View>
+      </ScrollView>
+    );
+  }
+
+  if (type === 'amount') {
+    return (
+      <View style={TopUpStyles.quickAmountsList}>
+        {Array.from({ length: 6 }).map((_, index) => (
+          <View key={index} style={TopUpStyles.skeletonAmountItem} />
+        ))}
+      </View>
+    );
+  }
+
+  return null;
+};
 
 const ProductStyles = {
   sectionTitle: {
@@ -238,124 +305,38 @@ const ProductStyles = {
     justifyContent: 'center',
     alignItems: 'center',
   },
-};
-
-const ModalStyles = {
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 0,
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  modalContainer: {
-    width: SCREEN_WIDTH * 0.85,
-    backgroundColor: Colors.white,
-    borderRadius: 24,
-    padding: 0,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 10,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    elevation: 10,
-    overflow: 'hidden',
-  },
-  modalHeader: {
-    alignItems: 'center',
-    paddingVertical: 30,
-    paddingHorizontal: 20,
-    backgroundColor: Colors.primary + '15',
-  },
-  iconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: Colors.primary + '20',
-    justifyContent: 'center',
-    alignItems: 'center',
+  // Skeleton Loader Styles
+  skeletonCard: {
+    borderRadius: 20,
+    backgroundColor: "#fff",
+    padding: 20,
     marginBottom: 16,
-  },
-  modalTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  modalSubtitle: {
-    fontSize: 16,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  modalContent: {
-    padding: 24,
-    alignItems: 'center',
-  },
-  featureList: {
-    width: '100%',
-    marginBottom: 24,
-  },
-  featureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    paddingHorizontal: 8,
-  },
-  featureIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: Colors.primary + '20',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  featureText: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    flex: 1,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    gap: 12,
-    width: '100%',
-  },
-  secondaryButton: {
-    flex: 1,
-    height: 50,
-    borderRadius: 12,
     borderWidth: 2,
-    borderColor: Colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'transparent',
+    borderColor: "#F0F0F0",
   },
-  secondaryButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.primary,
+  skeletonImage: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: '#F5F5F5',
   },
-  primaryButton: {
-    flex: 1,
-    height: 50,
-    borderRadius: 12,
-    backgroundColor: Colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
+  skeletonLine: {
+    height: 16,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 8,
   },
-  primaryButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.white,
+  skeletonChip: {
+    width: 80,
+    height: 32,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 20,
+  },
+  skeletonCategoryChip: {
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 30,
+    backgroundColor: '#F5F5F5',
+    minWidth: 100,
   },
 };
 
@@ -424,69 +405,8 @@ const extractFeatures = (description) => {
     features.push('Internet Bundle', 'Mobile Data');
   }
   
-  return features.slice(0, 3); // Limit to 3 features
+  return features.slice(0, 3); 
 };
-
-function ComingSoonModal({ visible, onClose, selectedProduct, localNumber }) {
-  const features = [
-    "Instant bundle activation",
-    "Real-time data allocation",
-    "Automatic balance update",
-    "Seamless network integration"
-  ];
-
-  return (
-    <Modal
-      visible={visible}
-      transparent={true}
-      animationType="fade"
-      onRequestClose={onClose}
-      statusBarTranslucent={true} 
-    >
-      <View style={ModalStyles.overlay}>
-        <View style={ModalStyles.modalContainer}>
-          <View style={ModalStyles.modalHeader}>
-            <View style={ModalStyles.iconContainer}>
-              <Ionicons name="time-outline" size={36} color={Colors.primary} />
-            </View>
-            <Text style={ModalStyles.modalTitle}>Coming Soon!</Text>
-            <Text style={ModalStyles.modalSubtitle}>
-              Bundle activation feature will be available soon
-            </Text>
-          </View>
-          
-          <View style={ModalStyles.modalContent}>
-            <View style={ModalStyles.featureList}>
-              {features.map((feature, index) => (
-                <View key={index} style={ModalStyles.featureItem}>
-                  <View style={ModalStyles.featureIcon}>
-                    <Ionicons name="checkmark" size={14} color={Colors.primary} />
-                  </View>
-                  <Text style={ModalStyles.featureText}>{feature}</Text>
-                </View>
-              ))}
-            </View>
-            
-            <View style={ModalStyles.modalActions}>
-              <TouchableOpacity 
-                style={ModalStyles.secondaryButton}
-                onPress={onClose}
-              >
-                <Text style={ModalStyles.secondaryButtonText}>Got It</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={ModalStyles.primaryButton}
-                onPress={onClose}
-              >
-                <Text style={ModalStyles.primaryButtonText}>Notify Me</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-}
 
 function BundleProductSelection({
   country,
@@ -496,125 +416,75 @@ function BundleProductSelection({
   onContinue,
   onActivateBundle
 }) {
-  const [productTypes, setProductTypes] = useState([]);
+  const [bundleCategories, setBundleCategories] = useState([]);
+  const [bundleTypes, setBundleTypes] = useState([]);
   const [products, setProducts] = useState([]);
-  const [productType, setProductType] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [selectedType, setSelectedType] = useState(null);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [activating, setActivating] = useState(false);
-  const [showComingSoon, setShowComingSoon] = useState(false);
-  const [selectedProductInfo, setSelectedProductInfo] = useState(null);
+  const [loadingCategories, setLoadingCategories] = useState(true);
+  const [loadingTypes, setLoadingTypes] = useState(true);
 
-useEffect(() => {
-  const fetchProductTypes = async () => {
-    try {
-      console.log("Fetching product types...");
-      const allProductsRes = await getDataProductsCustomer({
-        countryId: country?.id
-      });
-      
-      if (allProductsRes?.data) {
-        const uniqueProductTypes = [];
-        const seenTypes = new Set();
+  useEffect(() => {
+    const fetchBundleData = async () => {
+      try {
+        setLoadingCategories(true);
+        setLoadingTypes(true);
         
-        allProductsRes.data.forEach(product => {
-          // STRICTER BUNDLE FILTERING - Only show actual bundles
-          const isDataBundle = 
-            product.productName?.toLowerCase().includes('data') ||
-            product.productName?.toLowerCase().includes('bundle') ||
-            product.description?.toLowerCase().includes('data') ||
-            product.description?.toLowerCase().includes('bundle') ||
-            (product.productTypeDetails?.productType?.en?.toLowerCase().includes('data') ||
-             product.productTypeDetails?.productType?.en?.toLowerCase().includes('bundle')) ||
-            // Add more specific bundle indicators
-            product.productCategory?.toLowerCase().includes('data') ||
-            product.productCategory?.toLowerCase().includes('bundle');
-          
-          // EXCLUDE RECHARGE PRODUCTS
-          const isRecharge = 
-            product.productName?.toLowerCase().includes('topup') ||
-            product.productName?.toLowerCase().includes('recharge') ||
-            product.productName?.toLowerCase().includes('credit') ||
-            product.description?.toLowerCase().includes('topup') ||
-            product.description?.toLowerCase().includes('recharge') ||
-            product.description?.toLowerCase().includes('credit');
-          
-          if (isDataBundle && !isRecharge && product.productTypeDetails && product.productTypeDetails.id && !seenTypes.has(product.productTypeDetails.id)) {
-            seenTypes.add(product.productTypeDetails.id);
-            uniqueProductTypes.push({
-              id: product.productTypeDetails.id,
-              productType: product.productTypeDetails.productType || "Data Bundle",
-              description: product.productTypeDetails.description || ""
-            });
-          }
-        });
+        const [categoriesRes, typesRes] = await Promise.all([
+          getBundleCategories(),
+          getBundleTypes()
+        ]);
         
-        setProductTypes(uniqueProductTypes);
+        setBundleCategories(categoriesRes?.data || []);
+        setBundleTypes(typesRes?.data || []);
         
-        if (uniqueProductTypes.length > 0) {
-          setProductType(uniqueProductTypes[0]);
+        if (categoriesRes?.data?.length > 0 && !selectedCategory) {
+          setSelectedCategory(categoriesRes.data[0]);
         }
+        if (typesRes?.data?.length > 0 && !selectedType) {
+          setSelectedType(typesRes.data[0]);
+        }
+      } catch (error) {
+        console.error("Error loading bundle filters:", error);
+      } finally {
+        setLoadingCategories(false);
+        setLoadingTypes(false);
       }
-    } catch (error) {
-      console.error("Error fetching product types:", error);
-      Alert.alert("Error", "Failed to load product types");
-    }
-  };
+    };
 
-  if (country?.id) {
-    fetchProductTypes();
-  }
-}, [country]);
+    fetchBundleData();
+  }, []);
 
-useEffect(() => {
-  const getProducts = async () => {
-    if (!country?.id) return;
-    
-    try {
-      setLoading(true);
-      const filter = {
-        countryId: country.id
-      };
+  useEffect(() => {
+    const getProductsForAgent = async () => {
+      if (!country?.id) return;
       
-      const res = await getDataProductsCustomer(filter);
-      
-      // FILTER ONLY BUNDLE PRODUCTS
-      let filteredProducts = (res?.data || []).filter(product => {
-        const isDataBundle = 
-          product.productName?.toLowerCase().includes('data') ||
-          product.productName?.toLowerCase().includes('bundle') ||
-          product.description?.toLowerCase().includes('data') ||
-          product.description?.toLowerCase().includes('bundle') ||
-          (product.productTypeDetails?.productType?.en?.toLowerCase().includes('data') ||
-           product.productTypeDetails?.productType?.en?.toLowerCase().includes('bundle'));
-        
-        const isRecharge = 
-          product.productName?.toLowerCase().includes('topup') ||
-          product.productName?.toLowerCase().includes('recharge') ||
-          product.productName?.toLowerCase().includes('credit');
-        
-        return isDataBundle && !isRecharge;
-      });
-      
-      // Additional filtering by product type
-      if (productType?.id) {
-        filteredProducts = filteredProducts.filter(product => 
-          product.productTypeId === productType.id
-        );
+      try {
+        setLoading(true);
+        const filter = {
+          countryId: country?.id,
+          productCategoryId: selectedCategory?.id,
+          productTypeId: selectedType?.id,
+          productFor: "BUNDLE"
+        };
+        const res = await getDataProducts(filter);
+        console.log("Fetched Bundle Products:", res);
+        setProducts(res?.data || []);
+      } catch (error) {
+        console.error("Error fetching bundle products:", error);
+        setProducts([]);
+      } finally {
+        setLoading(false);
       }
-      
-      setProducts(filteredProducts);
-    } catch (error) {
-      console.error("Error fetching products:", error);
-      Alert.alert("Error", "Failed to load products");
-      setProducts([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
 
-  getProducts();
-}, [country, productType]);
+    if (selectedCategory && selectedType) {
+      getProductsForAgent();
+    }
+  }, [country, selectedCategory, selectedType]);
 
   const filteredProducts = products.filter((p) =>
     !search.trim() || 
@@ -623,50 +493,18 @@ useEffect(() => {
     p.price?.toString().includes(search.trim())
   );
 
-  const getProductTypeName = (typeItem) => {
-    if (!typeItem) return "";
-    
-    if (typeof typeItem.productType === 'string') {
-      return typeItem.productType;
-    } else if (typeItem.productType?.en) {
-      return typeItem.productType.en;
-    } else if (typeItem.productType) {
-      const firstKey = Object.keys(typeItem.productType)[0];
-      return typeItem.productType[firstKey];
-    }
-    
-    return typeItem.name || "Unknown Type";
-  };
-
-  const operatorLogo = React.useMemo(() => {
-    try {
-      const operatorId = getSetaraganMnoId(localNumber);
-      return getOperatorLogo(operatorId);
-    } catch (error) {
-      return OPERATOR_LOGOS.default;
-    }
-  }, [localNumber]);
-
   const handleProductSelect = async (selectedProduct) => {
     if (activating) return;
     
     setProduct(selectedProduct);
-    setSelectedProductInfo({
-      productName: selectedProduct.productName,
-      localNumber: localNumber
-    });
-
     setActivating(true);
-    setTimeout(() => {
-      setShowComingSoon(true);
-      setActivating(false);
-    }, 500);
-  };
 
-  const handleCloseComingSoon = () => {
-    setShowComingSoon(false);
-    setProduct(null);
-    setSelectedProductInfo(null);
+    setTimeout(() => {
+      setActivating(false);
+      if (onContinue) {
+        onContinue();
+      }
+    }, 300);
   };
 
   const renderProductImage = (item) => {
@@ -705,7 +543,7 @@ useEffect(() => {
           {renderProductImage(item)}
           <View style={ProductStyles.bundleInfo}>
             <Text style={[ProductStyles.bundleName, active && { color: Colors.primary }]}>
-              {item.productName}
+              {item.productName?.en || item.productName}
             </Text>
             <Text style={[ProductStyles.bundleDesc, active && { color: Colors.primary }]}>
               {item.description || "High-speed internet data bundle"}
@@ -748,36 +586,36 @@ useEffect(() => {
 
   return (
     <View style={{ flex: 1 }}>
-      <ComingSoonModal
-        visible={showComingSoon}
-        onClose={handleCloseComingSoon}
-        selectedProduct={selectedProductInfo}
-        localNumber={localNumber}
-      />
-
-      {productTypes.length > 0 && (
+      {/* Categories Skeleton */}
+      {loadingCategories ? (
         <>
+          <Text style={ProductStyles.smallLabel}>Category</Text>
+          <SkeletonLoader type="category" />
+        </>
+      ) : bundleCategories.length > 0 && (
+        <>
+          <Text style={ProductStyles.smallLabel}>Category</Text>
           <ScrollView 
             horizontal 
             showsHorizontalScrollIndicator={false} 
             style={ProductStyles.categoriesScroll}
           >
             <View style={ProductStyles.categoriesContainer}>
-              {productTypes.map((type) => (
+              {bundleCategories.map((category) => (
                 <TouchableOpacity
-                  key={type.id}
+                  key={category.id}
                   style={[
                     ProductStyles.categoryChip, 
-                    productType?.id === type.id && ProductStyles.categoryChipActive
+                    selectedCategory?.id === category.id && ProductStyles.categoryChipActive
                   ]}
-                  onPress={() => setProductType(type)}
+                  onPress={() => setSelectedCategory(category)}
                   disabled={activating}
                 >
                   <Text style={[
                     ProductStyles.categoryText, 
-                    productType?.id === type.id && ProductStyles.categoryTextActive
+                    selectedCategory?.id === category.id && ProductStyles.categoryTextActive
                   ]}>
-                    {getProductTypeName(type)}
+                    {category.category_name?.en || category.category_name || "Unknown"}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -786,11 +624,58 @@ useEffect(() => {
         </>
       )}
 
+      {/* Types Skeleton */}
+      {loadingTypes ? (
+        <>
+          <Text style={ProductStyles.smallLabel}>Type</Text>
+          <SkeletonLoader type="category" />
+        </>
+      ) : bundleTypes.length > 0 && (
+        <>
+          <Text style={ProductStyles.smallLabel}>Type</Text>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false} 
+            style={ProductStyles.categoriesScroll}
+          >
+            <View style={ProductStyles.categoriesContainer}>
+              {bundleTypes.map((type) => (
+                <TouchableOpacity
+                  key={type.id}
+                  style={[
+                    ProductStyles.categoryChip, 
+                    selectedType?.id === type.id && ProductStyles.categoryChipActive
+                  ]}
+                  onPress={() => setSelectedType(type)}
+                  disabled={activating}
+                >
+                  <Text style={[
+                    ProductStyles.categoryText, 
+                    selectedType?.id === type.id && ProductStyles.categoryTextActive
+                  ]}>
+                    {type.productType?.en || type.productType || "Unnamed Type"}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+        </>
+      )}
+
+      <View style={ProductStyles.searchContainer}>
+        <Ionicons name="search" size={20} color="#999" style={ProductStyles.searchIcon} />
+        <TextInput
+          placeholder="Search bundles..."
+          value={search}
+          onChangeText={setSearch}
+          style={ProductStyles.searchInput}
+          placeholderTextColor="#999"
+        />
+      </View>
+
+      {/* Products Skeleton */}
       {loading ? (
-        <View style={ProductStyles.loadingContainer}>
-          <Ionicons name="refresh" size={32} color={Colors.primary} />
-          <Text style={ProductStyles.loadingText}>Loading available bundles...</Text>
-        </View>
+        <SkeletonLoader type="card" count={3} />
       ) : (
         <FlatList
           data={filteredProducts}
@@ -802,10 +687,10 @@ useEffect(() => {
             <View style={ProductStyles.emptyProducts}>
               <Ionicons name="wifi-outline" size={64} color="#DDD" />
               <Text style={ProductStyles.emptyProductsText}>
-                {search ? "No bundles found for your search" : "No bundles available for this category"}
+                {search ? "No bundles found for your search" : "No bundles available for this category/type"}
               </Text>
               <Text style={[ProductStyles.emptyProductsText, { fontSize: 14, marginTop: 8 }]}>
-                Try selecting a different category or search term
+                Try selecting different categories or types
               </Text>
             </View>
           }
@@ -848,14 +733,6 @@ function StepAmount({
   const [customProduct, setCustomProduct] = useState(null);
   const [selectedPopularAmount, setSelectedPopularAmount] = useState(null);
   const [localCustomAfn, setLocalCustomAfn] = useState(customAfn || "");
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [lastRefresh, setLastRefresh] = useState(Date.now());
-
-  const forceRefreshProducts = () => {
-    console.log("🔄 Manual refresh triggered");
-    setRefreshKey(prev => prev + 1);
-    setLastRefresh(Date.now());
-  };
 
   useEffect(() => {
     setLocalCustomAfn(customAfn || "");
@@ -901,14 +778,12 @@ function StepAmount({
       
       try {
         setLoadingRechargeProducts(true);
-        console.log(`🔄 Fetching fresh recharge products (refresh #${refreshKey})`);
         
         const filter = { 
           countryId: country.id,
-          forceRefresh: refreshKey
         };
         
-        const res = await getDataProductsCustomer(filter, { force: true });
+        const res = await getDataProductsCustomer(filter);
         
         if (res?.data) {
           const rechargeProds = res.data.filter(product => {
@@ -921,7 +796,7 @@ function StepAmount({
             return !isDataBundle && parseFloat(product.price) > 0;
           });
           
-          console.log(`✅ Loaded ${rechargeProds.length} recharge products`);
+          console.log(`Loaded ${rechargeProds.length} recharge products`);
           setRechargeProducts(rechargeProds);
 
           const customTopupProduct = res.data.find(p => 
@@ -935,7 +810,7 @@ function StepAmount({
           }
         }
       } catch (error) {
-        console.error("❌ Error fetching recharge products:", error);
+        console.error("Error fetching recharge products:", error);
       } finally {
         setLoadingRechargeProducts(false);
       }
@@ -944,7 +819,7 @@ function StepAmount({
     if (serviceType === 'recharge' && country?.id) {
       fetchRechargeProducts();
     }
-  }, [country, serviceType, refreshKey]);
+  }, [country, serviceType]);
 
   const rechargeAmounts = React.useMemo(() => {
     if (rechargeProducts.length > 0) {
@@ -1057,45 +932,11 @@ function StepAmount({
     }
   };
 
-  const handleBundleActivated = () => {
-    setProduct(null);
-    if (onBundleActivated) {
-      onBundleActivated();
+  const handleBundleContinue = () => {
+    if (product && serviceType === 'bundle') {
+      console.log("Proceeding to bundle payment:", product);
+      onContinue();
     }
-  };
-
-  const getSlabBreakdown = (productItem = null) => {
-    const targetProduct = productItem || product;
-    if (!targetProduct) return null;
-
-    const slabPercent = targetProduct.slabDetails?.percentage || 0;
-    const servicePercent = targetProduct.serviceSlabDetails?.percentage || 0;
-    
-    if (slabPercent === 0 && servicePercent === 0) return null;
-
-    return { slabPercent, servicePercent };
-  };
-
-  const renderSlabInfo = (productItem = null) => {
-    const breakdown = getSlabBreakdown(productItem);
-    if (!breakdown) return null;
-
-    const { slabPercent, servicePercent } = breakdown;
-    
-    return (
-      <View style={AdditionalStyles.slabInfoContainer}>
-        {slabPercent > 0 && (
-          <Text style={AdditionalStyles.slabInfoText}>
-            Revenue Slab: +{slabPercent}%
-          </Text>
-        )}
-        {servicePercent > 0 && (
-          <Text style={AdditionalStyles.slabInfoText}>
-            Service Slab: +{servicePercent}%
-          </Text>
-        )}
-      </View>
-    );
   };
 
   return (
@@ -1130,7 +971,6 @@ function StepAmount({
           </Text>
         </TouchableOpacity>
       </View>
-
 
       <ScrollView 
         style={{ flex: 1 }}
@@ -1182,8 +1022,6 @@ function StepAmount({
               </TouchableOpacity>
             </View>
 
-            {/* {hasCustomAmount && customProduct && renderSlabInfo(customProduct)} */}
-
             {hasCustomAmount && (
               <View style={{ marginTop: 24 }}>
                 <PrimaryButton
@@ -1198,16 +1036,11 @@ function StepAmount({
                 <Text style={TopUpStyles.quickAmountsTitle}>{t('popularAmounts')}</Text>
                 
                 {loadingRechargeProducts ? (
-                  <View style={ProductStyles.emptyProducts}>
-                    <Ionicons name="refresh" size={32} color="#999" />
-                    <Text style={ProductStyles.emptyProductsText}>Loading amounts...</Text>
-                  </View>
+                  <SkeletonLoader type="amount" />
                 ) : (
                   <View style={TopUpStyles.quickAmountsList}>
                     {rechargeAmounts.map((amount) => {
                       const isSelected = selectedPopularAmount?.id === amount.id;
-                      const hasSlabs = amount.slabPercentage > 0 || amount.serviceSlabPercentage > 0;
-                      const showTotalAmount = amount.totalAfn > amount.afn;
                       
                       return (
                         <TouchableOpacity
@@ -1247,59 +1080,13 @@ function StepAmount({
             localNumber={localNumber}
             product={product}
             setProduct={setProduct}
-            onContinue={onContinue}
-            onActivateBundle={handleBundleActivated}
+            onContinue={handleBundleContinue}
+            onActivateBundle={onBundleActivated}
           />
         )}
       </ScrollView>
     </View>
   );
 }
-
-const AdditionalStyles = {
-  slabInfoContainer: {
-    marginTop: scale.hp(1),
-    padding: scale.hp(1),
-    backgroundColor: '#f8f9fa',
-    borderRadius: scale.hp(1),
-    borderLeftWidth: scale.wp(0.75),
-    borderLeftColor: Colors.primary,
-  },
-  slabInfoText: {
-    fontSize: scale.hp(1.5),
-    color: Colors.textSecondary,
-    marginBottom: scale.hp(0.25),
-  },
-  amountTotal: {
-    fontSize: scale.hp(1.4),
-    color: Colors.textSecondary,
-    fontWeight: '500',
-  },
-  amountTotalSelected: {
-    color: Colors.white,
-  },
-  slabBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.primary + '20',
-    paddingHorizontal: scale.wp(2),
-    paddingVertical: scale.hp(0.5),
-    borderRadius: scale.hp(1.5),
-    marginTop: scale.hp(0.5),
-  },
-  slabBadgeSelected: {
-    backgroundColor: Colors.primary + '40',
-  },
-  slabBadgeText: {
-    fontSize: scale.hp(1.25),
-    color: Colors.primary,
-    fontWeight: '600',
-    marginLeft: scale.wp(0.5),
-  },
-  slabBadgeTextSelected: {
-    color: Colors.white,
-  },
-
-};
 
 export default StepAmount;
