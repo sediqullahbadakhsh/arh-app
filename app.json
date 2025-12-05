@@ -4,7 +4,7 @@
     "slug": "arh",
     "version": "1.0.0",
     "orientation": "portrait",
-    "owner": "karim1224",
+    "owner": "karimjan",
     "icon": "./assets/icon.png",
     "assetBundlePatterns": [
       "**/*"
@@ -22,6 +22,10 @@
         "NSCameraUsageDescription": "Allow ARH to use your camera to capture verification photos.",
         "NSPhotoLibraryAddUsageDescription": "Allow ARH to save photos for your application.",
         "NSUserTrackingUsageDescription": "This identifier will be used to deliver personalized ads to you.",
+        "UIBackgroundModes": [
+          "remote-notification",
+          "fetch"
+        ],
         "SKAdNetworkItems": [
           {
             "SKAdNetworkIdentifier": "v9wttpbfk9.skadnetwork"
@@ -44,7 +48,13 @@
         "INTERNET",
         "ACCESS_NETWORK_STATE",
         "CAMERA",
-        "WRITE_EXTERNAL_STORAGE"
+        "WRITE_EXTERNAL_STORAGE",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "WAKE_LOCK",
+        "SCHEDULE_EXACT_ALARM",
+        "USE_FULL_SCREEN_INTENT",
+        "POST_NOTIFICATIONS"
       ],
       "usesCleartextTraffic": true
     },
@@ -53,12 +63,27 @@
     },
     "extra": {
       "eas": {
-        "projectId": "38589898-6912-4328-8434-33fbfb422422"
+        "projectId": "e3c89cdd-c15f-4ed0-bc51-aea1646077ca"
       }
     },
     "plugins": [
       "expo-localization",
       "expo-font",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#ffffff",
+          "sounds": ["./assets/notification-sound.wav"],
+          "defaultChannel": {
+            "name": "default",
+            "importance": "max",
+            "sound": "default",
+            "enableVibrate": true
+          },
+          "mode": "production"
+        }
+      ],
       [
         "expo-build-properties",
         {
@@ -73,12 +98,15 @@
                 "3.67.144.22",
                 "localhost",
                 "10.0.2.2",
-                "127.0.0.1"
+                "127.0.0.1",
+                "exp.host",
+                "*.exp.host"
               ]
             }
           },
           "ios": {
-            "deploymentTarget": "15.1"
+            "deploymentTarget": "15.1",
+            "useFrameworks": "static"
           }
         }
       ],

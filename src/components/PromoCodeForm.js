@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -18,21 +18,33 @@ import { saveFiles } from "../utils/imageHelpers";
 const PromoCodeForm = ({ onSubmit, loading, existingData }) => {
   const { t } = useTranslation();
   const [formData, setFormData] = useState({
-    WhatsApp_number: existingData?.WhatsApp_number || "",
-    facebook_link: existingData?.facebook_link || "",
-    tiktok_link: existingData?.tiktok_link || "",
-    instagram_link: existingData?.instagram_link || "",
+    WhatsApp_number: "",
+    facebook_link: "",
+    tiktok_link: "",
+    instagram_link: "",
     document: null,
   });
   const [errors, setErrors] = useState({});
   const [uploading, setUploading] = useState(false);
 
+  useEffect(() => {
+    if (existingData) {
+      setFormData({
+        WhatsApp_number: existingData.WhatsApp_number || "",
+        facebook_link: existingData.facebook_link || "",
+        tiktok_link: existingData.tiktok_link || "",
+        instagram_link: existingData.instagram_link || "",
+        document: existingData.document || null,
+      });
+    }
+  }, [existingData]);
+
   const validateForm = () => {
     const newErrors = {};
 
-    // if (!formData.WhatsApp_number.trim()) {
-    //   newErrors.WhatsApp_number = t('promoCode.errors.whatsappRequired');
-    // }
+    if (!formData.WhatsApp_number.trim()) {
+      newErrors.WhatsApp_number = t('promoCode.errors.whatsappRequired');
+    }
 
     // if (!formData.facebook_link.trim()) {
     //   newErrors.facebook_link = t('promoCode.errors.facebookRequired');
@@ -115,18 +127,65 @@ const PromoCodeForm = ({ onSubmit, loading, existingData }) => {
 
   const canEdit = !existingData || existingData.status === 'pending';
 
+  const getStatusConfig = () => {
+    if (!existingData) return null;
+    
+    switch (existingData.status) {
+      case 'accepted':
+        return {
+          icon: "checkmark-circle",
+          color: "#4CAF50",
+          backgroundColor: "#E8F5E8",
+          message: t('promoCode.applicationApproved')
+        };
+      case 'rejected':
+        return {
+          icon: "close-circle",
+          color: "#F44336",
+          backgroundColor: "#FFEBEE",
+          message: t('promoCode.applicationRejected')
+        };
+      case 'pending':
+        return {
+          icon: "time",
+          color: "#FF9800",
+          backgroundColor: "#FFF3E0",
+          message: t('promoCode.applicationPending')
+        };
+      default:
+        return null;
+    }
+  };
+
+  const statusConfig = getStatusConfig();
+
   return (
     <ScrollView 
       style={styles.container}
       contentContainerStyle={styles.contentContainer}
       showsVerticalScrollIndicator={false}
     >
-      <View style={styles.formSection}>
-        <Text style={styles.sectionTitle}>{t('promoCode.socialMediaLinks')}</Text>
-        <Text style={styles.sectionSubtitle}>
-          {t('promoCode.socialMediaDescription')}
-        </Text>
+      {/* Status Display */}
+      {statusConfig && (
+        <View style={[styles.statusMessage, { backgroundColor: statusConfig.backgroundColor }]}>
+          <Ionicons name={statusConfig.icon} size={24} color={statusConfig.color} />
+          <Text style={styles.statusMessageText}>{statusConfig.message}</Text>
+        </View>
+      )}
 
+      {/* Application Instructions */}
+      <View style={styles.instructionsContainer}>
+        <Ionicons name="information-circle" size={20} color={Colors.primary} />
+        <Text style={styles.instructionsText}>
+          {existingData 
+            ? t('promoCode.editApplicationDescription')
+            : t('promoCode.newApplicationDescription')
+          }
+        </Text>
+      </View>
+
+      {/* Form Fields */}
+      <View style={styles.formSection}>
         {/* WhatsApp Number */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>
@@ -143,7 +202,8 @@ const PromoCodeForm = ({ onSubmit, loading, existingData }) => {
               value={formData.WhatsApp_number}
               onChangeText={(text) => handleChange("WhatsApp_number", text)}
               keyboardType="phone-pad"
-              editable={canEdit}
+              editable={canEdit && !loading}
+              placeholderTextColor="#999"
             />
           </View>
           {errors.WhatsApp_number && (
@@ -167,7 +227,8 @@ const PromoCodeForm = ({ onSubmit, loading, existingData }) => {
               value={formData.facebook_link}
               onChangeText={(text) => handleChange("facebook_link", text)}
               autoCapitalize="none"
-              editable={canEdit}
+              editable={canEdit && !loading}
+              placeholderTextColor="#999"
             />
           </View>
           {errors.facebook_link && (
@@ -191,7 +252,8 @@ const PromoCodeForm = ({ onSubmit, loading, existingData }) => {
               value={formData.tiktok_link}
               onChangeText={(text) => handleChange("tiktok_link", text)}
               autoCapitalize="none"
-              editable={canEdit}
+              editable={canEdit && !loading}
+              placeholderTextColor="#999"
             />
           </View>
           {errors.tiktok_link && (
@@ -215,7 +277,8 @@ const PromoCodeForm = ({ onSubmit, loading, existingData }) => {
               value={formData.instagram_link}
               onChangeText={(text) => handleChange("instagram_link", text)}
               autoCapitalize="none"
-              editable={canEdit}
+              editable={canEdit && !loading}
+              placeholderTextColor="#999"
             />
           </View>
           {errors.instagram_link && (
@@ -227,23 +290,30 @@ const PromoCodeForm = ({ onSubmit, loading, existingData }) => {
         <View style={styles.inputGroup}>
           <Text style={styles.label}>
             {t('promoCode.document')}
+            <Text style={styles.optionalText}> ({t('common.optional')})</Text>
           </Text>
           <TouchableOpacity
-            style={styles.uploadButton}
+            style={[
+              styles.uploadButton,
+              !canEdit && styles.uploadButtonDisabled
+            ]}
             onPress={handleDocumentUpload}
-            disabled={!canEdit || uploading}
+            disabled={!canEdit || uploading || loading}
           >
             {uploading ? (
               <ActivityIndicator size="small" color={Colors.primary} />
             ) : (
               <>
                 <Ionicons 
-                  name="document-attach" 
+                  name={formData.document ? "checkmark-circle" : "document-attach"} 
                   size={20} 
-                  color={Colors.primary} 
+                  color={formData.document ? "#4CAF50" : Colors.primary} 
                   style={styles.uploadIcon} 
                 />
-                <Text style={styles.uploadText}>
+                <Text style={[
+                  styles.uploadText,
+                  formData.document && styles.uploadTextSuccess
+                ]}>
                   {formData.document 
                     ? t('promoCode.documentUploaded') 
                     : t('promoCode.uploadDocument')
@@ -257,56 +327,49 @@ const PromoCodeForm = ({ onSubmit, loading, existingData }) => {
               {t('promoCode.document')}: {formData.document}
             </Text>
           )}
+          <Text style={styles.helpText}>
+            {t('promoCode.documentHelp')}
+          </Text>
         </View>
-
-        {/* Status Message */}
-        {existingData && (
-          <View style={[
-            styles.statusMessage,
-            existingData.status === 'accepted' && styles.statusAccepted,
-            existingData.status === 'rejected' && styles.statusRejected,
-            existingData.status === 'pending' && styles.statusPending,
-          ]}>
-            <Ionicons 
-              name={
-                existingData.status === 'accepted' ? "checkmark-circle" :
-                existingData.status === 'rejected' ? "close-circle" : "time"
-              } 
-              size={20} 
-              color={
-                existingData.status === 'accepted' ? "#4CAF50" :
-                existingData.status === 'rejected' ? "#F44336" : "#FF9800"
-              } 
-            />
-            <Text style={styles.statusMessageText}>
-              {existingData.status === 'accepted' ? t('promoCode.applicationApproved') :
-               existingData.status === 'rejected' ? t('promoCode.applicationRejected') :
-               t('promoCode.applicationPending')}
-            </Text>
-          </View>
-        )}
 
         {/* Submit Button */}
         {canEdit && (
           <TouchableOpacity
             style={[
               styles.submitButton,
-              loading && styles.submitButtonDisabled
+              (loading || uploading) && styles.submitButtonDisabled
             ]}
             onPress={handleSubmit}
-            disabled={loading}
+            disabled={loading || uploading}
           >
             {loading ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color="#fff" size="small" />
             ) : (
               <>
-                <Ionicons name="send" size={20} color="#fff" />
+                <Ionicons 
+                  name={existingData ? "refresh" : "send"} 
+                  size={20} 
+                  color="#fff" 
+                />
                 <Text style={styles.submitButtonText}>
-                  {existingData ? t('promoCode.updateApplication') : t('promoCode.submitApplication')}
+                  {existingData 
+                    ? t('promoCode.updateApplication') 
+                    : t('promoCode.submitApplication')
+                  }
                 </Text>
               </>
             )}
           </TouchableOpacity>
+        )}
+
+        {/* Read-only Notice */}
+        {!canEdit && existingData && (
+          <View style={styles.readOnlyNotice}>
+            <Ionicons name="lock-closed" size={16} color="#666" />
+            <Text style={styles.readOnlyText}>
+              {t('promoCode.applicationLocked')}
+            </Text>
+          </View>
         )}
       </View>
     </ScrollView>
@@ -316,24 +379,46 @@ const PromoCodeForm = ({ onSubmit, loading, existingData }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    marginBottom: 100,
+    backgroundColor: Colors.white,
   },
   contentContainer: {
-    padding: 20,
+    paddingBottom: 20,
   },
-  formSection: {
-    marginBottom: 30,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: Colors.textPrimary,
+  statusMessage: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    margin: 16,
+    borderRadius: 8,
     marginBottom: 8,
   },
-  sectionSubtitle: {
+  statusMessageText: {
+    marginLeft: 12,
     fontSize: 14,
+    fontWeight: "500",
+    flex: 1,
+  },
+  instructionsContainer: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "#E3F2FD",
+    padding: 12,
+    margin: 16,
+    marginTop: 0,
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.primary,
+  },
+  instructionsText: {
+    marginLeft: 8,
+    fontSize: 12,
     color: Colors.textSecondary,
-    marginBottom: 20,
-    lineHeight: 20,
+    flex: 1,
+    lineHeight: 16,
+  },
+  formSection: {
+    padding: 16,
   },
   inputGroup: {
     marginBottom: 20,
@@ -343,6 +428,10 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: Colors.textPrimary,
     marginBottom: 8,
+  },
+  optionalText: {
+    color: Colors.textSecondary,
+    fontWeight: "normal",
   },
   inputContainer: {
     flexDirection: "row",
@@ -373,12 +462,17 @@ const styles = StyleSheet.create({
   uploadButton: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     borderWidth: 2,
     borderColor: Colors.primary,
     borderStyle: "dashed",
     borderRadius: 8,
     padding: 16,
-    backgroundColor: "#FFF5F5",
+    backgroundColor: "#F8F9FA",
+  },
+  uploadButtonDisabled: {
+    borderColor: "#E0E0E0",
+    backgroundColor: "#F5F5F5",
   },
   uploadIcon: {
     marginRight: 10,
@@ -387,31 +481,20 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontWeight: "500",
   },
+  uploadTextSuccess: {
+    color: "#4CAF50",
+  },
   documentName: {
     fontSize: 12,
     color: Colors.textSecondary,
     marginTop: 8,
     fontStyle: "italic",
   },
-  statusMessage: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 20,
-  },
-  statusAccepted: {
-    backgroundColor: "#E8F5E8",
-  },
-  statusRejected: {
-    backgroundColor: "#FFEBEE",
-  },
-  statusPending: {
-    backgroundColor: "#FFF3E0",
-  },
-  statusMessageText: {
-    marginLeft: 8,
-    fontWeight: "500",
+  helpText: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginTop: 4,
+    fontStyle: "italic",
   },
   submitButton: {
     flexDirection: "row",
@@ -420,7 +503,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     padding: 16,
     borderRadius: 8,
-    marginTop: 10,
+    marginTop: 20,
   },
   submitButtonDisabled: {
     opacity: 0.6,
@@ -430,6 +513,21 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     fontSize: 16,
     marginLeft: 8,
+  },
+  readOnlyNotice: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 16,
+    backgroundColor: "#F5F5F5",
+    borderRadius: 8,
+    marginTop: 20,
+  },
+  readOnlyText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: Colors.textSecondary,
+    fontStyle: "italic",
   },
 });
 

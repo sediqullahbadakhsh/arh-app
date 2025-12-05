@@ -20,13 +20,18 @@ import ValidationModal from "../../components/ValidationModal";
 import { useModal } from "../../hooks/useModal";
 import PromoCodeForm from "../../components/PromoCodeForm";
 import PromoCodeUsage from "../../components/PromoCodeUsage";
+
 import { 
   getCustomerPromoCodeStatus, 
   getCustomerPromoCodeUsage,
-  applyForPromoCode 
+  applyForPromoCode,
+  updatePromoCodeRequest,
+  createCashbackRequest,
+  getCustomerCashbackRequests,
 } from "../../services/promoCodeApi";
 import ServiceHeader from "../../components/ServiceHeader";
 import { scale } from "../../utils/normalizeSize";
+import CashbackRequests from "../../components/CashbackRequests";
 
 export default function PromoCodesScreen({ navigation }) {
   const { user } = useAuth();
@@ -38,24 +43,47 @@ export default function PromoCodesScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [statusData, setStatusData] = useState(null);
   const [usageData, setUsageData] = useState([]);
+  const [cashbackData, setCashbackData] = useState([]);
+  const [error, setError] = useState(null);
 
   const fetchPromoCodeData = async () => {
     try {
       setLoading(true);
+      setError(null);
+      
       const [statusResponse, usageResponse] = await Promise.all([
         getCustomerPromoCodeStatus(),
-        getCustomerPromoCodeUsage()
+        getCustomerPromoCodeUsage(),
       ]);
 
       if (statusResponse.status) {
         setStatusData(statusResponse.data);
+      } else {
+        setStatusData(null);
       }
 
       if (usageResponse.status) {
         setUsageData(usageResponse.data || []);
+      } else {
+        setUsageData([]);
       }
+
+      if (statusResponse.data?.status === 'accepted' && statusResponse.data?.promoCode) {
+        try {
+          const cashbackResponse = await getCustomerCashbackRequests();
+          if (cashbackResponse.status) {
+            setCashbackData(cashbackResponse.data || []);
+          }
+        } catch (cashbackError) {
+          console.error("Error fetching cashback data:", cashbackError);
+        }
+      } else {
+        setCashbackData([]);
+      }
+
     } catch (error) {
       console.error("Error fetching promo code data:", error);
+      setError(t('errors.loadData'));
       showModal(t('error'), t('errors.loadData'));
     } finally {
       setLoading(false);
@@ -65,6 +93,7 @@ export default function PromoCodesScreen({ navigation }) {
 
   const onRefresh = () => {
     setRefreshing(true);
+    setError(null);
     fetchPromoCodeData();
   };
 
@@ -75,18 +104,58 @@ export default function PromoCodesScreen({ navigation }) {
   const handleApplySubmit = async (formData) => {
     try {
       setLoading(true);
-      const response = await applyForPromoCode(formData);
+      setError(null);
+      
+      let response;
+      let successMessage;
+      
+      if (statusData && statusData.status === 'pending') {
+        response = await updatePromoCodeRequest(statusData.id, formData);
+        successMessage = t('promoCode.requestUpdated');
+      } else {
+        response = await applyForPromoCode(formData);
+        successMessage = t('promoCode.applicationSubmitted');
+      }
       
       if (response.status) {
-        showModal(t('success'), t('promoCode.applicationSubmitted'));
+        showModal(t('success'), successMessage);
         fetchPromoCodeData();
         setActiveTab("usage");
       } else {
-        showModal(t('error'), response.error || t('errors.somethingWentWrong'));
+        const errorMessage = response.error || t('errors.somethingWentWrong');
+        setError(errorMessage);
+        showModal(t('error'), errorMessage);
       }
     } catch (error) {
       console.error("Error applying for promo code:", error);
-      showModal(t('error'), t('errors.somethingWentWrong'));
+      const errorMessage = t('errors.somethingWentWrong');
+      setError(errorMessage);
+      showModal(t('error'), errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCashbackRequest = async (cashbackData) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await createCashbackRequest(cashbackData);
+      
+      if (response.status) {
+        showModal(t('success'), t('promoCode.cashbackRequestSubmitted'));
+        fetchPromoCodeData();
+      } else {
+        const errorMessage = response.error || t('errors.somethingWentWrong');
+        setError(errorMessage);
+        showModal(t('error'), errorMessage);
+      }
+    } catch (error) {
+      console.error("Error creating cashback request:", error);
+      const errorMessage = t('errors.somethingWentWrong');
+      setError(errorMessage);
+      showModal(t('error'), errorMessage);
     } finally {
       setLoading(false);
     }
@@ -110,50 +179,84 @@ export default function PromoCodesScreen({ navigation }) {
     }
   };
 
+  const canEditRequest = statusData && statusData.status === 'pending';
+  const hasApprovedPromoCode = statusData && statusData.status === 'accepted' && statusData.promoCode;
+
   return (
     <SafeAreaView style={styles.safeArea}>
-              <ServiceHeader 
-                title={t('promoCodes')}
-                onBack={() => navigation.goBack()} 
-              />
+      <ServiceHeader 
+        title={t('promoCodes')}
+        onBack={() => navigation.goBack()} 
+      />
+      
       <ValidationModal
         visible={modal.visible}
         title={modal.title}
         message={modal.message}
         onClose={hideModal}
       />
-    
 
-
-        {statusData && (
-          <View style={styles.statusCard}>
+      {statusData && (
+        <View style={styles.statusCard}>
+          <View style={styles.statusHeader}>
             <Text style={styles.statusTitle}>{t('promoCode.currentStatus')}</Text>
-            <View style={styles.statusRow}>
-              <View style={[styles.statusIndicator, { backgroundColor: getStatusColor(statusData.status) }]} />
-              <Text style={styles.statusText}>
-                {getStatusText(statusData.status)}
-              </Text>
-            </View>
-            {statusData.admin_notes && (
-              <Text style={styles.adminNotes}>
-                {t('promoCode.adminNotes')}: {statusData.admin_notes}
-              </Text>
-            )}
-            {statusData.promoCode && (
-              <View style={styles.promoCodeDisplay}>
-                <Text style={styles.promoCodeLabel}>{t('promoCode.yourPromoCode')}:</Text>
-                <Text style={styles.promoCodeValue}>{statusData.promoCode.code}</Text>
-                <Text style={styles.promoCodeDetails}>
-                  {t('promoCode.discount')}: {statusData.promoCode.discount_value}
-                  {statusData.promoCode.discount_type === 'percentage' ? '%' : '$'}
-                </Text>
+            {canEditRequest && (
+              <View style={styles.editBadge}>
+                <Ionicons name="create-outline" size={scale.hp(1.7)} color={Colors.primary} />
+                <Text style={styles.editBadgeText}>{t('common.editable')}</Text>
               </View>
             )}
           </View>
-        )}
-  
+          
+          <View style={styles.statusRow}>
+            <View style={[styles.statusIndicator, { backgroundColor: getStatusColor(statusData.status) }]} />
+            <Text style={styles.statusText}>
+              {getStatusText(statusData.status)}
+            </Text>
+          </View>
+          
+          {statusData.admin_notes && (
+            <View style={styles.adminNotesContainer}>
+              <Text style={styles.adminNotesLabel}>{t('promoCode.adminNotes')}:</Text>
+              <Text style={styles.adminNotes}>{statusData.admin_notes}</Text>
+            </View>
+          )}
+          
+          {statusData.promoCode && (
+            <View style={styles.promoCodeDisplay}>
+              <Text style={styles.promoCodeLabel}>{t('promoCode.yourPromoCode')}:</Text>
+              <Text style={styles.promoCodeValue}>{statusData.promoCode.code}</Text>
+              <View style={styles.promoCodeDetails}>
+                <Text style={styles.promoCodeDetail}>
+                  {t('promoCode.discount')}: {statusData.promoCode.discount_value}
+                  {statusData.promoCode.discount_type === 'percentage' ? '%' : '$'}
+                </Text>
+                {statusData.promoCode.max_discount && (
+                  <Text style={styles.promoCodeDetail}>
+                    {t('promoCode.maxDiscount')}: ${statusData.promoCode.max_discount}
+                  </Text>
+                )}
+                {statusData.promoCode.min_order_amount && (
+                  <Text style={styles.promoCodeDetail}>
+                    {t('promoCode.minOrder')}: ${statusData.promoCode.min_order_amount}
+                  </Text>
+                )}
+              </View>
+            </View>
+          )}
+        </View>
+      )}
 
- 
+      {error && (
+        <View style={styles.errorContainer}>
+          <Ionicons name="warning-outline" size={scale.hp(2.4)} color="#F44336" />
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity onPress={() => setError(null)}>
+            <Ionicons name="close" size={scale.hp(2.4)} color="#F44336" />
+          </TouchableOpacity>
+        </View>
+      )}
+
       <View style={styles.tabContainer}>
         <TouchableOpacity
           style={[styles.tab, activeTab === "apply" && styles.activeTab]}
@@ -163,6 +266,7 @@ export default function PromoCodesScreen({ navigation }) {
             {t('promoCode.applyForPromo')}
           </Text>
         </TouchableOpacity>
+        
         <TouchableOpacity
           style={[styles.tab, activeTab === "usage" && styles.activeTab]}
           onPress={() => setActiveTab("usage")}
@@ -171,8 +275,18 @@ export default function PromoCodesScreen({ navigation }) {
             {t('promoCode.usage')} ({usageData.length})
           </Text>
         </TouchableOpacity>
+        
+        {hasApprovedPromoCode && (
+          <TouchableOpacity
+            style={[styles.tab, activeTab === "cashback" && styles.activeTab]}
+            onPress={() => setActiveTab("cashback")}
+          >
+            <Text style={[styles.tabText, activeTab === "cashback" && styles.activeTabText]}>
+              {t('promoCode.cashback')} ({cashbackData.length})
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
-
 
       <View style={styles.content}>
         {loading && !refreshing ? (
@@ -186,11 +300,20 @@ export default function PromoCodesScreen({ navigation }) {
             loading={loading}
             existingData={statusData}
           />
-        ) : (
+        ) : activeTab === "usage" ? (
           <PromoCodeUsage 
             data={usageData}
             refreshing={refreshing}
             onRefresh={onRefresh}
+          />
+        ) : (
+          <CashbackRequests
+            data={cashbackData}
+            onSubmit={handleCashbackRequest}
+            loading={loading}
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            promoCode={statusData?.promoCode}
           />
         )}
       </View>
@@ -201,80 +324,124 @@ export default function PromoCodesScreen({ navigation }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    paddingBottom: scale.hp(13),
     backgroundColor: Colors.white,
   },
-  headerContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  backButton: {
-    padding: scale.hp(0.65),
-  },
-  headerTitle: {
-    color: Colors.white,
-    fontSize: scale.hp(2.6),
-    fontWeight: "600",
-  },
-  headerRight: {
-    width: scale.wp(6.2),
-  },
   statusCard: {
-    backgroundColor: "rgba(255, 255, 255, 0.9)",
-    borderRadius: scale.hp(1.55),
-    padding: scale.hp(2.1),
-    marginTop: scale.hp(1.3),
+    backgroundColor: Colors.white,
+    margin: scale.hp(2),
+    marginBottom: scale.hp(1),
+    padding: scale.hp(2),
+    borderRadius: scale.wp(2.5),
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: scale.hp(0.25),
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: scale.wp(1),
+    elevation: 5,
+    borderLeftWidth: scale.wp(1),
+    borderLeftColor: Colors.primary,
+  },
+  statusHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: scale.hp(1),
   },
   statusTitle: {
-    fontSize: scale.hp(2.1),
+    fontSize: scale.hp(2.2),
     fontWeight: "600",
     color: Colors.textPrimary,
-    marginBottom: scale.hp(1.05),
+  },
+  editBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#E3F2FD",
+    paddingHorizontal: scale.wp(2),
+    paddingVertical: scale.hp(0.5),
+    borderRadius: scale.wp(3),
+  },
+  editBadgeText: {
+    fontSize: scale.hp(1.4),
+    color: Colors.primary,
+    fontWeight: "500",
+    marginLeft: scale.wp(1),
   },
   statusRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: scale.hp(1.05),
+    marginBottom: scale.hp(1),
   },
   statusIndicator: {
-    width: scale.wp(3.1),
-    height: scale.wp(3.1),
-    borderRadius: scale.wp(1.55),
+    width: scale.wp(3),
+    height: scale.wp(3),
+    borderRadius: scale.wp(1.5),
     marginRight: scale.wp(2),
   },
   statusText: {
-    fontSize: scale.hp(1.8),
+    fontSize: scale.hp(1.9),
     fontWeight: "500",
     color: Colors.textPrimary,
   },
+  adminNotesContainer: {
+    marginTop: scale.hp(1),
+    padding: scale.hp(1),
+    backgroundColor: "#FFF3E0",
+    borderRadius: scale.wp(1.5),
+  },
+  adminNotesLabel: {
+    fontSize: scale.hp(1.4),
+    fontWeight: "500",
+    color: Colors.textPrimary,
+    marginBottom: scale.hp(0.25),
+  },
   adminNotes: {
-    fontSize: scale.hp(1.55),
-    color: "#666",
+    fontSize: scale.hp(1.4),
+    color: Colors.textSecondary,
     fontStyle: "italic",
-    marginTop: scale.hp(0.5),
   },
   promoCodeDisplay: {
-    marginTop: scale.hp(1.55),
-    paddingTop: scale.hp(1.55),
+    marginTop: scale.hp(1.5),
+    paddingTop: scale.hp(1.5),
     borderTopWidth: 1,
     borderTopColor: "#f0f0f0",
   },
   promoCodeLabel: {
-    fontSize: scale.hp(1.8),
+    fontSize: scale.hp(1.7),
     fontWeight: "500",
     color: Colors.textPrimary,
     marginBottom: scale.hp(0.5),
   },
   promoCodeValue: {
-    fontSize: scale.hp(2.35),
+    fontSize: scale.hp(2.4),
     fontWeight: "bold",
     color: Colors.primary,
-    marginBottom: scale.hp(0.5),
+    marginBottom: scale.hp(1),
   },
   promoCodeDetails: {
-    fontSize: scale.hp(1.55),
-    color: "#666",
+    gap: scale.hp(0.5),
+  },
+  promoCodeDetail: {
+    fontSize: scale.hp(1.4),
+    color: Colors.textSecondary,
+  },
+  errorContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFEBEE",
+    padding: scale.hp(1.5),
+    margin: scale.hp(2),
+    marginTop: 0,
+    borderRadius: scale.wp(2),
+    borderLeftWidth: scale.wp(1),
+    borderLeftColor: "#F44336",
+  },
+  errorText: {
+    fontSize: scale.hp(1.7),
+    color: "#D32F2F",
+    marginLeft: scale.wp(2),
+    flex: 1,
   },
   tabContainer: {
     flexDirection: "row",
@@ -288,16 +455,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   activeTab: {
-    borderBottomWidth: 2,
+    borderBottomWidth: scale.hp(0.25),
     borderBottomColor: Colors.primary,
   },
   tabText: {
-    fontSize: scale.hp(1.8),
+    fontSize: scale.hp(1.7),
     fontWeight: "500",
     color: "#666",
+    textAlign: "center",
   },
   activeTabText: {
     color: Colors.primary,
+    fontWeight: "600",
   },
   content: {
     flex: 1,
@@ -309,7 +478,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   loadingText: {
-    marginTop: scale.hp(1.3),
+    marginTop: scale.hp(1.5),
     color: Colors.textSecondary,
+    fontSize: scale.hp(1.7),
   },
 });

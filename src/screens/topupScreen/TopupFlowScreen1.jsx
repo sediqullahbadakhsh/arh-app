@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from "react";
+import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import {
   SafeAreaView,
   View,
@@ -29,7 +29,7 @@ import ServiceHeader from "../../components/ServiceHeader";
 import PrimaryButton from "../../components/PrimaryButton";
 import { codeToFlag } from "../../utils/flag";
 import { DIAL_CODES, guessOperator } from "../../constants/dialing";
-import { getCountries, makeRecharge, getCurrencies, getSlabs, getOrderStatus } from "../../services/customerAPIOrder";
+import { getCountries, makeRecharge, getCurrencies, getSlabs, getOrderStatus, activateBundleByCustomer } from "../../services/customerAPIOrder";
 import { getSetaraganMnoId } from "../../utils/getCompanyIdForSetaragan";
 import * as Contacts from 'expo-contacts';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -37,11 +37,13 @@ import StepCountry from "./StepCountry";
 import StepNumber from "./StepNumber";
 import StepAmount from "./StepAmount";
 import StepPay from "./StepPay";
+import StepPayBundle from "./StepPayBundle";
 import TopUpStyles from "./TopupStyle";
 import formatLocal from "../../utils/formatLocal";
 import { useTranslation } from "react-i18next";
 import { useStripe } from "@stripe/stripe-react-native";
 import { scale } from "../../utils/normalizeSize";
+import { validatePromoCode } from "../../services/promoCodeApi";
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 const BASE_STEPS = { COUNTRY: 0, NUMBER: 1, AMOUNT: 2, PAY: 3 };
@@ -53,6 +55,95 @@ const ORDER_STATUS = {
   FAILED: 'failed',
   PENDING: 'pending'
 };
+
+// Move PromoCodeModal outside the main component
+const PromoCodeModal = React.memo(({ 
+  visible, 
+  onClose, 
+  promoCode = "", 
+  setPromoCode, 
+  validatingPromo, 
+  promoError = "", 
+  onApply 
+}) => {
+  const { t } = useTranslation();
+  
+  const handleTextChange = useCallback((text) => {
+    setPromoCode(text.toUpperCase());
+  }, [setPromoCode]);
+
+  const handleApply = useCallback(() => {
+    onApply?.();
+  }, [onApply]);
+
+  const handleClose = useCallback(() => {
+    onClose?.();
+  }, [onClose]);
+
+  return (
+    <Modal
+      visible={visible}
+      transparent={true}
+      animationType="slide"
+      onRequestClose={handleClose}
+    >
+      <View style={modalStyles.modalOverlay}>
+        <View style={modalStyles.modalContent}>
+          <View style={modalStyles.modalHeader}>
+            <Text style={modalStyles.modalTitle}>{t('promoCode.applyPromo')}</Text>
+            <TouchableOpacity onPress={handleClose} style={modalStyles.closeButton}>
+              <Text style={modalStyles.closeButtonText}>×</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={modalStyles.promoInputContainer}>
+            <TextInput
+              style={modalStyles.promoInput}
+              placeholder={t('promoCode.enterCodePlaceholder')}
+              value={promoCode}
+              onChangeText={handleTextChange}
+              placeholderTextColor="#999"
+              autoCapitalize="characters"
+              autoFocus={true}
+            />
+          </View>
+
+          {promoError ? (
+            <View style={modalStyles.errorContainer}>
+              <Text style={modalStyles.errorText}>{promoError}</Text>
+            </View>
+          ) : null}
+
+          <View style={modalStyles.modalButtons}>
+            <TouchableOpacity 
+              style={[modalStyles.modalButton, modalStyles.cancelButton]} 
+              onPress={handleClose}
+              disabled={validatingPromo}
+            >
+              <Text style={modalStyles.cancelButtonText}>{t('cancel')}</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[
+                modalStyles.modalButton, 
+                modalStyles.applyButton, 
+                (!promoCode.trim() || validatingPromo) && modalStyles.disabledButton
+              ]} 
+              onPress={handleApply}
+              disabled={!promoCode.trim() || validatingPromo}
+            >
+              {validatingPromo ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={modalStyles.applyButtonText}>{t('promoCode.apply')}</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+});
 
 export default function TopupFlowScreen({ navigation, route }) {
   const { t } = useTranslation();
@@ -88,10 +179,17 @@ export default function TopupFlowScreen({ navigation, route }) {
   const continueButtonAnim = useRef(new Animated.Value(0)).current;
   const pollingRef = useRef(null);
   const lottieRef = useRef(null);
-
+  const [promoModalVisible, setPromoModalVisible] = useState(false);
+  const [promoCode, setPromoCode] = useState("");
+  const [appliedPromoCode, setAppliedPromoCode] = useState(null);
+  const [validatingPromo, setValidatingPromo] = useState(false);
+  const [promoError, setPromoError] = useState("");
+  const [discountAmount, setDiscountAmount] = useState(0);
+  const [finalAmount, setFinalAmount] = useState(0);
+  
+  console.log(exchangeRate, "this is exchange rate")
   const dial = DIAL_CODES[country?.countryCode] || "";
   const operator = guessOperator(country?.countryCode, localNumber.replace(/\D/g, ""));
-
 
   const calculateTotalAfnAmount = (baseAfn, productItem = null) => {
     const baseAmount = parseFloat(baseAfn) || 0;
@@ -103,12 +201,10 @@ export default function TopupFlowScreen({ navigation, route }) {
 
     let totalAmount = baseAmount;
     
-
     if (targetProduct.slabDetails?.percentage) {
       totalAmount += baseAmount * (targetProduct.slabDetails.percentage / 100);
     }
     
-
     if (targetProduct.serviceSlabDetails?.percentage) {
       totalAmount += baseAmount * (targetProduct.serviceSlabDetails.percentage / 100);
     }
@@ -148,7 +244,6 @@ export default function TopupFlowScreen({ navigation, route }) {
     return parseFloat(totalFee.toFixed(2));
   };
 
-
   const getActualAfnAmount = () => {
     if (product && product.price) {
       return parseFloat(product.price);
@@ -162,62 +257,96 @@ export default function TopupFlowScreen({ navigation, route }) {
   const afn = getActualAfnAmount();
   const totalAfn = calculateTotalAfnAmount(afn);
   const usd = calculateUsdAmount(afn);
+
   useEffect(() => {
-  console.log("Topup1 route params:", route.params);
-  console.log("Current step:", step);
-  
+    const originalUsd = calculateUsdAmount(getActualAfnAmount());
+    const newFinalAmount = Math.max(0, originalUsd - discountAmount);
+    setFinalAmount(parseFloat(newFinalAmount.toFixed(2)));
+  }, [usd, discountAmount, product, customAfn, exchangeRate]);
 
-  const resendOrder = route.params?.resendOrder;
-  console.log("Resend order detected:", resendOrder);
-  
-  if (resendOrder) {
-    console.log("Processing resend order:", resendOrder);
-    
- 
-    if (resendOrder.receiver) {
-      const cleanNumber = resendOrder.receiver.replace(/\D/g, "");
-      console.log("Setting local number to:", cleanNumber);
-      setLocalNumber(cleanNumber);
+  const handleApplyPromoCode = async () => {
+    if (!promoCode.trim()) {
+      setPromoError(t('promoCode.enterCode'));
+      return;
     }
-    
 
-    if (resendOrder.amount) {
-      const amount = parseFloat(resendOrder.amount);
-      if (!isNaN(amount) && amount > 0) {
-        console.log("Setting custom AFN to:", amount);
-        setCustomAfn(amount.toString());
-        setProduct(null);
+    setValidatingPromo(true);
+    setPromoError("");
+
+    try {
+      const orderAmount = getActualAfnAmount();
+      const response = await validatePromoCode({
+        code: promoCode.trim(),
+        orderAmount: orderAmount
+      });
+
+      if (response.status) {
+        let discount = 0;
+        const baseUsdAmount = calculateUsdAmount(getActualAfnAmount());
+        
+        if (response.discount_type === 'percentage') {
+          discount = (baseUsdAmount * response.discount_value) / 100;
+        } else {
+          discount = response.discount_value;
+        }
+
+        if (response.max_discount && discount > response.max_discount) {
+          discount = response.max_discount;
+        }
+
+        setDiscountAmount(discount);
+        setAppliedPromoCode({
+          code: promoCode.trim(),
+          discount_type: response.discount_type,
+          discount_value: response.discount_value,
+          discount_amount: discount
+        });
+        
+        setPromoModalVisible(false);
+        Alert.alert(t('success'), t('promoCode.appliedSuccessfully'));
+      } else {
+        setPromoError(response.error || t('promoCode.invalidCode'));
       }
+    } catch (error) {
+      console.error('Error validating promo code:', error);
+      setPromoError(t('promoCode.validationError'));
+    } finally {
+      setValidatingPromo(false);
     }
+  };
+
+  const handleRemovePromoCode = () => {
+    setAppliedPromoCode(null);
+    setDiscountAmount(0);
+    setPromoError("");
+  };
+
+  const openPromoModal = () => {
+    setPromoModalVisible(true);
+    setPromoError("");
+  };
+
+  const closePromoModal = () => {
+    setPromoModalVisible(false);
+    setPromoError("");
+  };
+
+  useEffect(() => {
+    console.log("Topup1 route params:", route.params);
+    console.log("Current step:", step);
     
-
-    setTimeout(() => {
-      console.log("Auto-proceeding to AMOUNT step");
-      setStep(BASE_STEPS.AMOUNT);
-    }, 500);
-  }
-}, [route.params?.resendOrder]); 
-
-
-useEffect(() => {
-  const resendOrder = route.params?.resendOrder;
-  if (resendOrder) {
-    console.log("Resend order detected - resetting flow");
+    const resendOrder = route.params?.resendOrder;
+    console.log("Resend order detected:", resendOrder);
     
- 
-    setStep(BASE_STEPS.COUNTRY);
-    setProduct(null);
-    setCustomAfn("");
-    
-
-    setTimeout(() => {
+    if (resendOrder) {
+      console.log("Processing resend order:", resendOrder);
+      
       if (resendOrder.receiver) {
         const cleanNumber = resendOrder.receiver.replace(/\D/g, "");
         console.log("Setting local number to:", cleanNumber);
         setLocalNumber(cleanNumber);
       }
       
-   
       if (resendOrder.amount) {
         const amount = parseFloat(resendOrder.amount);
         if (!isNaN(amount) && amount > 0) {
@@ -226,14 +355,47 @@ useEffect(() => {
           setProduct(null);
         }
       }
-
+      
       setTimeout(() => {
-        console.log("Auto-proceeding to AMOUNT step after reset");
+        console.log("Auto-proceeding to AMOUNT step");
         setStep(BASE_STEPS.AMOUNT);
-      }, 300);
-    }, 100);
-  }
-}, [route.params?.resendOrder]);
+      }, 500);
+    }
+  }, [route.params?.resendOrder]);
+
+  useEffect(() => {
+    const resendOrder = route.params?.resendOrder;
+    if (resendOrder) {
+      console.log("Resend order detected - resetting flow");
+      
+      setStep(BASE_STEPS.COUNTRY);
+      setProduct(null);
+      setCustomAfn("");
+      
+      setTimeout(() => {
+        if (resendOrder.receiver) {
+          const cleanNumber = resendOrder.receiver.replace(/\D/g, "");
+          console.log("Setting local number to:", cleanNumber);
+          setLocalNumber(cleanNumber);
+        }
+        
+        if (resendOrder.amount) {
+          const amount = parseFloat(resendOrder.amount);
+          if (!isNaN(amount) && amount > 0) {
+            console.log("Setting custom AFN to:", amount);
+            setCustomAfn(amount.toString());
+            setProduct(null);
+          }
+        }
+
+        setTimeout(() => {
+          console.log("Auto-proceeding to AMOUNT step after reset");
+          setStep(BASE_STEPS.AMOUNT);
+        }, 300);
+      }, 100);
+    }
+  }, [route.params?.resendOrder]);
+
   useEffect(() => {
     return () => {
       if (pollingRef.current) {
@@ -254,7 +416,6 @@ useEffect(() => {
       setBundleActivated(false);
     }, 2000);
   };
-
 
   const startPollingOrderStatus = async (orderId) => {
     if (pollingRef.current) {
@@ -473,7 +634,6 @@ useEffect(() => {
         }
       } catch (error) {
         console.error("Error fetching data:", error);
-        setExchangeRate(0.012);
         setSlabPercentage(0);
       } finally {
         setLoadingData(false);
@@ -521,7 +681,7 @@ useEffect(() => {
     )
     : countries;
 
-   const canNext =
+  const canNext =
     (step === BASE_STEPS.COUNTRY && !!country) ||
     (step === BASE_STEPS.NUMBER && localNumber.replace(/\D/g, "").length === 9 && validateMobileNumber(localNumber).isValid) ||
     (step === BASE_STEPS.AMOUNT && serviceType === 'recharge' && afn > 0) ||
@@ -541,10 +701,6 @@ useEffect(() => {
       });
       return;
     }
-    if (step === BASE_STEPS.AMOUNT && serviceType === 'bundle') {
-      Alert.alert(t('comingSoon'), t('bundleComingSoon'));
-      return;
-    }
     setStep(step + 1);
   };
 
@@ -554,25 +710,20 @@ useEffect(() => {
     setLocalNumber("");
   }, [country?.countryCode]);
 
-
   const handleSelectPopularAmount = (selectedAmount) => {
     console.log("Popular amount selected:", selectedAmount);
     
-  
     if (selectedAmount.product) {
       setProduct(selectedAmount.product);
     }
     
-
     setCustomAfn("");
     
-
     setTimeout(() => {
       console.log("Auto-proceeding to payment...");
       setStep(BASE_STEPS.PAY);
     }, 100);
   };
-
 
   const recharge = async () => {
     if (!paymentMethodId) {
@@ -591,12 +742,13 @@ useEffect(() => {
         return;
       }
 
- 
       if (afn <= 0) {
         Alert.alert("Invalid Amount", "Please enter a valid amount greater than 0");
         setLoading(false);
         return;
       }
+
+      const originalUsdAmount = calculateUsdAmount(afn);
 
       const payload = {
         amount: afn,
@@ -604,17 +756,21 @@ useEffect(() => {
         countryId: country?.id,
         currency: "AFN",
         operator: operatorId,
-        productId: product?.id || 1,
+        productId: product?.id || null,
         receiver: localNumber.replace(/\D/g, ""),
         source: "stripe_card",
         cardCurrency: "USD",
-        cardAmount: usd,
+        cardAmount: finalAmount, 
         confirmNow: true,
         paymentMethodId: paymentMethodId,
         customAmount: customAfn || afn,
+        serviceType: serviceType,
+        promo_code: appliedPromoCode?.code || null,
+        finalDiscountAmount: finalAmount,
+        promodiscountamoun: discountAmount,
       };
 
-      console.log("Sending recharge payload:", payload);
+      console.log("Sending recharge payload with promo code:", payload);
 
       const response = await makeRecharge(payload);
       
@@ -625,9 +781,13 @@ useEffect(() => {
           txnNumber: response.txnNumber,
           mobile: `${dial} ${formatLocal(localNumber)}`,
           amountAfn: afn,
-          usdAmount: usd,
+          usdAmount: finalAmount, 
+          originalUsdAmount: originalUsdAmount, 
+          discountAmount: discountAmount,
+          promoCode: appliedPromoCode?.code,
           date: new Date().toISOString(),
           operator: operator?.name || "Unknown",
+          serviceType: serviceType,
         });
         
         await startPollingOrderStatus(response.orderId);
@@ -642,9 +802,13 @@ useEffect(() => {
             txnNumber: response.txnNumber,
             mobile: `${dial} ${formatLocal(localNumber)}`,
             amountAfn: afn,
-            usdAmount: usd,
+            usdAmount: finalAmount,
+            originalUsdAmount: originalUsdAmount,
+            discountAmount: discountAmount,
+            promoCode: appliedPromoCode?.code,
             date: new Date().toISOString(),
             operator: operator?.name || "Unknown",
+            serviceType: serviceType,
           });
           
           await startPollingOrderStatus(response.orderId);
@@ -660,30 +824,104 @@ useEffect(() => {
       setOrderStatus(ORDER_STATUS.FAILED);
       setOrderDetails({
         mobile: `${dial} ${formatLocal(localNumber)}`,
-        amountAfn: afn,
-        usdAmount: usd,
+        amountAfn: serviceType === 'bundle' ? (product?.price || 0) : afn,
+        usdAmount: finalAmount,
+        originalUsdAmount: originalUsdAmount,
+        discountAmount: discountAmount,
+        promoCode: appliedPromoCode?.code,
+        productName: serviceType === 'bundle' ? product?.productName : undefined,
         date: new Date().toISOString(),
         operator: operator?.name || "Unknown",
-        error: message
+        error: message,
+        serviceType: serviceType,
       });
     }
     setLoading(false);
   };
 
-
-  const getPaymentSummary = () => {
-    const baseAmount = calculateBaseAmount(afn);
-    const feeAmount = calculateFeeAmount(afn);
-    const totalUsd = calculateUsdAmount(afn);
+  const getPaymentSummaryForBundle = () => {
+    const baseAfn = serviceType === 'bundle' && product ? parseFloat(product.price) : afn;
+    const baseAmount = calculateBaseAmount(baseAfn);
+    const feeAmount = calculateFeeAmount(baseAfn);
+    const totalUsd = calculateUsdAmount(baseAfn);
     
-
     const slabPercent = product?.slabDetails?.percentage || 0;
     const serviceSlabPercent = product?.serviceSlabDetails?.percentage || 0;
     
     return {
       mobile: `${dial} ${formatLocal(localNumber)}`,
       usd: totalUsd,
-      afn: afn,
+      afn: baseAfn,
+      totalAfn: calculateTotalAfnAmount(baseAfn),
+      exchangeRate,
+      slabPercentage: slabPercent,
+      serviceSlabPercentage: serviceSlabPercent,
+      calculateBaseAmount: () => baseAmount,
+      calculateFeeAmount: () => feeAmount,
+      baseAmount: baseAmount,
+      feeAmount: feeAmount,
+      totalAmount: totalUsd,
+      product: product,
+      serviceType: serviceType,
+      finalAmount: finalAmount,
+      discountAmount: discountAmount,
+      appliedPromoCode: appliedPromoCode,
+      onApplyPromoCode: handleApplyPromoCode,
+      onRemovePromoCode: handleRemovePromoCode,
+      openPromoModal: openPromoModal,
+      closePromoModal: closePromoModal,
+      validatingPromo: validatingPromo,
+      promoError: promoError
+    };
+  };
+
+  const getPaymentSummaryForRecharge = () => {
+    let baseAfn = 0;
+    let baseAmount = 0;
+    let feeAmount = 0;
+    let totalUsd = 0;
+    let totalAfn = 0;
+
+    if (serviceType === 'bundle' && product) {
+      baseAfn = parseFloat(product.price) || 0;
+      baseAmount = calculateBaseAmount(baseAfn);
+      feeAmount = calculateFeeAmount(baseAfn, product);
+      totalUsd = calculateUsdAmount(baseAfn, product);
+      totalAfn = calculateTotalAfnAmount(baseAfn, product);
+    } else if (serviceType === 'recharge') {
+      if (product && product.id) {
+        baseAfn = parseFloat(product.price) || 0;
+        baseAmount = calculateBaseAmount(baseAfn);
+        feeAmount = calculateFeeAmount(baseAfn, product);
+        totalUsd = calculateUsdAmount(baseAfn, product);
+        totalAfn = calculateTotalAfnAmount(baseAfn, product);
+      } else {
+        baseAfn = getActualAfnAmount();
+        baseAmount = calculateBaseAmount(baseAfn);
+        feeAmount = calculateFeeAmount(baseAfn);
+        totalUsd = calculateUsdAmount(baseAfn);
+        totalAfn = calculateTotalAfnAmount(baseAfn);
+      }
+    }
+
+    const slabPercent = product?.slabDetails?.percentage || 0;
+    const serviceSlabPercent = product?.serviceSlabDetails?.percentage || 0;
+    
+    console.log("Payment Summary:", {
+      serviceType,
+      hasProduct: !!product,
+      baseAfn,
+      baseAmount,
+      feeAmount,
+      totalUsd,
+      totalAfn,
+      product: product?.productName
+    });
+
+    return {
+      mobile: `${dial} ${formatLocal(localNumber)}`,
+      usd: totalUsd,
+      afn: baseAfn,
       totalAfn: totalAfn,
       exchangeRate,
       slabPercentage: slabPercent,
@@ -693,7 +931,17 @@ useEffect(() => {
       baseAmount: baseAmount,
       feeAmount: feeAmount,
       totalAmount: totalUsd,
-      product: product
+      product: product,
+      serviceType: serviceType,
+      finalAmount: finalAmount,
+      discountAmount: discountAmount,
+      appliedPromoCode: appliedPromoCode,
+      onApplyPromoCode: handleApplyPromoCode,
+      onRemovePromoCode: handleRemovePromoCode,
+      openPromoModal: openPromoModal,
+      closePromoModal: closePromoModal,
+      validatingPromo: validatingPromo,
+      promoError: promoError
     };
   };
 
@@ -706,6 +954,13 @@ useEffect(() => {
     setLocalNumber("");
     setCardDetailsComplete(false);
     setPaymentMethodId(null);
+    setAppliedPromoCode(null);
+    setDiscountAmount(0);
+    setFinalAmount(0);
+    setPromoCode("");
+    setPromoError("");
+    setPromoModalVisible(false);
+    
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
       pollingRef.current = null;
@@ -737,14 +992,22 @@ useEffect(() => {
   const getStatusMessage = () => {
     switch (orderStatus) {
       case ORDER_STATUS.QUEUED:
-        return "Your topup has been queued and will be processed shortly.";
+        return serviceType === 'bundle' 
+          ? "Your bundle activation request has been submitted and payment processed. Our backoffice team will activate your bundle shortly."
+          : "Your topup has been queued and will be processed shortly.";
       case ORDER_STATUS.PROCESSING:
       case ORDER_STATUS.PENDING:
-        return "Your topup is being processed. Please wait...";
+        return serviceType === 'bundle'
+          ? "Your bundle activation is being processed by our backoffice team. Please wait..."
+          : "Your topup is being processed. Please wait...";
       case ORDER_STATUS.SUCCEEDED:
-        return "Topup completed successfully! ";
+        return serviceType === 'bundle'
+          ? "Bundle activated successfully! Our team has processed your request."
+          : "Topup completed successfully! ";
       case ORDER_STATUS.FAILED:
-        return "Topup failed. ";
+        return serviceType === 'bundle'
+          ? "Bundle activation failed. Please contact support if this continues."
+          : "Topup failed. ";
       default:
         return "Processing your request...";
     }
@@ -797,14 +1060,14 @@ useEffect(() => {
   const getStatusTitle = () => {
     switch (orderStatus) {
       case ORDER_STATUS.QUEUED:
-        return "Topup Queued";
+        return serviceType === 'bundle' ? "Request Submitted" : "Topup Queued";
       case ORDER_STATUS.PROCESSING:
       case ORDER_STATUS.PENDING:
-        return "Processing Topup";
+        return serviceType === 'bundle' ? "Processing Request" : "Processing Topup";
       case ORDER_STATUS.SUCCEEDED:
-        return "Topup Successful!";
+        return serviceType === 'bundle' ? "Bundle Activated!" : "Topup Successful!";
       case ORDER_STATUS.FAILED:
-        return "Topup Failed";
+        return serviceType === 'bundle' ? "Activation Failed" : "Topup Failed";
       default:
         return "Processing";
     }
@@ -974,7 +1237,7 @@ useEffect(() => {
                     setCountrySearch('');
                   }}
                 >
-                  <Text style={{ fontSize: 24, marginRight: 12 }}>
+                  <Text style={{ fontSize: 24, marginEnd: 12 }}>
                     {codeToFlag(item.countryCode)}
                   </Text>
                   <View style={{ flex: 1 }}>
@@ -995,93 +1258,92 @@ useEffect(() => {
     );
   };
 
-const OrderStatusScreen = () => {
-  const receiptCaptureRef = useRef(null);
-  const [hasMediaPermission, setHasMediaPermission] = useState(false);
-  const [isCapturing, setIsCapturing] = useState(false);
+  const OrderStatusScreen = () => {
+    const receiptCaptureRef = useRef(null);
+    const [hasMediaPermission, setHasMediaPermission] = useState(false);
+    const [isCapturing, setIsCapturing] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      setHasMediaPermission(status === 'granted');
-    })();
-  }, []);
+    useEffect(() => {
+      (async () => {
+        const { status } = await MediaLibrary.requestPermissionsAsync();
+        setHasMediaPermission(status === 'granted');
+      })();
+    }, []);
 
-  const captureReceipt = async () => {
-    try {
-      setIsCapturing(true);
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      if (receiptCaptureRef.current) {
-        console.log('Capturing receipt...');
-        const uri = await captureRef(receiptCaptureRef.current, {
-          format: 'png',
-          quality: 1.0,
-          result: 'tmpfile',
-        });
+    const captureReceipt = async () => {
+      try {
+        setIsCapturing(true);
+        await new Promise(resolve => setTimeout(resolve, 100));
         
-        console.log('Receipt captured successfully:', uri);
-        return uri;
-      } else {
-        throw new Error('Receipt capture ref not available');
-      }
-    } catch (error) {
-      console.error('Error capturing receipt:', error);
-      throw error;
-    } finally {
-      setIsCapturing(false);
-    }
-  };
-
-  const shareReceipt = async () => {
-    try {
-      if (isCapturing) {
-        Alert.alert('Please Wait', 'Preparing receipt for sharing...');
-        return;
-      }
-
-      console.log('Starting receipt capture for sharing...');
-      const receiptUri = await captureReceipt();
-      
-      if (receiptUri) {
-        console.log('Sharing receipt URI:', receiptUri);
-        
-        if (await Sharing.isAvailableAsync()) {
-          console.log('Using expo-sharing directly...');
-          await Sharing.shareAsync(receiptUri, {
-            mimeType: 'image/png',
-            dialogTitle: 'Share Receipt',
-            UTI: 'public.png'
+        if (receiptCaptureRef.current) {
+          console.log('Capturing receipt...');
+          const uri = await captureRef(receiptCaptureRef.current, {
+            format: 'png',
+            quality: 1.0,
+            result: 'tmpfile',
           });
+          
+          console.log('Receipt captured successfully:', uri);
+          return uri;
         } else {
-          let shareUri = receiptUri;
-          if (Platform.OS === 'android') {
-            if (!receiptUri.startsWith('file://') && !receiptUri.startsWith('content://')) {
-              shareUri = `file://${receiptUri}`;
-            }
-          } else {
-            if (!receiptUri.startsWith('file://')) {
-              shareUri = `file://${receiptUri}`;
-            }
-          }
-
-          const shareOptions = {
-            url: shareUri,
-            type: 'image/png',
-            title: 'Share Receipt'
-          };
-
-          await Share.share(shareOptions);
+          throw new Error('Receipt capture ref not available');
         }
-        
-      } else {
-        throw new Error('Failed to capture receipt');
+      } catch (error) {
+        console.error('Error capturing receipt:', error);
+        throw error;
+      } finally {
+        setIsCapturing(false);
       }
-    } catch (error) {
-      console.error('Error sharing receipt:', error);
-      
-      // Fallback to text sharing
-      const receiptText = `
+    };
+
+    const shareReceipt = async () => {
+      try {
+        if (isCapturing) {
+          Alert.alert('Please Wait', 'Preparing receipt for sharing...');
+          return;
+        }
+
+        console.log('Starting receipt capture for sharing...');
+        const receiptUri = await captureReceipt();
+        
+        if (receiptUri) {
+          console.log('Sharing receipt URI:', receiptUri);
+          
+          if (await Sharing.isAvailableAsync()) {
+            console.log('Using expo-sharing directly...');
+            await Sharing.shareAsync(receiptUri, {
+              mimeType: 'image/png',
+              dialogTitle: 'Share Receipt',
+              UTI: 'public.png'
+            });
+          } else {
+            let shareUri = receiptUri;
+            if (Platform.OS === 'android') {
+              if (!receiptUri.startsWith('file://') && !receiptUri.startsWith('content://')) {
+                shareUri = `file://${receiptUri}`;
+              }
+            } else {
+              if (!receiptUri.startsWith('file://')) {
+                shareUri = `file://${receiptUri}`;
+              }
+            }
+
+            const shareOptions = {
+              url: shareUri,
+              type: 'image/png',
+              title: 'Share Receipt'
+            };
+
+            await Share.share(shareOptions);
+          }
+          
+        } else {
+          throw new Error('Failed to capture receipt');
+        }
+      } catch (error) {
+        console.error('Error sharing receipt:', error);
+        
+        const receiptText = `
 🎫 Transaction Receipt
 Total Amount: ${orderDetails?.amountAfn} AFN
 Receiver: ${orderDetails?.mobile}
@@ -1090,260 +1352,243 @@ Date & Time: ${new Date(orderDetails?.date).toLocaleString()}
 Transaction ID: ${orderDetails?.txnNumber}
 
 Thank you for using our service!
-      `.trim();
+        `.trim();
 
-      await Share.share({
-        message: receiptText,
-        title: 'Transaction Receipt',
-      });
-    }
-  };
-
-  const downloadReceipt = async () => {
-    try {
-      if (isCapturing) {
-        Alert.alert('Please Wait', 'Preparing receipt for download...');
-        return;
+        await Share.share({
+          message: receiptText,
+          title: 'Transaction Receipt',
+        });
       }
+    };
 
-      if (!hasMediaPermission) {
-        Alert.alert(
-          'Permission Required',
-          'Please grant media library permissions to download receipts',
-          [{ text: 'OK' }]
-        );
-        return;
-      }
-
-      console.log('Starting receipt capture for download...');
-      const receiptUri = await captureReceipt();
-      
-      if (receiptUri) {
-        console.log('Downloading receipt:', receiptUri);
-        
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const filename = `Receipt-${orderDetails?.txnNumber}-${timestamp}.png`;
-        
-        const asset = await MediaLibrary.createAssetAsync(receiptUri);
-        const album = await MediaLibrary.getAlbumAsync('Receipts');
-        
-        if (album) {
-          await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
-        } else {
-          await MediaLibrary.createAlbumAsync('Receipts', asset, false);
+    const downloadReceipt = async () => {
+      try {
+        if (isCapturing) {
+          Alert.alert('Please Wait', 'Preparing receipt for download...');
+          return;
         }
+
+        if (!hasMediaPermission) {
+          Alert.alert(
+            'Permission Required',
+            'Please grant media library permissions to download receipts',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+
+        console.log('Starting receipt capture for download...');
+        const receiptUri = await captureReceipt();
         
+        if (receiptUri) {
+          console.log('Downloading receipt:', receiptUri);
+          
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+          const filename = `Receipt-${orderDetails?.txnNumber}-${timestamp}.png`;
+          
+          const asset = await MediaLibrary.createAssetAsync(receiptUri);
+          const album = await MediaLibrary.getAlbumAsync('Receipts');
+          
+          if (album) {
+            await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+          } else {
+            await MediaLibrary.createAlbumAsync('Receipts', asset, false);
+          }
+          
+          Alert.alert(
+            'Download Successful',
+            'Receipt has been saved to your gallery',
+            [{ text: 'OK' }]
+          );
+        } else {
+          throw new Error('Failed to capture receipt');
+        }
+      } catch (error) {
+        console.error('Error downloading receipt:', error);
         Alert.alert(
-          'Download Successful',
-          'Receipt has been saved to your gallery',
+          'Download Error',
+          'Failed to download receipt. Please try again.',
           [{ text: 'OK' }]
         );
-      } else {
-        throw new Error('Failed to capture receipt');
       }
-    } catch (error) {
-      console.error('Error downloading receipt:', error);
-      Alert.alert(
-        'Download Error',
-        'Failed to download receipt. Please try again.',
-        [{ text: 'OK' }]
-      );
-    }
-  };
+    };
 
-  const ReceiptContent = React.forwardRef((props, ref) => (
-    <View ref={ref} style={receiptStyles.receiptCaptureContainer}>
-      <View style={receiptStyles.captureHeader}>
-        <Image
-          source={require('../../../assets/logoV.png')} 
-          style={receiptStyles.captureLogo}
-          resizeMode="contain"
-        />
-        <Text style={receiptStyles.captureTitle}>TRANSACTION RECEIPT</Text>
-      </View>
-
-      <View style={receiptStyles.captureStatusSection}>
-        <Text style={receiptStyles.captureStatusTitle}>
-          {getStatusTitle()}
-        </Text>
-      </View>
-
-      <View style={receiptStyles.captureDetails}>
-        <View style={receiptStyles.captureDetailRow}>
-          <Text style={receiptStyles.captureDetailLabel}>Transaction ID:</Text>
-          <Text style={receiptStyles.captureDetailValue}>{orderDetails?.txnNumber}</Text>
-        </View>
-        
-        <View style={receiptStyles.captureDetailRow}>
-          <Text style={receiptStyles.captureDetailLabel}>Date & Time:</Text>
-          <Text style={receiptStyles.captureDetailValue}>
-            {new Date(orderDetails?.date).toLocaleString()}
-          </Text>
-        </View>
-        
-        <View style={receiptStyles.captureDetailRow}>
-          <Text style={receiptStyles.captureDetailLabel}>Receiver:</Text>
-          <Text style={receiptStyles.captureDetailValue}>{orderDetails?.mobile}</Text>
+    const ReceiptContent = React.forwardRef((props, ref) => (
+      <View ref={ref} style={receiptStyles.receiptCaptureContainer}>
+        <View style={receiptStyles.captureHeader}>
+          <Image
+            source={require('../../../assets/logoV.png')} 
+            style={receiptStyles.captureLogo}
+            resizeMode="contain"
+          />
+          <Text style={receiptStyles.captureTitle}>TRANSACTION RECEIPT</Text>
         </View>
 
-        <View style={receiptStyles.captureDetailRow}>
-          <Text style={receiptStyles.captureDetailLabel}>Status:</Text>
-          <Text style={[receiptStyles.captureDetailValue, { color: getStatusColor() }]}>
-            {getStatusTitle()}
-          </Text>
-        </View>
-      </View>
-
-      <View style={receiptStyles.captureAmountSection}>
-        <Text style={receiptStyles.captureAmountLabel}>TOTAL AMOUNT</Text>
-        <Text style={receiptStyles.captureAmountValue}>
-          {orderDetails?.amountAfn} AFN
-        </Text>
-        <Text style={receiptStyles.captureAmountSubValue}>
-          ${orderDetails?.usdAmount} USD
-        </Text>
-      </View>
-
-      <View style={receiptStyles.captureFooter}>
-        <Text style={receiptStyles.captureFooterText}>Thank you for using our service!</Text>
-      </View>
-    </View>
-  ));
-
-  return (
-    <View style={{ flex: 1, paddingBottom: 100 }}>
-
-      <View style={{ position: 'absolute', left: -1000 }}>
-        <ReceiptContent ref={receiptCaptureRef} />
-      </View>
-
-      <ScrollView
-        contentContainerStyle={{ 
-          flexGrow: 1,
-          padding: 24, 
-          alignItems: "center",
-          justifyContent: 'center'
-        }}
-      >
-    
-        {/* {(orderStatus === ORDER_STATUS.SUCCEEDED || orderStatus === ORDER_STATUS.FAILED) && (
-          <View style={TopUpStyles.receiptActions}>
-            <TouchableOpacity 
-              style={[
-                TopUpStyles.receiptActionButton,
-                TopUpStyles.shareButton,
-                isCapturing && TopUpStyles.buttonDisabled
-              ]}
-              onPress={shareReceipt}
-              disabled={isCapturing}
-            >
-              <Ionicons name="share-outline" size={20} color="#fff" />
-              <Text style={TopUpStyles.receiptActionButtonText}>
-                {isCapturing ? 'Preparing...' : 'Share Receipt'}
-              </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[
-                TopUpStyles.receiptActionButton,
-                TopUpStyles.downloadButton,
-                isCapturing && TopUpStyles.buttonDisabled
-              ]}
-              onPress={downloadReceipt}
-              disabled={isCapturing}
-            >
-              <Ionicons name="download-outline" size={20} color="#fff" />
-              <Text style={TopUpStyles.receiptActionButtonText}>
-                {isCapturing ? 'Preparing...' : 'Download'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )} */}
-
-        <View style={TopUpStyles.statusHeader}>
-          {getStatusIcon()}
-          <Text style={[TopUpStyles.statusTitle, { color: getStatusColor() }]}>
+        <View style={receiptStyles.captureStatusSection}>
+          <Text style={receiptStyles.captureStatusTitle}>
             {getStatusTitle()}
           </Text>
         </View>
 
-        <View style={TopUpStyles.detailsCard}>
-          <View style={TopUpStyles.detailRow}>
-            <Text style={TopUpStyles.detailLabel}>Receiver Number</Text>
-            <Text style={TopUpStyles.detailValue}>{orderDetails?.mobile}</Text>
+        <View style={receiptStyles.captureDetails}>
+          <View style={receiptStyles.captureDetailRow}>
+            <Text style={receiptStyles.captureDetailLabel}>Transaction ID:</Text>
+            <Text style={receiptStyles.captureDetailValue}>{orderDetails?.txnNumber}</Text>
           </View>
-         
-          <View style={TopUpStyles.detailRow}>
-            <Text style={TopUpStyles.detailLabel}>Transaction ID</Text>
-            <Text style={TopUpStyles.detailValue}>{orderDetails?.txnNumber}</Text>
-          </View>
-          <View style={TopUpStyles.detailRow}>
-            <Text style={TopUpStyles.detailLabel}>Date</Text>
-            <Text style={TopUpStyles.detailValue}>
+          
+          <View style={receiptStyles.captureDetailRow}>
+            <Text style={receiptStyles.captureDetailLabel}>Date & Time:</Text>
+            <Text style={receiptStyles.captureDetailValue}>
               {new Date(orderDetails?.date).toLocaleString()}
             </Text>
           </View>
+          
+          <View style={receiptStyles.captureDetailRow}>
+            <Text style={receiptStyles.captureDetailLabel}>Receiver:</Text>
+            <Text style={receiptStyles.captureDetailValue}>{orderDetails?.mobile}</Text>
+          </View>
 
-          <View style={TopUpStyles.amountSection}>
-            <Text style={TopUpStyles.amountLabel}>Total Amount</Text>
-            <View>
-              <Text style={TopUpStyles.amountValue}>{orderDetails?.amountAfn} AFN</Text>
-              <Text style={[TopUpStyles.detailValue, { fontSize: 14, textAlign: 'center' }]}>
-                ${orderDetails?.usdAmount} USD
+          {orderDetails?.productName && (
+            <View style={receiptStyles.captureDetailRow}>
+              <Text style={receiptStyles.captureDetailLabel}>Bundle Plan:</Text>
+              <Text style={receiptStyles.captureDetailValue}>
+                {orderDetails?.productName?.en || orderDetails?.productName}
               </Text>
             </View>
-          </View>
-        </View>
+          )}
 
-        <View style={TopUpStyles.statusMessageContainer}>
-          <Text style={[TopUpStyles.statusMessage, { color: getStatusColor() }]}>
-            {getStatusMessage()}
-          </Text>
-        </View>
-
-        {(orderStatus === ORDER_STATUS.QUEUED || orderStatus === ORDER_STATUS.PROCESSING || orderStatus === ORDER_STATUS.PENDING) && (
-          <View style={TopUpStyles.progressContainer}>
-            <View style={TopUpStyles.progressBar}>
-              <View 
-                style={[
-                  TopUpStyles.progressFill,
-                  { 
-                    width: orderStatus === ORDER_STATUS.QUEUED ? '30%' : 
-                          (orderStatus === ORDER_STATUS.PROCESSING ? '60%' : '80%'),
-                    backgroundColor: getStatusColor()
-                  }
-                ]} 
-              />
-            </View>
-            <Text style={TopUpStyles.progressText}>
-              {orderStatus === ORDER_STATUS.QUEUED ? 'Queued' : 
-              orderStatus === ORDER_STATUS.PROCESSING ? 'Processing' : 'Finalizing...'}
+          <View style={receiptStyles.captureDetailRow}>
+            <Text style={receiptStyles.captureDetailLabel}>Status:</Text>
+            <Text style={[receiptStyles.captureDetailValue, { color: getStatusColor() }]}>
+              {getStatusTitle()}
             </Text>
           </View>
-        )}
+        </View>
 
-        {(orderStatus === ORDER_STATUS.SUCCEEDED || orderStatus === ORDER_STATUS.FAILED) && (
-          <PrimaryButton
-            label="Done"
-            onPress={() => {
-              if (pollingRef.current) {
-                clearInterval(pollingRef.current);
-              }
-              navigation.popToTop();
-            }}
-            style={{ width: "100%", marginTop: 20 }}
-          />
-        )}
-
-        <TouchableOpacity onPress={resetFlow} style={TopUpStyles.moreButton}>
-          <Text style={TopUpStyles.moreButtonText}>
-            {orderStatus === ORDER_STATUS.FAILED ? "Try Again" : "Topup More"}
+        <View style={receiptStyles.captureAmountSection}>
+          <Text style={receiptStyles.captureAmountLabel}>TOTAL AMOUNT</Text>
+          <Text style={receiptStyles.captureAmountValue}>
+            {orderDetails?.amountAfn} AFN
           </Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </View>
-  );
-};
+          <Text style={receiptStyles.captureAmountSubValue}>
+            ${orderDetails?.usdAmount} USD
+          </Text>
+        </View>
+
+        <View style={receiptStyles.captureFooter}>
+          <Text style={receiptStyles.captureFooterText}>Thank you for using our service!</Text>
+        </View>
+      </View>
+    ));
+
+    return (
+      <View style={{ flex: 1, paddingBottom: 100 }}>
+        <View style={{ position: 'absolute', left: -1000 }}>
+          <ReceiptContent ref={receiptCaptureRef} />
+        </View>
+
+        <ScrollView
+          contentContainerStyle={{ 
+            flexGrow: 1,
+            padding: 24, 
+            alignItems: "center",
+            justifyContent: 'center'
+          }}
+        >
+          <View style={TopUpStyles.statusHeader}>
+            {getStatusIcon()}
+            <Text style={[TopUpStyles.statusTitle, { color: getStatusColor() }]}>
+              {getStatusTitle()}
+            </Text>
+          </View>
+
+          <View style={TopUpStyles.detailsCard}>
+            <View style={TopUpStyles.detailRow}>
+              <Text style={TopUpStyles.detailLabel}>Receiver Number</Text>
+              <Text style={TopUpStyles.detailValue}>{orderDetails?.mobile}</Text>
+            </View>
+           
+            {orderDetails?.productName && (
+              <View style={TopUpStyles.detailRow}>
+                <Text style={TopUpStyles.detailLabel}>Bundle Plan</Text>
+                <Text style={TopUpStyles.detailValue}>
+                  {orderDetails?.productName?.en || orderDetails?.productName}
+                </Text>
+              </View>
+            )}
+           
+            <View style={TopUpStyles.detailRow}>
+              <Text style={TopUpStyles.detailLabel}>Transaction ID</Text>
+              <Text style={TopUpStyles.detailValue}>{orderDetails?.txnNumber}</Text>
+            </View>
+            <View style={TopUpStyles.detailRow}>
+              <Text style={TopUpStyles.detailLabel}>Date</Text>
+              <Text style={TopUpStyles.detailValue}>
+                {new Date(orderDetails?.date).toLocaleString()}
+              </Text>
+            </View>
+
+            <View style={TopUpStyles.amountSection}>
+              <Text style={TopUpStyles.amountLabel}>Total Amount</Text>
+              <View>
+                <Text style={TopUpStyles.amountValue}>{orderDetails?.amountAfn} AFN</Text>
+                <Text style={[TopUpStyles.detailValue, { fontSize: 14, textAlign: 'center' }]}>
+                  ${orderDetails?.usdAmount} USD
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={TopUpStyles.statusMessageContainer}>
+            <Text style={[TopUpStyles.statusMessage, { color: getStatusColor() }]}>
+              {getStatusMessage()}
+              {orderDetails?.error && `\n\nError: ${orderDetails.error}`}
+            </Text>
+          </View>
+
+          {(orderStatus === ORDER_STATUS.QUEUED || orderStatus === ORDER_STATUS.PROCESSING || orderStatus === ORDER_STATUS.PENDING) && (
+            <View style={TopUpStyles.progressContainer}>
+              <View style={TopUpStyles.progressBar}>
+                <View 
+                  style={[
+                    TopUpStyles.progressFill,
+                    { 
+                      width: orderStatus === ORDER_STATUS.QUEUED ? '30%' : 
+                            (orderStatus === ORDER_STATUS.PROCESSING ? '60%' : '80%'),
+                      backgroundColor: getStatusColor()
+                    }
+                  ]} 
+                />
+              </View>
+              <Text style={TopUpStyles.progressText}>
+                {orderStatus === ORDER_STATUS.QUEUED ? 'Queued' : 
+                orderStatus === ORDER_STATUS.PROCESSING ? 'Processing' : 'Finalizing...'}
+              </Text>
+            </View>
+          )}
+
+          {(orderStatus === ORDER_STATUS.SUCCEEDED || orderStatus === ORDER_STATUS.FAILED) && (
+            <PrimaryButton
+              label="Done"
+              onPress={() => {
+                if (pollingRef.current) {
+                  clearInterval(pollingRef.current);
+                }
+                navigation.popToTop();
+              }}
+              style={{ width: "100%", marginTop: 20 }}
+            />
+          )}
+
+          <TouchableOpacity onPress={resetFlow} style={TopUpStyles.moreButton}>
+            <Text style={TopUpStyles.moreButtonText}>
+              {orderStatus === ORDER_STATUS.FAILED ? "Try Again" : "Topup More"}
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background }}>
@@ -1414,14 +1659,25 @@ Thank you for using our service!
             )}
 
             {step === BASE_STEPS.PAY && (
-              <StepPay
-                summary={getPaymentSummary()}
-                onEditAmount={() => jumpTo(BASE_STEPS.AMOUNT)}
-                onCardDetailsChange={(complete, methodId) => {
-                  setCardDetailsComplete(complete);
-                  if (methodId) setPaymentMethodId(methodId);
-                }}
-              />
+              serviceType === 'bundle' ? (
+                <StepPayBundle
+                  summary={getPaymentSummaryForBundle()}
+                  onEditAmount={() => jumpTo(BASE_STEPS.AMOUNT)}
+                  onCardDetailsChange={(complete, methodId) => {
+                    setCardDetailsComplete(complete);
+                    if (methodId) setPaymentMethodId(methodId);
+                  }}
+                />
+              ) : (
+                <StepPay
+                  summary={getPaymentSummaryForRecharge()}
+                  onEditAmount={() => jumpTo(BASE_STEPS.AMOUNT)}
+                  onCardDetailsChange={(complete, methodId) => {
+                    setCardDetailsComplete(complete);
+                    if (methodId) setPaymentMethodId(methodId);
+                  }}
+                />
+              )
             )}
 
             {step !== BASE_STEPS.AMOUNT && (
@@ -1429,7 +1685,7 @@ Thank you for using our service!
                 <PrimaryButton
                   label={
                     step === lastStep
-                      ? `${t('pay')} $${usd} USD`
+                      ? `${t('pay')} $${finalAmount.toFixed(2)} USD`
                       : t('continue')
                   }
                   onPress={step === lastStep ? recharge : goNext}
@@ -1451,12 +1707,21 @@ Thank you for using our service!
 
       <ContactsModal />
       <CountriesModal />
+      <PromoCodeModal
+        visible={promoModalVisible}
+        onClose={closePromoModal}
+        promoCode={promoCode}
+        setPromoCode={setPromoCode}
+        validatingPromo={validatingPromo}
+        promoError={promoError}
+        onApply={handleApplyPromoCode}
+      />
     </SafeAreaView>
   );
 }
 
 const modalStyles = {
- modalOverlay: {
+  modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
@@ -1501,7 +1766,7 @@ const modalStyles = {
     height: scale.hp(6),
   },
   searchIcon: {
-    marginRight: scale.wp(3),
+    marginEnd: scale.wp(3),
   },
   searchInput: {
     flex: 1,
@@ -1522,7 +1787,7 @@ const modalStyles = {
     backgroundColor: Colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: scale.wp(3),
+    marginEnd: scale.wp(3),
   },
   contactAvatarText: {
     color: 'white',
@@ -1563,7 +1828,73 @@ const modalStyles = {
     paddingHorizontal: scale.wp(5),
     paddingVertical: scale.hp(2),
   },
-
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: scale.hp(2),
+    padding: scale.hp(2.5),
+    width: '100%',
+    maxWidth: scale.wp(90),
+  },
+  promoInputContainer: {
+    marginBottom: scale.hp(2),
+  },
+  promoInput: {
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+    borderRadius: scale.hp(1),
+    padding: scale.hp(1.5),
+    fontSize: scale.hp(1.75),
+    fontWeight: '600',
+    textAlign: 'center',
+    letterSpacing: 1,
+    backgroundColor: '#F8F9FA',
+  },
+  errorContainer: {
+    backgroundColor: '#FEF2F2',
+    padding: scale.hp(1),
+    borderRadius: scale.hp(0.75),
+    marginBottom: scale.hp(2),
+    borderLeftWidth: 4,
+    borderLeftColor: '#EF4444',
+  },
+  errorText: {
+    color: '#DC2626',
+    fontSize: scale.hp(1.5),
+    fontWeight: '500',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: scale.wp(3),
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: scale.hp(1.5),
+    borderRadius: scale.hp(1),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+  },
+  cancelButtonText: {
+    color: Colors.textSecondary,
+    fontSize: scale.hp(1.75),
+    fontWeight: '600',
+  },
+  applyButton: {
+    backgroundColor: Colors.primary,
+  },
+  disabledButton: {
+    backgroundColor: '#9CA3AF',
+    opacity: 0.6,
+  },
+  applyButtonText: {
+    color: '#FFFFFF',
+    fontSize: scale.hp(1.75),
+    fontWeight: '600',
+  },
 };
 
 const receiptStyles = StyleSheet.create({

@@ -38,6 +38,7 @@ import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as MediaLibrary from 'expo-media-library';
 import ReceiptModal1 from "../orderScreen/ReceiptModal";
+import FinalPushTest from "../PushNotificationTester";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -388,21 +389,44 @@ Thank you for your business!
     `;
   };
 
+  const requestMediaPermissions = async () => {
+    try {
+      if (Platform.OS === 'android') {
+        const { status } = await MediaLibrary.requestPermissionsAsync();
+        return status === 'granted';
+      }
+      return true;
+    } catch (error) {
+      console.error('Error requesting media permissions:', error);
+      return false;
+    }
+  };
+
   const downloadPDF = async () => {
     if (!transaction) return;
     
     try {
       setDownloading(true);
       
- 
+      // Request permissions only when user tries to download
+      if (Platform.OS === 'android') {
+        const hasPermission = await requestMediaPermissions();
+        if (!hasPermission) {
+          Alert.alert(
+            'Permission Required',
+            'Storage permission is required to save the receipt to your device.',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+      }
+
       const html = generatePDFHtml();
       const { uri } = await Print.printToFileAsync({ html });
       
-
       const fileName = `Receipt_${transaction.txnNumber}_${new Date().getTime()}.pdf`;
       const newPath = `${FileSystem.documentDirectory}${fileName}`;
       
-
       await FileSystem.moveAsync({
         from: uri,
         to: newPath,
@@ -414,14 +438,13 @@ Thank you for your business!
           dialogTitle: 'Save Receipt as PDF',
         });
       } else {
-        const permission = await MediaLibrary.requestPermissionsAsync();
+        const permission = await MediaLibrary.getPermissionsAsync();
         
         if (permission.granted) {
           const asset = await MediaLibrary.createAssetAsync(newPath);
           await MediaLibrary.createAlbumAsync('Downloads', asset, false);
           Alert.alert('Success', 'Receipt saved to Downloads folder');
         } else {
-          // Fallback to sharing if permission denied
           await Sharing.shareAsync(newPath, {
             mimeType: 'application/pdf',
             dialogTitle: 'Save Receipt as PDF',
@@ -1034,7 +1057,7 @@ const TransactionRow = ({ item }) => (
                 <Text style={HomeStyles.seeAll}>{t('common.seeAll')}</Text>
               </TouchableOpacity>
             </View>
-
+<FinalPushTest/>
             {isLoading ? (
               <ActivityIndicator size="small" color={Colors.primary} style={HomeStyles.loader} />
             ) : isError ? (

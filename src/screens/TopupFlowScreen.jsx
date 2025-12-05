@@ -77,7 +77,7 @@ export default function MerchantTopupFlowScreen({ navigation }) {
   const operatorId = getSetaraganMnoId(localNumber);
   const operatorLogo = getMnoLogo(operatorId);
 
-  // Clean up polling on unmount
+
   useEffect(() => {
     return () => {
       if (pollingRef.current) {
@@ -86,7 +86,7 @@ export default function MerchantTopupFlowScreen({ navigation }) {
     };
   }, []);
 
-  // Play Lottie animation when status changes
+
   useEffect(() => {
     if (lottieRef.current && (orderStatus === ORDER_STATUS.SUCCEEDED || orderStatus === ORDER_STATUS.FAILED)) {
       lottieRef.current.play();
@@ -104,14 +104,14 @@ export default function MerchantTopupFlowScreen({ navigation }) {
     getAllCountries();
   }, []);
 
-  // Polling function to check order status
+
   const startPollingOrderStatus = async (orderId) => {
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
     }
 
     let pollCount = 0;
-    const maxPolls = 60; // 3 minutes maximum (60 polls * 3 seconds)
+    const maxPolls = 60; 
 
     pollingRef.current = setInterval(async () => {
       try {
@@ -127,7 +127,7 @@ export default function MerchantTopupFlowScreen({ navigation }) {
           ...statusResponse.data
         }));
 
-        // Stop polling if we reach a final state or max polls
+
         if (currentStatus === ORDER_STATUS.SUCCEEDED || 
             currentStatus === ORDER_STATUS.FAILED || 
             pollCount >= maxPolls) {
@@ -141,14 +141,13 @@ export default function MerchantTopupFlowScreen({ navigation }) {
         }
       } catch (error) {
         console.error("Error polling order status:", error);
-        // Continue polling even if there's an error, but stop after max attempts
         if (pollCount >= maxPolls) {
           clearInterval(pollingRef.current);
           pollingRef.current = null;
           setOrderStatus(ORDER_STATUS.FAILED);
         }
       }
-    }, 3000); // Poll every 3 seconds
+    }, 3000); 
   };
 
   useEffect(() => {

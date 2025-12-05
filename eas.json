@@ -21,8 +21,17 @@
           "EXPO_PUBLIC_API_URL": "http://3.67.144.22/backend/v1"
         }
       }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk",
+        "env": {
+          "EXPO_ENABLE_NEW_ARCHITECTURE": "true",
+          "NODE_ENV": "production",
+          "EXPO_PUBLIC_API_URL": "http://3.67.144.22/backend/v1"
+        }
+      }
     }
   }
 }
-
-

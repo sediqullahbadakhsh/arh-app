@@ -23,6 +23,7 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import './src/utils/polyfills';
 import InternetConnectionMonitor from "./src/components/InternetConnectionMonitor";
+
 LogBox.ignoreAllLogs();
 
 
@@ -131,18 +132,21 @@ function MainAppContent() {
                     publishableKey={process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || "pk_test_51RxnvBKOx8MiO1ejmrVjvOoop4cA1ANX3lDRPOTy1cu95T1f4qRWnM6GmnoQnAK5RDxtVsNVmH3eKdny6PWyswn300iWaALjXq"}
                 >
                     <UserProvider>
+                          
                         <AuthProvider>
-                            <SocketProvider>
+                          <SocketProvider>
                             <AccessFromAuth>
                                   <InternetConnectionMonitor 
                     onInternetDisconnected={handleInternetDisconnected} 
                   />
+              
                                 <CustomNavigationContainer>
                                     <RootNavigator />
                                 </CustomNavigationContainer>
                             </AccessFromAuth>
-                            </SocketProvider>
+                          </SocketProvider>
                         </AuthProvider>
+                          
                     </UserProvider>
                 </StripeProvider>
             </SafeAreaProvider>

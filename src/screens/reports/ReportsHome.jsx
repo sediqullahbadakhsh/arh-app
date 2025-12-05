@@ -54,10 +54,12 @@ export default function ReportsHome({ navigation }) {
                 <View style={[styles.iconContainer, { backgroundColor: report.gradient[0] }]}>
                   <Ionicons name={report.icon} size={24} color={report.color} />
                 </View>
+                <View >
+                      <Text style={styles.tileTitle}>{t(report.title)}</Text>
+              <Text style={styles.tileDescription}>{t(report.description)}</Text></View>
               </View>
               
-              <Text style={styles.tileTitle}>{t(report.title)}</Text>
-              <Text style={styles.tileDescription}>{t(report.description)}</Text>
+        
               
               <View style={styles.tileFooter}>
                 <Text style={styles.viewText}>{t('viewReport')}</Text>
@@ -112,6 +114,7 @@ const styles = StyleSheet.create({
   tileHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
+    alignContent: "center",
     alignItems: "center",
     marginBottom: scale.hp(2.1),
   },
@@ -120,6 +123,7 @@ const styles = StyleSheet.create({
     height: scale.wp(12.5),
     borderRadius: scale.hp(1.55),
     justifyContent: "center",
+    marginEnd: scale.hp(2),
     alignItems: "center",
   },
   tileTitle: {
@@ -130,9 +134,10 @@ const styles = StyleSheet.create({
   },
   tileDescription: {
     fontSize: scale.hp(1.8),
-    color: Colors.textSecondary,
+    color: Colors.textSecondary, 
     lineHeight: scale.hp(2.6),
-    marginBottom: scale.hp(2.1),
+    width: scale.wp(65),
+    // marginBottom: scale.hp(2.1),
   },
   tileFooter: {
     flexDirection: "row",

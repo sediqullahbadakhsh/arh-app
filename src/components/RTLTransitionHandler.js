@@ -10,7 +10,7 @@ const RTLTransitionHandler = ({ children }) => {
       setHasError(true);
     };
 
-    // Add global error handler
+
     const originalErrorHandler = ErrorUtils.getGlobalHandler();
     ErrorUtils.setGlobalHandler(errorHandler);
 

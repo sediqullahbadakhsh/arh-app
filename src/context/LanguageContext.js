@@ -25,8 +25,8 @@ export const LanguageProvider = ({ children, onLanguageChange }) => {
 
   const LANGS = [
     { label: "English", value: "english", code: "en", flag: "https://flagcdn.com/w20/gb.png" },
-    { label: "Dari", value: "dari", code: "dr", flag: "https://flagcdn.com/w20/af.png" },
-    { label: "Pashto", value: "pashto", code: "ps", flag: "https://flagcdn.com/w20/af.png" },
+    { label: "دری", value: "dari", code: "dr", flag: "https://flagcdn.com/w20/af.png" },
+    { label: "پشتو", value: "pashto", code: "ps", flag: "https://flagcdn.com/w20/af.png" },
   ];
 
   useEffect(() => {
