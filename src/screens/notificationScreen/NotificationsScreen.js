@@ -31,7 +31,6 @@ const NotificationsScreen = () => {
   
   const navigation = useNavigation();
   
-
   const {
     notifications,
     unreadCount,
@@ -56,16 +55,31 @@ const NotificationsScreen = () => {
     setRefreshing(false);
   }, [refreshNotifications]);
 
-  const handleNotificationPress = async (notification) => {
-    setSelectedNotification(notification);
-    setDetailModalVisible(true);
+  const handleNotificationPress = useCallback(async (notification) => {
+    try {
+      // Store the notification first
+      setSelectedNotification(notification);
+      setDetailModalVisible(true);
 
-    if (!notification.isRead) {
-      await markAsRead(notification.id);
+      // Mark as read if needed (but don't wait for it)
+      if (!notification.isRead) {
+        setTimeout(async () => {
+          try {
+            await markAsRead(notification.id);
+          } catch (err) {
+            console.error('Error marking as read in background:', err);
+          }
+        }, 100); // Small delay to ensure modal opens first
+      }
+    } catch (error) {
+      console.error('Error handling notification press:', error);
+      // Still show the modal
+      setSelectedNotification(notification);
+      setDetailModalVisible(true);
     }
-  };
+  }, [markAsRead]);
 
-  const handleMarkAllAsRead = async () => {
+  const handleMarkAllAsRead = useCallback(async () => {
     if (!hasUnreadNotifications) {
       Alert.alert(t('info'), t('allNotificationsRead'));
       return;
@@ -90,10 +104,11 @@ const NotificationsScreen = () => {
         }
       ]
     );
-  };
+  }, [hasUnreadNotifications, markAllAsRead, t]);
 
-  const handleDeleteNotification = async (notification, event) => {
-    event.stopPropagation();
+  const handleDeleteNotification = useCallback(async (notification, event) => {
+    event?.stopPropagation?.();
+    
     Alert.alert(
       t('deleteNotification'),
       t('deleteNotificationConfirm'),
@@ -106,8 +121,6 @@ const NotificationsScreen = () => {
             const success = await deleteNotification(notification.id);
             if (success) {
               console.log('Notification deleted successfully:', notification.id);
-              // Show success message if needed
-              // Alert.alert(t('success'), t('notificationDeleted'));
             } else {
               Alert.alert(t('error'), t('failedToDeleteNotification'));
             }
@@ -115,7 +128,7 @@ const NotificationsScreen = () => {
         }
       ]
     );
-  };
+  }, [deleteNotification, t]);
 
   const handleDeleteAllNotifications = () => {
     if (!hasNotifications) {
@@ -139,9 +152,13 @@ const NotificationsScreen = () => {
     );
   };
 
-  const getNotificationTypeName = (notification) => {
+  const getNotificationTypeName = useCallback((notification) => {
     try {
-      const notiType = notification.notificationType?.name;
+      if (!notification) return 'system';
+      
+      const notiType = notification.notificationType?.name || 
+                      notification.notiType ||
+                      'system';
 
       if (typeof notiType === 'string') {
         return notiType.toLowerCase();
@@ -149,14 +166,14 @@ const NotificationsScreen = () => {
         return (notiType.en || notiType.ar || 'system').toLowerCase();
       }
       
-      return (notification.notiType || 'system').toString().toLowerCase();
+      return 'system';
     } catch (error) {
       console.log('Error getting notification type:', error);
       return 'system';
     }
-  };
+  }, []);
 
-  const getNotificationIcon = (notification) => {
+  const getNotificationIcon = useCallback((notification) => {
     const notiType = getNotificationTypeName(notification);
 
     switch (notiType) {
@@ -201,9 +218,9 @@ const NotificationsScreen = () => {
       default:
         return { name: 'notifications', color: Colors.primary };
     }
-  };
+  }, [getNotificationTypeName]);
 
-  const formatTime = (timeString) => {
+  const formatTime = useCallback((timeString) => {
     if (!timeString) return t('recently');
     
     try {
@@ -223,31 +240,47 @@ const NotificationsScreen = () => {
     } catch (error) {
       return t('recently');
     }
-  };
+  }, [t]);
 
-  const getNotificationTitle = (notification) => {
+  const getNotificationTitle = useCallback((notification) => {
     try {
+      if (!notification) return t('notification');
+      
       if (typeof notification.title === 'string') {
         return notification.title;
       }
-      return notification.title?.en || notification.title || t('notification');
+      
+      if (notification.title && typeof notification.title === 'object') {
+        return notification.title.en || notification.title.ar || t('notification');
+      }
+      
+      return notification.title || t('notification');
     } catch (error) {
+      console.log('Error getting notification title:', error);
       return t('notification');
     }
-  };
+  }, [t]);
 
-  const getNotificationDescription = (notification) => {
+  const getNotificationDescription = useCallback((notification) => {
     try {
+      if (!notification) return '';
+      
       if (typeof notification.description === 'string') {
         return notification.description;
       }
-      return notification.description?.en || notification.description || '';
+      
+      if (notification.description && typeof notification.description === 'object') {
+        return notification.description.en || notification.description.ar || '';
+      }
+      
+      return notification.description || '';
     } catch (error) {
+      console.log('Error getting notification description:', error);
       return '';
     }
-  };
+  }, []);
 
-  const renderNotificationItem = ({ item, index }) => {
+  const renderNotificationItem = useCallback(({ item, index }) => {
     const icon = getNotificationIcon(item);
     const title = getNotificationTitle(item);
     const description = getNotificationDescription(item);
@@ -302,9 +335,9 @@ const NotificationsScreen = () => {
         </View>
       </TouchableOpacity>
     );
-  };
+  }, [getNotificationIcon, getNotificationTitle, getNotificationDescription, formatTime, handleNotificationPress, handleDeleteNotification]);
 
-  const renderEmptyState = () => (
+  const renderEmptyState = useCallback(() => (
     <View style={notificationStyles.emptyState}>
       <Ionicons name="notifications-off-outline" size={64} color="#ccc" />
       <Text style={notificationStyles.emptyStateText}>{t('noNotifications')}</Text>
@@ -323,9 +356,9 @@ const NotificationsScreen = () => {
         </TouchableOpacity>
       )}
     </View>
-  );
+  ), [isConnected, refreshNotifications, t]);
 
-  const renderErrorState = () => (
+  const renderErrorState = useCallback(() => (
     <View style={notificationStyles.errorState}>
       <Ionicons name="alert-circle-outline" size={64} color="#f44336" />
       <Text style={notificationStyles.errorStateText}>{t('failedToLoadNotifications')}</Text>
@@ -339,16 +372,16 @@ const NotificationsScreen = () => {
         <Text style={notificationStyles.retryButtonText}>{t('tryAgain')}</Text>
       </TouchableOpacity>
     </View>
-  );
+  ), [error, refreshNotifications, t]);
 
-  const renderLoadingState = () => (
+  const renderLoadingState = useCallback(() => (
     <View style={notificationStyles.loadingContainer}>
       <Ionicons name="notifications-outline" size={48} color={Colors.primary} />
       <Text style={notificationStyles.loadingText}>{t('loadingNotifications')}</Text>
     </View>
-  );
+  ), [t]);
 
-  const handleNotificationAction = (notification) => {
+  const handleNotificationAction = useCallback((notification) => {
     setDetailModalVisible(false);
     
     const notiType = getNotificationTypeName(notification);
@@ -374,15 +407,14 @@ const NotificationsScreen = () => {
         navigation.navigate('Topup');
         break;
       default:
-  
         console.log('No specific action for notification type:', notiType);
         break;
     }
-  };
+  }, [getNotificationTypeName, navigation]);
 
-  const handleSettingsPress = () => {
+  const handleSettingsPress = useCallback(() => {
     setSettingsModalVisible(true);
-  };
+  }, []);
 
   return (
     <SafeAreaView style={notificationStyles.container}>
@@ -397,7 +429,6 @@ const NotificationsScreen = () => {
         hasUnreadNotifications={hasUnreadNotifications}
       />
       
-   
       {!isConnected && (
         <View style={notificationStyles.connectionStatus}>
           <Ionicons name="cloud-offline" size={16} color="#fff" />
@@ -408,12 +439,9 @@ const NotificationsScreen = () => {
         </View>
       )}
 
-
       {error && !loading && renderErrorState()}
 
-
       {loading && !refreshing && renderLoadingState()}
-
 
       {!error && !loading && (
         <FlatList
@@ -438,9 +466,9 @@ const NotificationsScreen = () => {
           initialNumToRender={10}
           maxToRenderPerBatch={10}
           windowSize={5}
+          extraData={notifications} // This ensures re-render when notifications change
         />
       )}
-
 
       <SettingModal 
         visible={settingsModalVisible} 
@@ -448,20 +476,24 @@ const NotificationsScreen = () => {
         onDeleteAll={handleDeleteAllNotifications}
         hasNotifications={hasNotifications}
       />
-     
 
-      <DetailModal
-        visible={detailModalVisible}
-        onRequestClose={() => setDetailModalVisible(false)}
-        selectedNotification={selectedNotification}
-        onNotificationAction={handleNotificationAction}
-        getNotificationIcon={getNotificationIcon}
-        getNotificationTitle={getNotificationTitle}
-        getNotificationDescription={getNotificationDescription}
-        formatTime={formatTime}
-        getNotificationTypeName={getNotificationTypeName}
-        onMarkAsRead={markAsRead}
-      />
+      {selectedNotification && (
+        <DetailModal
+          visible={detailModalVisible}
+          onRequestClose={() => {
+            setDetailModalVisible(false);
+            setSelectedNotification(null);
+          }}
+          selectedNotification={selectedNotification}
+          onNotificationAction={handleNotificationAction}
+          getNotificationIcon={getNotificationIcon}
+          getNotificationTitle={getNotificationTitle}
+          getNotificationDescription={getNotificationDescription}
+          formatTime={formatTime}
+          getNotificationTypeName={getNotificationTypeName}
+          onMarkAsRead={markAsRead}
+        />
+      )}
     </SafeAreaView>
   );
 };

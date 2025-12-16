@@ -1,6 +1,16 @@
-import React, { useState, useEffect } from "react";
-import { Text, TouchableOpacity, ScrollView, StyleSheet, Image, Alert } from "react-native";
-import { View } from "react-native";
+import React, { useState, useEffect, useRef } from "react";
+import { 
+  Text, 
+  TouchableOpacity, 
+  StyleSheet, 
+  Image, 
+  Alert, 
+  View,
+  Platform,
+  KeyboardAvoidingView,
+  ScrollView,
+  Keyboard
+} from "react-native";
 import { CardField, useStripe } from "@stripe/stripe-react-native";
 
 import { Colors } from "../../theme/colors";
@@ -19,6 +29,11 @@ function StepPay({
   const [cardDetails, setCardDetails] = useState(null);
   const [isCreatingPaymentMethod, setIsCreatingPaymentMethod] = useState(false);
   const [paymentMethodId, setPaymentMethodId] = useState(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const scrollViewRef = useRef(null);
+  const cardFieldRef = useRef(null);
+
+  console.log(summary?.product?.totalAmountInUSD, "this is summary");
 
   const paymentMethods = [
     { 
@@ -41,7 +56,44 @@ function StepPay({
     },
   ];
 
-  // Create Stripe PaymentMethod when card details are complete
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        setKeyboardHeight(e.endCoordinates.height);
+        // Scroll to make card field visible when keyboard appears
+        setTimeout(() => {
+          scrollToCardField();
+        }, 100);
+      }
+    );
+
+    const keyboardDidHideListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setKeyboardHeight(0);
+      }
+    );
+
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
+  }, []);
+
+  const scrollToCardField = () => {
+    if (scrollViewRef.current && selectedPaymentMethod === 'card') {
+      // Scroll to make card field visible
+      scrollViewRef.current.scrollTo({ y: 200, animated: true });
+    }
+  };
+
+  const handleCardFieldFocus = () => {
+    setTimeout(() => {
+      scrollToCardField();
+    }, 300);
+  };
+
   useEffect(() => {
     const createStripePaymentMethod = async () => {
       if (!cardDetails?.complete || isCreatingPaymentMethod) return;
@@ -76,7 +128,6 @@ function StepPay({
     };
 
     if (selectedPaymentMethod === 'card' && cardDetails?.complete) {
-      // Add a small delay to avoid rapid API calls
       const timer = setTimeout(() => {
         createStripePaymentMethod();
       }, 500);
@@ -100,8 +151,7 @@ function StepPay({
 
   const handleCardFieldChange = (cardDetails) => {
     setCardDetails(cardDetails);
-    
-    // If card becomes incomplete, reset payment method
+
     if (!cardDetails.complete && paymentMethodId) {
       setPaymentMethodId(null);
       onCardDetailsChange(false, null);
@@ -112,220 +162,207 @@ function StepPay({
     setCardDetails(null);
     setPaymentMethodId(null);
     onCardDetailsChange(false, null);
+    Keyboard.dismiss();
   };
 
   return (
-    <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-      <View style={{ marginTop: 12 }}>
-        <Text style={TopUpStyles.sectionTitle}>
-          {t('paymentMethod')}
-        </Text>
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: '#fff' }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+    >
+      <ScrollView
+        ref={scrollViewRef}
+        style={{ flex: 1 }}
+        contentContainerStyle={{ 
+          paddingBottom: keyboardHeight > 0 ? keyboardHeight + 20 : 40,
+          paddingHorizontal: 16
+        }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        automaticallyAdjustContentInsets={false}
+        scrollEventThrottle={16}
+      >
+        <View style={{ marginTop: 12 }}>
+          <Text style={TopUpStyles.sectionTitle}>
+            {t('paymentMethod')}
+          </Text>
 
-  
-        <View style={styles.paymentMethodContainer}>
-          {paymentMethods.map((method) => (
-            <TouchableOpacity
-              key={method.id}
-              style={[
-                styles.paymentMethodButton,
-                selectedPaymentMethod === method.id && styles.paymentMethodButtonSelected
-              ]}
-              onPress={() => handlePaymentMethodSelect(method.id)}
-              disabled={isCreatingPaymentMethod}
-            >
-              <View style={styles.paymentMethodContent}>
-                <Image 
-                  source={method.icon} 
-                  style={[
-                    styles.paymentIcon,
-                    selectedPaymentMethod === method.id && styles.paymentIconSelected
-                  ]}
-                  resizeMode="contain"
-                />
-                <Text style={[
-                  styles.paymentMethodText,
-                  selectedPaymentMethod === method.id && styles.paymentMethodTextSelected
-                ]}>
-                  {method.label}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Card Details Form */}
-        {selectedPaymentMethod === 'card' && (
-          <View style={styles.cardDetailsContainer}>
-            <View style={styles.fieldContainer}>
-              <View style={styles.fieldHeader}>
-                <Text style={styles.fieldLabel}>{t('cardDetails')}</Text>
-                {cardDetails && (
-                  <TouchableOpacity onPress={clearCardDetails} style={styles.clearButton}>
-                    <Text style={styles.clearButtonText}>{t('clear')}</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-              
-              <CardField
-                postalCodeEnabled={false}
-                placeholders={{
-                  number: '1234 1234 1234 1234',
-                  expiration: 'MM/YY',
-                  cvc: 'CVC',
-                }}
-                cardStyle={{
-                  backgroundColor: '#FFFFFF',
-                  textColor: '#000000',
-                  borderWidth: 1,
-                  borderColor: cardDetails?.complete ? '#10B981' : '#E0E0E0',
-                  borderRadius: 8,
-                  fontSize: 16,
-                }}
-                style={{
-                  width: '100%',
-                  height: 50,
-                  marginVertical: 8,
-                }}
-                onCardChange={handleCardFieldChange}
-              />
-
-              {cardDetails?.error && (
-                <Text style={styles.errorText}>
-                  {cardDetails.error.message || t('cardError')}
-                </Text>
-              )}
-
-              {/* {cardDetails?.complete && !paymentMethodId && (
-                <View style={styles.processingContainer}>
-                  <Text style={styles.processingText}>
-                    {t('validatingCard')}
+          <View style={styles.paymentMethodContainer}>
+            {paymentMethods.map((method) => (
+              <TouchableOpacity
+                key={method.id}
+                style={[
+                  styles.paymentMethodButton,
+                  selectedPaymentMethod === method.id && styles.paymentMethodButtonSelected
+                ]}
+                onPress={() => handlePaymentMethodSelect(method.id)}
+                disabled={isCreatingPaymentMethod}
+              >
+                <View style={styles.paymentMethodContent}>
+                  <Image 
+                    source={method.icon} 
+                    style={[
+                      styles.paymentIcon,
+                      selectedPaymentMethod === method.id && styles.paymentIconSelected
+                    ]}
+                    resizeMode="contain"
+                  />
+                  <Text style={[
+                    styles.paymentMethodText,
+                    selectedPaymentMethod === method.id && styles.paymentMethodTextSelected
+                  ]}>
+                    {method.label}
                   </Text>
                 </View>
-              )} */}
-            </View>
+              </TouchableOpacity>
+            ))}
+          </View>
 
-            {/* {isCreatingPaymentMethod && (
-              <View style={styles.processingContainer}>
-                <Text style={styles.processingText}>
-                  {t('creatingPaymentMethod')}
-                </Text>
+          {selectedPaymentMethod === 'card' && (
+            <View style={styles.cardDetailsContainer}>
+              <View style={styles.fieldContainer}>
+                <View style={styles.fieldHeader}>
+                  <Text style={styles.fieldLabel}>{t('cardDetails')}</Text>
+                  {cardDetails && (
+                    <TouchableOpacity onPress={clearCardDetails} style={styles.clearButton}>
+                      <Text style={styles.clearButtonText}>{t('clear')}</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                
+                <TouchableOpacity 
+                  activeOpacity={1}
+                  onPress={handleCardFieldFocus}
+                  style={styles.cardFieldWrapper}
+                >
+                  <CardField
+                    ref={cardFieldRef}
+                    postalCodeEnabled={false}
+                    placeholders={{
+                      number: '1234 1234 1234 1234',
+                      expiration: 'MM/YY',
+                      cvc: 'CVC',
+                    }}
+                    cardStyle={{
+                      backgroundColor: '#FFFFFF',
+                      textColor: '#000000',
+                      borderWidth: 1,
+                      borderColor: cardDetails?.complete ? '#10B981' : '#E0E0E0',
+                      borderRadius: 8,
+                      fontSize: 16,
+                    }}
+                    style={{
+                      width: '100%',
+                      height: 50,
+                      marginVertical: 8,
+                    }}
+                    onCardChange={handleCardFieldChange}
+                    onFocus={handleCardFieldFocus}
+                  />
+                </TouchableOpacity>
+
+                {cardDetails?.error && (
+                  <Text style={styles.errorText}>
+                    {cardDetails.error.message || t('cardError')}
+                  </Text>
+                )}
               </View>
-            )} */}
 
-            {/* {paymentMethodId && (
-              <View style={styles.successContainer}>
-                <Text style={styles.successMessage}>
-                  {t('paymentMethodReady')}
-                </Text>
-              </View>
-            )} */}
-
-            <Text style={[TopUpStyles.smallLabel, { marginTop: 16 }]}>
-              {t('securePaymentNotice')}
-            </Text>
-          </View>
-        )}
-
-      
-        {selectedPaymentMethod === 'paypal' && (
-          <View style={styles.altPaymentContainer}>
-            <Image 
-              source={require('../../../assets/images/paypal.png')} 
-              style={styles.paymentLogo} 
-              resizeMode="contain"
-            />
-            <Text style={styles.altPaymentText}>
-              {t('paypalRedirect')}
-            </Text>
-            <TouchableOpacity style={[styles.paymentButton, { backgroundColor: '#CD0202' }]}>
-              <Image 
-                source={require('../../../assets/images/paypal.png')} 
-                style={styles.buttonIcon} 
-                resizeMode="contain"
-              />
-              <Text style={styles.paymentButtonText}>{t('continueWithPaypal')}</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-     
-        {selectedPaymentMethod === 'googlepay' && (
-          <View style={styles.altPaymentContainer}>
-            <Image 
-              source={require('../../../assets/images/google-pay.png')} 
-              style={styles.paymentLogo} 
-              resizeMode="contain"
-            />
-            <Text style={styles.altPaymentText}>
-              {t('googlePayRedirect')}
-            </Text>
-            <TouchableOpacity style={[styles.paymentButton, { backgroundColor: '#CD0202' }]}>
-              <Image 
-                source={require('../../../assets/images/google-pay.png')} 
-                style={styles.buttonIcon} 
-                resizeMode="contain"
-              />
-              <Text style={styles.paymentButtonText}>{t('payWithGooglePay')}</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-      
-        <View style={TopUpStyles.summaryCard}>
-          <View style={TopUpStyles.summaryRow}>
-            <Text style={TopUpStyles.summaryKey}>{t('mobileNumber')}</Text>
-            <Text style={TopUpStyles.summaryValue}>{summary.mobile}</Text>
-          </View>
-          <View style={TopUpStyles.summaryRow}>
-            <Text style={TopUpStyles.summaryKey}>{t('amountToSend')}</Text>
-            <Text style={TopUpStyles.summaryValue}>{summary.afn} AFN</Text>
-          </View>
-          <View style={TopUpStyles.summaryRow}>
-            <Text style={TopUpStyles.summaryKey}>{t('baseAmount')}</Text>
-            <Text style={TopUpStyles.summaryValue}>${summary.calculateBaseAmount()} USD</Text>
-          </View>
-          {summary.slabPercentage > 0 && (
-            <View style={TopUpStyles.summaryRow}>
-              <Text style={TopUpStyles.summaryKey}>{t('fee')}</Text>
-              <Text style={TopUpStyles.summaryValue}>${summary.calculateFeeAmount()} USD</Text>
+              <Text style={[TopUpStyles.smallLabel, { marginTop: 16 }]}>
+                {t('securePaymentNotice')}
+              </Text>
             </View>
           )}
-          <View
-            style={[
-              TopUpStyles.summaryRow,
-              {
-                borderTopWidth: 1,
-                borderTopColor: "#F2F2F2",
-                paddingTop: 8,
-                marginTop: 6,
-              },
-            ]}
-          >
-            <Text style={[TopUpStyles.summaryKey, { fontWeight: "700" }]}>
-              {t('totalAmount')}
-            </Text>
-            <Text
+
+          {selectedPaymentMethod === 'paypal' && (
+            <View style={styles.altPaymentContainer}>
+              <Image 
+                source={require('../../../assets/images/paypal.png')} 
+                style={styles.paymentLogo} 
+                resizeMode="contain"
+              />
+              <Text style={styles.altPaymentText}>
+                {t('paypalRedirect')}
+              </Text>
+              <TouchableOpacity style={[styles.paymentButton, { backgroundColor: '#CD0202' }]}>
+                <Image 
+                  source={require('../../../assets/images/paypal.png')} 
+                  style={styles.buttonIcon} 
+                  resizeMode="contain"
+                />
+                <Text style={styles.paymentButtonText}>{t('continueWithPaypal')}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {selectedPaymentMethod === 'googlepay' && (
+            <View style={styles.altPaymentContainer}>
+              <Image 
+                source={require('../../../assets/images/google-pay.png')} 
+                style={styles.paymentLogo} 
+                resizeMode="contain"
+              />
+              <Text style={styles.altPaymentText}>
+                {t('googlePayRedirect')}
+              </Text>
+              <TouchableOpacity style={[styles.paymentButton, { backgroundColor: '#CD0202' }]}>
+                <Image 
+                  source={require('../../../assets/images/google-pay.png')} 
+                  style={styles.buttonIcon} 
+                  resizeMode="contain"
+                />
+                <Text style={styles.paymentButtonText}>{t('payWithGooglePay')}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          <View style={TopUpStyles.summaryCard}>
+            <View style={TopUpStyles.summaryRow}>
+              <Text style={TopUpStyles.summaryKey}>{t('mobileNumber')}</Text>
+              <Text style={TopUpStyles.summaryValue}>{summary.mobile}</Text>
+            </View>
+            <View style={TopUpStyles.summaryRow}>
+              <Text style={TopUpStyles.summaryKey}>{t('bundleName')}</Text>
+              <Text style={TopUpStyles.summaryValue}>{summary.product?.productName}</Text>
+            </View>
+            <View
               style={[
-                TopUpStyles.summaryValue,
-                { color: Colors.primary, fontWeight: "700" },
+                TopUpStyles.summaryRow,
+                {
+                  borderTopWidth: 1,
+                  borderTopColor: "#F2F2F2",
+                  paddingTop: 8,
+                  marginTop: 6,
+                },
               ]}
             >
-              ${summary.usd} USD
-            </Text>
+              <Text style={[TopUpStyles.summaryKey, { fontWeight: "700" }]}>
+                {t('totalAmount')}
+              </Text>
+              <Text
+                style={[
+                  TopUpStyles.summaryValue,
+                  { color: Colors.primary, fontWeight: "700" },
+                ]}
+              >
+                ${summary.product?.totalAmountInUSD} USD
+              </Text>
+            </View>
+            <TouchableOpacity onPress={onEditAmount} style={{ marginTop: 8 }}>
+              <Text style={[TopUpStyles.editLink, { alignSelf: "flex-end" }]}>
+                {t('changeAmount')}
+              </Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity onPress={onEditAmount} style={{ marginTop: 8 }}>
-            <Text style={[TopUpStyles.editLink, { alignSelf: "flex-end" }]}>
-              {t('changeAmount')}
-            </Text>
-          </TouchableOpacity>
         </View>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
- paymentMethodContainer: {
+  paymentMethodContainer: {
     flexDirection: 'column',
     width: '100%',
     marginVertical: scale.hp(1.5),
@@ -470,7 +507,9 @@ const styles = StyleSheet.create({
     fontSize: scale.hp(2),
     fontWeight: '600',
   },
-
+  cardFieldWrapper: {
+    width: '100%',
+  },
 });
 
 export default StepPay;

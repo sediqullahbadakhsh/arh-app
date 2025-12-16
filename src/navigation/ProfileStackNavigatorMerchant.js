@@ -15,6 +15,7 @@ import ProfileDetailsScreenMerchant from "../screens/profileScreensMerchant/prof
 import ReverseStockReportScreen from "../screens/profileScreensMerchant/ReverseStockReportScreen";
 import CreateTicketScreen from "../screens/profileScreensMerchant/CreateTicketScreen";
 import TicketsReportScreen from "../screens/profileScreensMerchant/TicketReportScreen";
+import ChangePassword from "../screens/profileScreens/ChangePasswordScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -29,6 +30,13 @@ export default function ProfileStackNavigatorMerchant() {
         name="ReverseStockScreen"
         component={ReverseStockScreen}
       />
+      <Stack.Screen 
+  name="ChangePassword" 
+  component={ChangePassword}
+  options={{
+    headerShown: false,
+  }}
+/>
        <Stack.Screen
         name="CreateTicket"
         component={CreateTicketScreen}

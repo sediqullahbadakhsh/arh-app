@@ -30,6 +30,21 @@ export const getCustomerProfile = async () => {
   }
 };
 
+export const resetAgentPassword = async (payload) => {
+  try {
+    const lang = payload.lang || 'en';
+    const res = await api.post(`/reset-password/agent-self?lang=${lang}`, {
+      currentPassword: payload.currentPassword,
+      newPassword: payload.newPassword,
+      confirmPassword: payload.confirmPassword,
+    });
+    return res.data;
+  } catch (error) {
+    console.log('Reset password error:', error);
+    throw error;
+  }
+};
+
 export const updateCustomerProfile = async (formData) => {
   try {
     const response = await api.put("/customer/me", formData, {

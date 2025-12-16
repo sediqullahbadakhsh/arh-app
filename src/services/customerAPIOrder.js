@@ -33,7 +33,7 @@ export const makeRecharge = (payload = {})=>{
   return api.post(`/orders/customer?lang=en`,payload).then((r)=>r.data)
 }
 export const getOrderStatus = async (orderId) => {
-  try {
+ try {
     const response = await api.get(`/orders/customer/${orderId}`);
     return response.data;
   } catch (error) {

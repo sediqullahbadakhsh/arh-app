@@ -18,12 +18,11 @@ import { Ionicons } from "@expo/vector-icons";
 import ServiceHeader from "../../components/ServiceHeader";
 import { useTranslation } from "react-i18next";
 import { 
-  getAllGameCategories,
-  getAllGamesProductsForUser,
+  getAllSocialCategories,
+  getAllSocailProductsForUser,
 } from "../../services/merchantApi";
 import { scale } from "../../utils/normalizeSize";
 import { useQuery } from "@tanstack/react-query"; 
-
 
 const chunkArray = (array, chunkSize) => {
   const results = [];
@@ -46,146 +45,56 @@ const debounce = (func, wait) => {
   };
 };
 
-
-const SkeletonLoader = ({ showHeader = true }) => {
-  const { width } = Dimensions.get('window');
-  const CARD_WIDTH = (width - (scale.wp(5) * 2) - scale.wp(2)) / 2;
-  
-  const SkeletonPulse = ({ style }) => (
-    <View style={[styles.skeletonPulse, style]} />
-  );
-
-
-  const renderSkeletonHeader = () => (
-    <View style={styles.skeletonHeader}>
-      <SkeletonPulse style={styles.skeletonBackButton} />
-      <SkeletonPulse style={styles.skeletonHeaderTitle} />
-      <SkeletonPulse style={styles.skeletonRefreshButton} />
-    </View>
-  );
-
-
-  const renderSkeletonSearch = () => (
-    <View style={styles.skeletonSearchContainer}>
-      <SkeletonPulse style={styles.skeletonSearchIcon} />
-      <SkeletonPulse style={styles.skeletonSearchInput} />
-    </View>
-  );
-
-
-  const renderSkeletonCategories = () => (
-    <View style={styles.skeletonCategoriesContainer}>
-      {[1, 2, 3, 4, 5].map((item) => (
-        <SkeletonPulse 
-          key={`skeleton-category-${item}`}
-          style={styles.skeletonCategoryItem}
-        />
-      ))}
-    </View>
-  );
-
-
-  const renderSkeletonProductCard = () => (
-    <View style={[styles.skeletonProductCard, { width: CARD_WIDTH }]}>
-      <SkeletonPulse style={styles.skeletonProductImage} />
-      <View style={styles.skeletonProductContent}>
-        <SkeletonPulse style={styles.skeletonProductName} />
-        <SkeletonPulse style={styles.skeletonProductPrice} />
-        <SkeletonPulse style={styles.skeletonProductButton} />
-      </View>
-    </View>
-  );
-
-
-  const renderSkeletonProductRow = () => (
-    <View style={styles.skeletonProductRow}>
-      <View style={styles.skeletonProductContainer}>
-        {renderSkeletonProductCard()}
-      </View>
-      <View style={styles.skeletonProductContainer}>
-        {renderSkeletonProductCard()}
-      </View>
-    </View>
-  );
-
-  return (
-    <SafeAreaView style={styles.container}>
-      {showHeader && renderSkeletonHeader()}
-      {renderSkeletonSearch()}
-      {renderSkeletonCategories()}
-      
-      <FlatList
-        data={[1, 2, 3, 4]}
-        renderItem={() => renderSkeletonProductRow()}
-        keyExtractor={(item) => `skeleton-row-${item}`}
-        contentContainerStyle={styles.skeletonProductsList}
-        showsVerticalScrollIndicator={false}
-        ListHeaderComponent={() => (
-          <View style={styles.skeletonProductsHeader}>
-            <SkeletonPulse style={styles.skeletonSectionTitle} />
-          </View>
-        )}
-        ListFooterComponent={() => (
-          <View style={styles.skeletonFooter}>
-            <SkeletonPulse style={styles.skeletonLoadMore} />
-          </View>
-        )}
-      />
-    </SafeAreaView>
-  );
-};
-
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - (scale.wp(5) * 2) - scale.wp(2)) / 2;
 const ITEMS_PER_PAGE = 10;
 
-export default function GameCoinsCustomerScreen({ navigation, route }) {
+export default function SocialCustomerScreen({ navigation, route }) {
   const { t } = useTranslation();
   const { customer } = route?.params || {};
-  
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [currency, setCurrency] = useState("USD");
   const [chunkedProducts, setChunkedProducts] = useState([]);
   const [allProducts, setAllProducts] = useState([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [totalPages, setTotalPages] = useState(1);
-  const [refreshing, setRefreshing] = useState(false);
   
-  // API filters state
+
   const [apiFilters, setApiFilters] = useState({
     search: '',
     productCategoryId: null,
   });
 
-  // Refs
+
   const flatListRef = useRef(null);
   const isMountedRef = useRef(true);
   const isLoadingMoreRef = useRef(false);
 
-  // Categories query
   const { 
     data: categoriesData,
     isLoading: categoriesLoading,
     error: categoriesError,
     refetch: refetchCategories 
   } = useQuery({
-    queryKey: ['gameCategories'],
-    queryFn: getAllGameCategories,
+    queryKey: ['socialCategories'],
+    queryFn: getAllSocialCategories,
   });
 
-  // Products query with pagination
+
   const { 
     data: productsData,
     isLoading: productsLoading,
     error: productsError,
     refetch: refetchProducts,
-    isFetching: isFetchingProducts,
   } = useQuery({
-    queryKey: ['gameProducts', apiFilters, page],
-    queryFn: () => getAllGamesProductsForUser({
+    queryKey: ['socialProducts', apiFilters, page],
+    queryFn: () => getAllSocailProductsForUser({
       ...apiFilters,
       page: page,
       limit: ITEMS_PER_PAGE,
@@ -218,7 +127,7 @@ export default function GameCoinsCustomerScreen({ navigation, route }) {
       console.error("Error fetching products:", productsError);
       Alert.alert(t("error"), t("failedToLoadProducts"));
     }
-  }, [categoriesError, productsError, t]);
+  }, [categoriesError, productsError]);
 
   useEffect(() => {
     if (categoriesData) {
@@ -226,7 +135,7 @@ export default function GameCoinsCustomerScreen({ navigation, route }) {
     }
   }, [categoriesData]);
 
-  // Handle products data and pagination
+
   useEffect(() => {
     if (productsData?.data && isMountedRef.current) {
       const newProducts = productsData.data;
@@ -242,24 +151,19 @@ export default function GameCoinsCustomerScreen({ navigation, route }) {
       });
       
       if (page === 1) {
-        // First page - replace all products
         setAllProducts(newProducts || []);
       } else {
-        // Subsequent pages - append products
         setAllProducts(prev => {
-          // Avoid duplicates
           const existingIds = new Set(prev.map(p => p.id));
           const uniqueNewProducts = (newProducts || []).filter(p => !existingIds.has(p.id));
           return [...prev, ...uniqueNewProducts];
         });
       }
       
-      // Update pagination info
       if (meta) {
         setTotalPages(meta.pages || 1);
         setHasMore(page < meta.pages);
       } else {
-        // Fallback logic if no meta data
         const hasMoreItems = (newProducts || []).length >= ITEMS_PER_PAGE;
         setHasMore(hasMoreItems);
       }
@@ -269,29 +173,25 @@ export default function GameCoinsCustomerScreen({ navigation, route }) {
     }
   }, [productsData, page]);
 
-  // Update chunked products whenever allProducts changes
   useEffect(() => {
     setChunkedProducts(chunkArray(allProducts, 2));
-  }, [allProducts]);
+    setLoading(categoriesLoading || (productsLoading && page === 1));
+  }, [allProducts, categoriesLoading, productsLoading, page]);
 
-  // Update API filters when search or category changes
   const updateApiFilters = useCallback((newFilters) => {
     console.log("Updating filters, resetting to page 1");
     setApiFilters(prev => ({
       ...prev,
       ...newFilters,
     }));
-    // Reset to page 1 when filters change
     setPage(1);
     setHasMore(true);
     setAllProducts([]);
-    // Scroll to top when filters change
     if (flatListRef.current) {
       flatListRef.current.scrollToOffset({ offset: 0, animated: true });
     }
   }, []);
 
-  // Debounced search function
   const debouncedSearch = useCallback(
     debounce((searchText) => {
       updateApiFilters({ 
@@ -302,25 +202,21 @@ export default function GameCoinsCustomerScreen({ navigation, route }) {
     [selectedCategory, updateApiFilters]
   );
 
-  // Handle search input change
   const handleSearchChange = (text) => {
     setSearchQuery(text);
     debouncedSearch(text);
   };
 
-  // Handle category selection
   const handleCategorySelect = (category) => {
     const newCategory = selectedCategory?.id === category.id ? null : category;
     setSelectedCategory(newCategory);
     
-    // Update API filters with new category
     updateApiFilters({ 
       productCategoryId: newCategory?.id || null,
       search: searchQuery,
     });
   };
 
-  // Load more products
   const loadMoreProducts = useCallback(async () => {
     console.log("loadMoreProducts called:", {
       hasMore,
@@ -341,12 +237,11 @@ export default function GameCoinsCustomerScreen({ navigation, route }) {
     isLoadingMoreRef.current = true;
     setLoadingMore(true);
     
-    // Increment page to trigger new query
     const nextPage = page + 1;
     setPage(nextPage);
+    
   }, [hasMore, loadingMore, productsLoading, page, totalPages]);
 
-  // Clear search
   const clearSearch = () => {
     setSearchQuery("");
     updateApiFilters({ 
@@ -355,7 +250,6 @@ export default function GameCoinsCustomerScreen({ navigation, route }) {
     });
   };
 
-  // Clear all filters
   const clearAllFilters = () => {
     setSearchQuery("");
     setSelectedCategory(null);
@@ -387,7 +281,7 @@ export default function GameCoinsCustomerScreen({ navigation, route }) {
   };
 
   const handleProductSelect = (product) => {
-    navigation.navigate("GameActivationCustomer", { 
+    navigation.navigate("SocialActivationScreen", { 
       product, 
       customer,
     });
@@ -439,7 +333,7 @@ export default function GameCoinsCustomerScreen({ navigation, route }) {
           />
         ) : (
           <View style={styles.productImagePlaceholder}>
-            <Ionicons name="game-controller" size={65} color={Colors.primary} />
+            <Ionicons name="chatbubble" size={65} color={Colors.primary} />
           </View>
         )}
         
@@ -464,18 +358,6 @@ export default function GameCoinsCustomerScreen({ navigation, route }) {
     );
   };
 
-  // Loading More Skeleton Product Card
-  const renderLoadingMoreProductCard = () => (
-    <View style={[styles.loadingMoreCard, { width: CARD_WIDTH }]}>
-      <View style={styles.loadingMoreImage} />
-      <View style={styles.loadingMoreContent}>
-        <View style={styles.loadingMoreText} />
-        <View style={[styles.loadingMoreText, { width: '70%' }]} />
-        <View style={styles.loadingMoreButton} />
-      </View>
-    </View>
-  );
-
   const renderRow = ({ item: row, index }) => {
     return (
       <View style={styles.rowContainer}>
@@ -495,28 +377,19 @@ export default function GameCoinsCustomerScreen({ navigation, route }) {
     );
   };
 
-  // Loading More Row
-  const renderLoadingMoreRow = () => (
-    <View style={styles.rowContainer}>
-      <View style={[styles.productContainer, styles.firstInRow]}>
-        {renderLoadingMoreProductCard()}
-      </View>
-      <View style={[styles.productContainer, styles.lastInRow]}>
-        {renderLoadingMoreProductCard()}
-      </View>
-    </View>
-  );
-
-  // Render footer with loading indicator or skeleton
   const renderFooter = () => {
     if (loadingMore) {
       return (
         <View style={styles.footerContainer}>
-          {renderLoadingMoreRow()}
+          <ActivityIndicator size="small" color={Colors.primary} />
+          <Text style={styles.footerText}>
+            {t("loadingMore") || "Loading more"}
+          </Text>
         </View>
       );
     }
     
+ 
     if (hasMore && allProducts.length > 0 && !loadingMore) {
       return (
         <TouchableOpacity
@@ -531,16 +404,6 @@ export default function GameCoinsCustomerScreen({ navigation, route }) {
       );
     }
     
-    if (!hasMore && allProducts.length > 0) {
-      return (
-        <View style={styles.noMoreContainer}>
-          <Text style={styles.noMoreText}>
-            {t("noMoreProducts") || "No more products"}
-          </Text>
-        </View>
-      );
-    }
-    
     return null;
   };
 
@@ -549,17 +412,17 @@ export default function GameCoinsCustomerScreen({ navigation, route }) {
     
     return (
       <View style={styles.emptyState}>
-        <Ionicons name="game-controller-outline" size={64} color={Colors.textSecondary} />
+        <Ionicons name="chatbubbles" size={64} color={Colors.textSecondary} />
         <Text style={styles.emptyStateTitle}>
           {apiFilters.search || apiFilters.productCategoryId 
-            ? t("noGamesFound") || "No Games Found"
-            : t("noGamesAvailable") || "No Games Available"}
+            ? t("noSocialFound") || "No social product found"
+            : t("noSocialAvailable") || "No social product available"}
         </Text>
         <Text style={styles.emptyStateText}>
           {apiFilters.search 
             ? t("noResultsForSearch") || `No results for "${apiFilters.search}"`
             : apiFilters.productCategoryId
-            ? t("noGamesInCategory") || "No games found in this category"
+            ? t("noSocialInCategory") || "No social found in this category"
             : t("tryAgainLater") || "Please try again later"}
         </Text>
         
@@ -586,26 +449,35 @@ export default function GameCoinsCustomerScreen({ navigation, route }) {
 
   const handleEndReached = useCallback(() => {
     console.log("handleEndReached triggered");
+    console.log("Current state:", {
+      loadingMore,
+      hasMore,
+      productsLoading,
+      page,
+      totalPages,
+      totalProducts: allProducts.length
+    });
     
     if (!loadingMore && hasMore && !productsLoading) {
       console.log("Conditions met, calling loadMoreProducts");
       loadMoreProducts();
+    } else {
+      console.log("Conditions NOT met:", {
+        loadingMore,
+        hasMore,
+        productsLoading
+      });
     }
-  }, [loadingMore, hasMore, productsLoading, loadMoreProducts]);
+  }, [loadingMore, hasMore, productsLoading, loadMoreProducts, page, totalPages, allProducts.length]);
 
   const hasActiveFilters = apiFilters.search || apiFilters.productCategoryId;
   const isLoading = categoriesLoading || (productsLoading && page === 1);
   const totalProducts = allProducts.length;
 
-  // Show skeleton loader on initial load
-  if (isLoading) {
-    return <SkeletonLoader showHeader={true} />;
-  }
-
   return (
     <SafeAreaView style={styles.container}>
       <ServiceHeader 
-        title={t("gameCoins") || "Game Coins"} 
+        title={t("social") || "Social"} 
         onBack={() => navigation.goBack()}
         rightIcon={
           <TouchableOpacity onPress={loadData}>
@@ -618,7 +490,7 @@ export default function GameCoinsCustomerScreen({ navigation, route }) {
         <Ionicons name="search" size={20} color={Colors.textSecondary} />
         <TextInput
           style={styles.searchInput}
-          placeholder={t("searchGames") || "Search games..."}
+          placeholder={t("searchSocial") || "Search social..."}
           placeholderTextColor={Colors.textSecondary}
           value={searchQuery}
           onChangeText={handleSearchChange}
@@ -646,6 +518,7 @@ export default function GameCoinsCustomerScreen({ navigation, route }) {
         </View>
       )}
 
+  
       {hasActiveFilters && (
         <View style={styles.activeFiltersContainer}>
           <Text style={styles.activeFiltersText}>
@@ -684,33 +557,43 @@ export default function GameCoinsCustomerScreen({ navigation, route }) {
         </View>
       )}
 
-      <FlatList
-        ref={flatListRef}
-        data={chunkedProducts}
-        renderItem={renderRow}
-        keyExtractor={(item, index) => `row-${index}-${page}`}
-        contentContainerStyle={[
-          styles.productsList,
-          chunkedProducts.length === 0 && styles.emptyListContainer
-        ]}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={[Colors.primary]}
-            tintColor={Colors.primary}
-          />
-        }
-        ListEmptyComponent={renderEmptyState}
-        ListFooterComponent={renderFooter}
-        onEndReached={handleEndReached}
-        onEndReachedThreshold={0.3}
-        removeClippedSubviews={false}
-        maxToRenderPerBatch={10}
-        initialNumToRender={10}
-        windowSize={10}
-      />
+    
+
+      {isLoading && page === 1 ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={styles.loadingText}>{t("loadingSocial") || "Loading social products..."}</Text>
+        </View>
+      ) : (
+        <FlatList
+          ref={flatListRef}
+          data={chunkedProducts}
+          renderItem={renderRow}
+          keyExtractor={(item, index) => `row-${index}-${page}`}
+          contentContainerStyle={[
+            styles.productsList,
+            chunkedProducts.length === 0 && styles.emptyListContainer
+          ]}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[Colors.primary]}
+              tintColor={Colors.primary}
+            />
+          }
+          ListEmptyComponent={renderEmptyState}
+          ListFooterComponent={renderFooter}
+          onEndReached={handleEndReached}
+          onEndReachedThreshold={0.3}
+          removeClippedSubviews={false}
+          maxToRenderPerBatch={10}
+          initialNumToRender={10}
+          windowSize={10}
+        
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -721,173 +604,12 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
     marginBottom: 100,
   },
-  
-  // Skeleton Styles
-  skeletonPulse: {
-    backgroundColor: '#E0E0E0',
-    borderRadius: 4,
-  },
-  skeletonHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: scale.wp(4),
-    paddingVertical: scale.hp(2),
-    backgroundColor: Colors.background,
-  },
-  skeletonBackButton: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-  },
-  skeletonHeaderTitle: {
-    width: scale.wp(40),
-    height: 24,
-    borderRadius: 4,
-  },
-  skeletonRefreshButton: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-  },
-  skeletonSearchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    margin: scale.wp(4),
-    paddingHorizontal: scale.wp(3),
-    paddingVertical: scale.hp(1.2),
-    borderRadius: scale.wp(2.5),
-  },
-  skeletonSearchIcon: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-  },
-  skeletonSearchInput: {
-    flex: 1,
-    height: 20,
-    marginLeft: scale.wp(2),
-    borderRadius: 4,
-  },
-  skeletonCategoriesContainer: {
-    flexDirection: 'row',
-    marginHorizontal: scale.wp(4),
-    marginTop: scale.hp(1),
-    marginBottom: scale.hp(2)
-  },
-  skeletonCategoryItem: {
-    width: scale.wp(25),
-    height: scale.hp(3.5),
-    borderRadius: scale.wp(10),
-    marginRight: scale.wp(2),
-  },
-  skeletonProductsList: {
-    paddingHorizontal: scale.wp(4),
-    paddingBottom: scale.hp(2),
-  },
-  skeletonProductsHeader: {
-    marginBottom: scale.hp(2),
-  },
-  skeletonSectionTitle: {
-    width: scale.wp(40),
-    height: 20,
-    borderRadius: 4,
-  },
-  skeletonProductRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: scale.hp(2),
-  },
-  skeletonProductContainer: {
-    width: (Dimensions.get('window').width - (scale.wp(5) * 2) - scale.wp(2)) / 2,
-  },
-  skeletonProductCard: {
-    backgroundColor: "#fff",
-    borderRadius: scale.wp(3),
-    padding: scale.wp(2.5),
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  skeletonProductImage: {
-    width: '100%',
-    height: scale.wp(30),
-    borderRadius: scale.wp(2),
-    marginBottom: scale.hp(1),
-  },
-  skeletonProductContent: {
-    flex: 1,
-  },
-  skeletonProductName: {
-    width: '90%',
-    height: 16,
-    borderRadius: 4,
-    marginBottom: scale.hp(0.8),
-  },
-  skeletonProductPrice: {
-    width: '70%',
-    height: 14,
-    borderRadius: 4,
-    marginBottom: scale.hp(1.2),
-  },
-  skeletonProductButton: {
-    width: '100%',
-    height: 36,
-    borderRadius: scale.wp(2),
-  },
-  skeletonFooter: {
-    alignItems: 'center',
-    paddingVertical: scale.hp(2),
-  },
-  skeletonLoadMore: {
-    width: scale.wp(30),
-    height: scale.hp(4),
-    borderRadius: scale.wp(3),
-  },
-  
-  // Loading More Styles
-  loadingMoreCard: {
-    backgroundColor: "#fff",
-    borderRadius: scale.wp(3),
-    padding: scale.wp(2.5),
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  loadingMoreImage: {
-    width: '100%',
-    height: scale.wp(30),
-    borderRadius: scale.wp(2),
-    backgroundColor: '#F5F5F5',
-    marginBottom: scale.hp(1),
-  },
-  loadingMoreContent: {
-    flex: 1,
-  },
-  loadingMoreText: {
-    height: 16,
-    backgroundColor: '#F5F5F5',
-    borderRadius: 4,
-    marginBottom: scale.hp(0.8),
-  },
-  loadingMoreButton: {
-    width: '100%',
-    height: 36,
-    backgroundColor: '#F5F5F5',
-    borderRadius: scale.wp(2),
-  },
-  
-  // Existing Styles
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#fff",
     margin: scale.wp(4),
+ 
     paddingHorizontal: scale.wp(3),
     paddingVertical: scale.hp(0.5),
     borderRadius: scale.wp(2.5),
@@ -972,6 +694,28 @@ const styles = StyleSheet.create({
     fontSize: scale.hp(1.4),
     color: "#fff",
     fontWeight: "500",
+  },
+  resultsCountContainer: {
+    paddingHorizontal: scale.wp(4),
+    paddingVertical: scale.hp(1),
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e9ecef",
+  },
+  resultsCountText: {
+    fontSize: scale.hp(1.6),
+    color: Colors.textSecondary,
+    fontWeight: "500",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: scale.hp(2),
+    fontSize: scale.hp(1.8),
+    color: Colors.textSecondary,
   },
   productsList: {
     paddingHorizontal: scale.wp(4),
@@ -1102,7 +846,15 @@ const styles = StyleSheet.create({
     fontSize: scale.hp(1.6),
   },
   footerContainer: {
-    paddingVertical: scale.hp(2),
+    paddingVertical: scale.hp(3),
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+  },
+  footerText: {
+    marginLeft: scale.wp(2),
+    fontSize: scale.hp(1.6),
+    color: Colors.textSecondary,
   },
   loadMoreButton: {
     paddingVertical: scale.hp(1.5),

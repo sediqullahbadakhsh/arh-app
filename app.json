@@ -4,7 +4,7 @@
     "slug": "arh",
     "version": "1.0.0",
     "orientation": "portrait",
-    "owner": "karimjan",
+    "owner": "karimi25",
     "icon": "./assets/icon.png",
     "assetBundlePatterns": [
       "**/*"
@@ -18,28 +18,17 @@
     },
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.sediqullah.badakhsh.arh",
       "infoPlist": {
-        "NSCameraUsageDescription": "Allow ARH to use your camera to capture verification photos.",
-        "NSPhotoLibraryAddUsageDescription": "Allow ARH to save photos for your application.",
-        "NSUserTrackingUsageDescription": "This identifier will be used to deliver personalized ads to you.",
-        "UIBackgroundModes": [
-          "remote-notification",
-          "fetch"
-        ],
-        "SKAdNetworkItems": [
-          {
-            "SKAdNetworkIdentifier": "v9wttpbfk9.skadnetwork"
-          },
-          {
-            "SKAdNetworkIdentifier": "n38lu8286q.skadnetwork"
-          }
-        ]
-      },
-      "bundleIdentifier": "com.sediqullah.badakhsh.arh"
+        "NSPhotoLibraryUsageDescription": "Allow $(PRODUCT_NAME) to save transaction receipts to your photos.",
+        "NSPhotoLibraryAddUsageDescription": "Allow $(PRODUCT_NAME) to save transaction receipts to your photos."
+      }
     },
     "android": {
       "package": "com.sediqullah.badakhsh.arh",
-      "versionCode": 1,
+      "versionCode": 3,
+      "versionName": "1.0.1",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -48,7 +37,6 @@
         "INTERNET",
         "ACCESS_NETWORK_STATE",
         "CAMERA",
-        "WRITE_EXTERNAL_STORAGE",
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE",
         "WAKE_LOCK",
@@ -56,14 +44,18 @@
         "USE_FULL_SCREEN_INTENT",
         "POST_NOTIFICATIONS"
       ],
+      "blockedPermissions": [
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ],
+      "allowBackup": true,
       "usesCleartextTraffic": true
-    },
-    "web": {
-      "favicon": "./assets/favicon.png"
     },
     "extra": {
       "eas": {
-        "projectId": "e3c89cdd-c15f-4ed0-bc51-aea1646077ca"
+        "projectId": "ee465f33-6119-4032-92dc-8f9488f7cc6a"
       }
     },
     "plugins": [
@@ -72,16 +64,18 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/notification-icon.png",
+          "icon": "./assets/icon.png",
           "color": "#ffffff",
-          "sounds": ["./assets/notification-sound.wav"],
-          "defaultChannel": {
-            "name": "default",
-            "importance": "max",
-            "sound": "default",
-            "enableVibrate": true
-          },
+          "defaultChannel": "default",
           "mode": "production"
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow Yes Charge to save transaction receipts.",
+          "savePhotosPermission": "Allow Yes Charge to save receipts to your photos.",
+          "isAccessMediaLocationEnabled": false
         }
       ],
       [
@@ -90,7 +84,7 @@
           "android": {
             "compileSdkVersion": 35,
             "targetSdkVersion": 35,
-            "buildToolsVersion": "34.0.0",
+            "buildToolsVersion": "35.0.0",
             "usesCleartextTraffic": true,
             "networkSecurityConfig": {
               "cleartextTrafficPermitted": true,
@@ -100,7 +94,8 @@
                 "10.0.2.2",
                 "127.0.0.1",
                 "exp.host",
-                "*.exp.host"
+                "*.exp.host",
+                "*.expo.dev"
               ]
             }
           },

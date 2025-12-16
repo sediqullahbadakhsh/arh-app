@@ -9,18 +9,29 @@ export const isRTL = (languageCode) => {
 };
 
 /**
- * @param {string} languageCode
- * @returns {boolean}
+ * Apply RTL settings synchronously and persistently
  */
 export const applyRTLSettings = (languageCode) => {
   try {
     const shouldBeRTL = isRTL(languageCode);
     
+    // Check if we need to change anything
     if (I18nManager.isRTL !== shouldBeRTL) {
       I18nManager.allowRTL(shouldBeRTL);
       I18nManager.forceRTL(shouldBeRTL);
       
-      console.log(`RTL settings changed: ${shouldBeRTL ? 'RTL' : 'LTR'}`);
+      // Force layout update
+      if (Platform.OS === 'android') {
+        // On Android, we need to force RN to pick up RTL changes
+        const reactTag = findNodeHandle(AppState.currentState);
+        if (reactTag) {
+          UIManager.setLayoutAnimationEnabledExperimental &&
+            UIManager.setLayoutAnimationEnabledExperimental(true);
+          LayoutAnimation.configureNext(LayoutAnimation.Presets.spring);
+        }
+      }
+      
+      console.log(`RTL settings applied: ${shouldBeRTL ? 'RTL' : 'LTR'} (was ${I18nManager.isRTL ? 'RTL' : 'LTR'})`);
       return true;
     }
     
@@ -32,8 +43,37 @@ export const applyRTLSettings = (languageCode) => {
 };
 
 /**
- * @returns {boolean} 
+ * Ensure RTL is properly initialized
  */
-export const getCurrentRTLStatus = () => {
-  return I18nManager.isRTL;
+export const initializeRTL = async (languageCode) => {
+  try {
+    // First, ensure RTL is allowed
+    I18nManager.allowRTL(true);
+    
+    // Then apply specific RTL setting
+    const shouldBeRTL = isRTL(languageCode);
+    I18nManager.forceRTL(shouldBeRTL);
+    
+    // Store in AsyncStorage for persistence
+    await AsyncStorage.setItem('app_rtl_setting', JSON.stringify(shouldBeRTL));
+    
+    console.log(`RTL initialized to: ${shouldBeRTL ? 'RTL' : 'LTR'}`);
+    return shouldBeRTL;
+  } catch (error) {
+    console.error('Error initializing RTL:', error);
+    return false;
+  }
+};
+
+/**
+ * Get persisted RTL setting
+ */
+export const getPersistedRTLSetting = async () => {
+  try {
+    const setting = await AsyncStorage.getItem('app_rtl_setting');
+    return setting !== null ? JSON.parse(setting) : null;
+  } catch (error) {
+    console.error('Error getting persisted RTL:', error);
+    return null;
+  }
 };

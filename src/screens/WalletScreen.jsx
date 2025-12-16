@@ -21,7 +21,7 @@ import { useUser } from "../context/userContext";
 import { formatDateTime } from "../utils/formatDate";
 import ReceiptModal1 from "../components/ReceiptModal";
 import { scale } from "../utils/normalizeSize";
-
+import { useTranslation } from "react-i18next"; // Add this import
 
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = width - 48;
@@ -42,6 +42,7 @@ export default function WalletScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [txLoading, setTxLoading] = useState(true);
   const scrollX = useRef(new Animated.Value(0)).current;
+  const { t } = useTranslation(); // Add translation hook
   
   // Receipt modal state
   const [receiptModalVisible, setReceiptModalVisible] = useState(false);
@@ -69,20 +70,18 @@ export default function WalletScreen({ navigation }) {
           getStockInOut()
         ]);
 
-   
         const commissionWallet = {
           ...walletsRes?.comissionWallet,
           key: "commission",
-          label: "Commission Wallet",
+          label: t('commissionWallet'), // Translated
         };
         const primaryWallet = {
           ...walletsRes?.primaryWallet,
           key: "primary",
-          label: "Primary Wallet",
+          label: t('primaryWallet'), // Translated
         };
         const data = [primaryWallet, commissionWallet];
         setWallets(data);
-
 
         setTx(stockRes?.data || []);
       } catch (error) {
@@ -100,12 +99,10 @@ export default function WalletScreen({ navigation }) {
     navigation.goBack();
   };
 
- 
   const handleTransactionPress = (transaction) => {
     setSelectedTransaction(transaction);
     setReceiptModalVisible(true);
   };
-
 
   const renderSkeletonCard = ({ item, index }) => {
     const inputRange = [
@@ -195,7 +192,6 @@ export default function WalletScreen({ navigation }) {
           end={{ x: 1, y: 1 }}
           style={styles.walletCard}
         >
-    
           <View style={styles.cardPattern}>
             <View style={styles.patternCircle1} />
             <View style={styles.patternCircle2} />
@@ -203,9 +199,9 @@ export default function WalletScreen({ navigation }) {
 
           <View style={styles.cardHeader}>
             <View style={styles.balanceSection}>
-              <Text style={styles.walletLabel}>Wallet Balance</Text>
+              <Text style={styles.walletLabel}>{t('walletBalance')}</Text>
               <Text style={styles.balanceText}>
-                {formatAF(item.balance)} AF
+                {formatAF(item.balance)} {t('currency')}
               </Text>
               <Text style={styles.walletName}>{item.label}</Text>
             </View>
@@ -215,7 +211,6 @@ export default function WalletScreen({ navigation }) {
             </View>
           </View>
 
-    
           {item.key === "commission" && (
             <TouchableOpacity
               onPress={() =>
@@ -233,7 +228,7 @@ export default function WalletScreen({ navigation }) {
                 end={{ x: 1, y: 0 }}
               >
                 <Text style={styles.transferButtonText}>
-                  Transfer To Primary
+                  {t('transferToPrimary')}
                 </Text>
                 <Ionicons
                   name="arrow-forward"
@@ -249,7 +244,6 @@ export default function WalletScreen({ navigation }) {
     );
   };
 
-  // Skeleton for Transaction Item
   const renderSkeletonTransaction = ({ item, index }) => (
     <View style={styles.txRow}>
       <View style={styles.txLeft}>
@@ -284,12 +278,12 @@ export default function WalletScreen({ navigation }) {
         </View>
         <View style={styles.txInfo}>
           <Text style={styles.txTitle}>
-            {item.type === "IN" ? "Stock In" : "Stock Out"}
+            {item.type === "IN" ? t('stockIn') : t('stockOut')}
           </Text>
           <Text style={styles.txSub}>
             {formatDateTime(item.createdAt)} • {item.type === "IN" ? 
-              `From ${item.from_wallet_id}` : 
-              `To ${item.to_wallet_id || "Activate Bundle"}`}
+              `${t('from')} ${item.from_wallet_id}` : 
+              `${t('to')} ${item.to_wallet_id || t('activateBundle')}`}
           </Text>
         </View>
       </View>
@@ -300,7 +294,7 @@ export default function WalletScreen({ navigation }) {
         ]}
       >
         {item.type === "OUT" ? "-" : "+"}
-        {formatAF(Math.abs(item.amount))} AF
+        {formatAF(Math.abs(item.amount))} {t('currency')}
       </Text>
     </TouchableOpacity>
   );
@@ -308,14 +302,13 @@ export default function WalletScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
-      <ServiceHeader title="Wallet" onBack={goBack} />
+      <ServiceHeader title={t('wallet')} onBack={goBack} />
 
       <ScrollView 
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-
         <View style={styles.carouselContainer}>
           <Animated.FlatList
             ref={flatRef}
@@ -346,7 +339,7 @@ export default function WalletScreen({ navigation }) {
 
         <View style={styles.recentContainer}>
           <View style={styles.recentHeader}>
-            <Text style={styles.recentTitle}>Recent Transactions</Text>
+            <Text style={styles.recentTitle}>{t('recentTransactions')}</Text>
           </View>
           
           <FlatList
@@ -360,16 +353,15 @@ export default function WalletScreen({ navigation }) {
           {!txLoading && tx.length === 0 && (
             <View style={styles.emptyState}>
               <Ionicons name="receipt-outline" size={48} color="#CCCCCC" />
-              <Text style={styles.emptyStateText}>No transactions yet</Text>
+              <Text style={styles.emptyStateText}>{t('noTransactions')}</Text>
               <Text style={styles.emptyStateSubText}>
-                Your transactions will appear here
+                {t('transactionsWillAppear')}
               </Text>
             </View>
           )}
         </View>
       </ScrollView>
 
-  
       <ReceiptModal1
         visible={receiptModalVisible}
         onClose={() => setReceiptModalVisible(false)}
@@ -558,7 +550,7 @@ const styles = StyleSheet.create({
     borderRadius: scale.wp(5.2),
     justifyContent: "center",
     alignItems: "center",
-    marginRight: scale.wp(3.1),
+    marginEnd: scale.wp(3.1),
   },
   txInIcon: {
     backgroundColor: "rgba(11, 163, 96, 0.1)",
@@ -665,4 +657,3 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 });
-

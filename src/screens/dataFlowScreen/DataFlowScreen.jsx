@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from "react";
+import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -19,6 +19,13 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import {
+  QueryClient,
+  QueryClientProvider,
+  useQuery,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { Colors } from "../../theme/colors";
 import ServiceHeader from "../../components/ServiceHeader";
 import PrimaryButton from "../../components/PrimaryButton";
@@ -27,18 +34,17 @@ import { DIAL_CODES, guessOperator } from "../../constants/dialing";
 import { useAuth } from "../../auth/AuthProvider";
 import { 
   getCountries, 
-  getDataProducts,
+  getDataProductsCustomer,
   getBundleCategories,
   getBundleTypes,
-  getOrderStatus,
   getCurrencies,
+  checkBundleOrderStatus,
   getSlabs
 } from "../../services/merchantApi";
 import { activateBundleByCustomer } from "../../services/customerAPIOrder";
 import * as Contacts from 'expo-contacts';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import formatLocal from "../../utils/formatLocal";
-import DataStyles from "./DataStyles";
 import StepCountry from "./StepCountry";
 import StepNumber from "./StepNumber";
 import StepProducts from "./StepProducts";
@@ -58,329 +64,157 @@ const ORDER_STATUS = {
   PENDING: 'pending'
 };
 
-const OrderStatusScreen = ({ 
-  orderStatus, 
-  orderDetails, 
-  getStatusIcon, 
-  getStatusTitle, 
-  getStatusColor, 
-  getStatusMessage, 
-  resetFlow, 
-  navigation,
-  pollingRef 
-}) => {
-  return (
-    <View style={{ flex: 1, paddingBottom: 100 }}>
-      <ScrollView
-        contentContainerStyle={{ 
-          flexGrow: 1,
-          padding: 24, 
-          alignItems: "center",
-          justifyContent: 'center'
-        }}
-      >
-        <View style={styles.statusHeader}>
-          {getStatusIcon()}
-          <Text style={[styles.statusTitle, { color: getStatusColor() }]}>
-            {getStatusTitle()}
-          </Text>
-        </View>
+// Create Query Client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      cacheTime: 10 * 60 * 1000, // 10 minutes
+      retry: 1,
+    },
+  },
+});
 
-        <View style={styles.detailsCard}>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Receiver Number</Text>
-            <Text style={styles.detailValue}>{orderDetails?.mobile}</Text>
-          </View>
-         
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Bundle Plan</Text>
-            <Text style={styles.detailValue}>{orderDetails?.productName?.en}</Text>
-          </View>
-
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Transaction ID</Text>
-            <Text style={styles.detailValue}>{orderDetails?.txnNumber}</Text>
-          </View>
-
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Date</Text>
-            <Text style={styles.detailValue}>
-              {new Date(orderDetails?.date).toLocaleString()}
-            </Text>
-          </View>
-
-          <View style={styles.amountSection}>
-            <Text style={styles.amountLabel}>Total Amount</Text>
-            <Text style={styles.amountValue}>{orderDetails?.amountAfn} AFN</Text>
-            <Text style={styles.amountSubValue}>${orderDetails?.usdAmount} USD</Text>
-          </View>
-        </View>
-
-        <View style={styles.statusMessageContainer}>
-          <Text style={[styles.statusMessage, { color: getStatusColor() }]}>
-            {getStatusMessage()}
-            {orderDetails?.error && `\n\nError: ${orderDetails.error}`}
-          </Text>
-        </View>
-
-        {(orderStatus === ORDER_STATUS.QUEUED || orderStatus === ORDER_STATUS.PROCESSING || orderStatus === ORDER_STATUS.PENDING) && (
-          <View style={styles.progressContainer}>
-            <View style={styles.progressBar}>
-              <View 
-                style={[
-                  styles.progressFill,
-                  { 
-                    width: orderStatus === ORDER_STATUS.QUEUED ? '30%' : 
-                          (orderStatus === ORDER_STATUS.PROCESSING ? '60%' : '80%'),
-                    backgroundColor: getStatusColor()
-                  }
-                ]} 
-              />
-            </View>
-            <Text style={styles.progressText}>
-              {orderStatus === ORDER_STATUS.QUEUED ? 'Queued' : 
-              orderStatus === ORDER_STATUS.PROCESSING ? 'Processing' : 'Finalizing...'}
-            </Text>
-          </View>
-        )}
-
-        {(orderStatus === ORDER_STATUS.SUCCEEDED || orderStatus === ORDER_STATUS.FAILED) && (
-          <PrimaryButton
-            label="Done"
-            onPress={() => {
-              if (pollingRef.current) {
-                clearInterval(pollingRef.current);
-              }
-              navigation.popToTop();
-            }}
-            style={{ width: "100%", marginTop: 20 }}
-          />
-        )}
-
-        <TouchableOpacity onPress={resetFlow} style={styles.moreButton}>
-          <Text style={styles.moreButtonText}>
-            {orderStatus === ORDER_STATUS.FAILED ? "Try Again" : "Activate More"}
-          </Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </View>
-  );
+const QUERY_KEYS = {
+  COUNTRIES: ['countries'],
+  BUNDLE_CATEGORIES: ['bundle-categories'],
+  BUNDLE_TYPES: ['bundle-types'],
+  DATA_PRODUCTS: (countryId, categoryId, typeId) => ['data-products', countryId, categoryId, typeId],
+  CURRENCIES: ['currencies'],
+  SLABS: ['slabs'],
+  CONTACTS: ['contacts'],
 };
 
-const ContactsModal = ({ 
-  contactsModalVisible, 
-  setContactsModalVisible, 
-  contactsSlideAnim, 
-  insets, 
-  searchQuery, 
-  setSearchQuery, 
-  filteredContacts, 
-  handleContactSelect,
-  t 
-}) => {
-  return (
-    <Modal
-      visible={contactsModalVisible}
-      transparent={true}
-      animationType="none"
-      statusBarTranslucent={true}
-      onRequestClose={() => setContactsModalVisible(false)}
-    >
-      <View style={styles.modalOverlay}>
-        <TouchableOpacity 
-          style={styles.modalBackdrop}
-          activeOpacity={1}
-          onPress={() => setContactsModalVisible(false)}
-        />
-        <Animated.View 
-          style={[
-            styles.modalCard,
-            { 
-              transform: [{ translateY: contactsSlideAnim }],
-              height: '80%',
-              marginBottom: -insets.bottom
-            }
-          ]}
-        >
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{t("selectContact")}</Text>
-            <TouchableOpacity 
-              onPress={() => setContactsModalVisible(false)}
-              style={styles.closeButton}
-            >
-              <Ionicons name="close" size={24} color="#666" />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.searchContainer}>
-            <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
-            <TextInput
-              placeholder="Search contacts..."
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              style={styles.searchInput}
-              placeholderTextColor="#999"
-            />
-          </View>
-
-          {filteredContacts.length > 0 ? (
-            <FlatList
-              data={filteredContacts}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.contactItem}
-                  onPress={() => {
-                    if (item.phoneNumbers && item.phoneNumbers.length > 0) {
-                      handleContactSelect(item.phoneNumbers[0].number);
-                    }
-                  }}
-                >
-                  <View style={styles.contactAvatar}>
-                    <Text style={{ color: 'white', fontWeight: 'bold' }}>
-                      {item.name ? item.name.charAt(0).toUpperCase() : '?'}
-                    </Text>
-                  </View>
-                  <View style={styles.contactInfo}>
-                    <Text style={styles.contactName}>{item.name}</Text>
-                    {item.phoneNumbers && item.phoneNumbers.length > 0 && (
-                      <Text style={styles.contactPhone}>{item.phoneNumbers[0].number}</Text>
-                    )}
-                  </View>
-                </TouchableOpacity>
-              )}
-              ItemSeparatorComponent={() => <View style={styles.contactSeparator} />}
-            />
-          ) : (
-            <View style={styles.emptyContainer}>
-              <Ionicons name="people-outline" size={48} color="#999" />
-              <Text style={styles.emptyText}>{t("noContactsFound")}</Text>
-            </View>
-          )}
-        </Animated.View>
-      </View>
-    </Modal>
-  );
+const useCountries = () => {
+  return useQuery({
+    queryKey: QUERY_KEYS.COUNTRIES,
+    queryFn: async () => {
+      const response = await getCountries();
+      return response?.data || [];
+    },
+    staleTime: 30 * 60 * 1000,
+  });
 };
 
-const CountriesModal = ({ 
-  countryOpen, 
-  setCountryOpen, 
-  countriesSlideAnim, 
-  insets, 
-  countrySearch, 
-  setCountrySearch, 
-  countries, 
-  setCountry 
-}) => {
-  return (
-    <Modal
-      visible={countryOpen}
-      transparent={true}
-      animationType="none"
-      statusBarTranslucent={true}
-      onRequestClose={() => setCountryOpen(false)}
-    >
-      <View style={styles.modalOverlay}>
-        <TouchableOpacity 
-          style={styles.modalBackdrop}
-          activeOpacity={1}
-          onPress={() => setCountryOpen(false)}
-        />
-        <Animated.View 
-          style={[
-            styles.modalCard,
-            { 
-              transform: [{ translateY: countriesSlideAnim }],
-              height: '80%',
-              marginBottom: -insets.bottom
-            }
-          ]}
-        >
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Select Country</Text>
-            <TouchableOpacity 
-              onPress={() => setCountryOpen(false)}
-              style={styles.closeButton}
-            >
-              <Ionicons name="close" size={24} color="#666" />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.searchContainer}>
-            <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
-            <TextInput
-              placeholder="Search countries..."
-              value={countrySearch}
-              onChangeText={setCountrySearch}
-              style={styles.searchInput}
-              placeholderTextColor="#999"
-            />
-          </View>
-
-          <FlatList
-            data={countries.filter(c =>
-              c.countryName?.toLowerCase().includes(countrySearch.toLowerCase()) ||
-              c.countryCode?.toLowerCase().includes(countrySearch.toLowerCase())
-            )}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.modalRow}
-                onPress={() => {
-                  setCountry(item);
-                  setCountryOpen(false);
-                  setCountrySearch('');
-                }}
-              >
-                <Text style={{ fontSize: 24, marginRight: 12 }}>
-                  {codeToFlag(item.countryCode)}
-                </Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: Colors.textPrimary, fontSize: 16, fontWeight: '500' }}>
-                    {item.countryName}
-                  </Text>
-                  <Text style={{ color: Colors.textSecondary, fontSize: 14 }}>
-                    {DIAL_CODES[item.countryCode] || ""}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            )}
-            ItemSeparatorComponent={() => <View style={styles.contactSeparator} />}
-          />
-        </Animated.View>
-      </View>
-    </Modal>
-  );
+const useBundleCategories = () => {
+  return useQuery({
+    queryKey: QUERY_KEYS.BUNDLE_CATEGORIES,
+    queryFn: async () => {
+      const response = await getBundleCategories();
+      return response?.data || [];
+    },
+    staleTime: 30 * 60 * 1000,
+  });
 };
 
-export default function DataFlowScreenMerchant({ navigation }) {
+const useBundleTypes = () => {
+  return useQuery({
+    queryKey: QUERY_KEYS.BUNDLE_TYPES,
+    queryFn: async () => {
+      const response = await getBundleTypes();
+      return response?.data || [];
+    },
+    staleTime: 30 * 60 * 1000,
+  });
+};
+
+const useDataProducts = (countryId, categoryId, typeId, enabled = false) => {
+  return useQuery({
+    queryKey: QUERY_KEYS.DATA_PRODUCTS(countryId, categoryId, typeId),
+    queryFn: async () => {
+      if (!countryId) return [];
+      
+      const filter = {
+        countryId,
+        productCategoryId: categoryId,
+        productTypeId: typeId,
+        productFor: "BUNDLE"
+      };
+      
+      const response = await getDataProductsCustomer(filter);
+      return response?.data || [];
+    },
+    enabled: !!countryId && enabled,
+    staleTime: 5 * 60 * 1000, 
+  });
+};
+
+const useCurrencies = () => {
+  return useQuery({
+    queryKey: QUERY_KEYS.CURRENCIES,
+    queryFn: async () => {
+      const response = await getCurrencies();
+      return response;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+};
+
+const useSlabs = () => {
+  return useQuery({
+    queryKey: QUERY_KEYS.SLABS,
+    queryFn: async () => {
+      const response = await getSlabs();
+      return response;
+    },
+    staleTime: 10 * 60 * 1000,
+  });
+};
+
+const useContacts = () => {
+  return useQuery({
+    queryKey: QUERY_KEYS.CONTACTS,
+    queryFn: async () => {
+      const { status } = await Contacts.requestPermissionsAsync();
+      if (status !== 'granted') {
+        throw new Error('Contacts permission denied');
+      }
+      
+      const { data } = await Contacts.getContactsAsync({
+        fields: [Contacts.Fields.Name, Contacts.Fields.PhoneNumbers],
+      });
+      
+      return data || [];
+    },
+    enabled: false,
+    staleTime: Infinity,
+    cacheTime: Infinity,
+  });
+};
+
+const useActivateBundle = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (payload) => {
+      const response = await activateBundleByCustomer(payload);
+      return response;
+    },
+    onError: (error) => {
+      console.error('Bundle activation mutation error:', error);
+    },
+  });
+};
+
+function DataFlowScreenMerchant({ navigation }) {
   const { user } = useAuth?.() || { user: null };
   const { confirmPayment } = useStripe();
   const lastStep = BASE_STEPS.PAY;
-  const [countries, setCountries] = useState([]);
-  const [bundleCategories, setBundleCategories] = useState([]);
-  const [bundleTypes, setBundleTypes] = useState([]);
   const [step, setStep] = useState(0);
   const [orderStatus, setOrderStatus] = useState(null);
   const [orderDetails, setOrderDetails] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [contacts, setContacts] = useState([]);
-  const [filteredContacts, setFilteredContacts] = useState([]);
   const [contactsModalVisible, setContactsModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [country, setCountry] = useState(null);
   const [countryOpen, setCountryOpen] = useState(false);
   const [countrySearch, setCountrySearch] = useState('');
   const [localNumber, setLocalNumber] = useState("");
-  const [products, setProducts] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedType, setSelectedType] = useState(null);
   const [product, setProduct] = useState(null);
   const [search, setSearch] = useState("");
   const [exchangeRate, setExchangeRate] = useState(null);
   const [slabPercentage, setSlabPercentage] = useState(0);
-  const [loadingData, setLoadingData] = useState(false);
   const [paymentMethodId, setPaymentMethodId] = useState(null);
   const [cardDetailsComplete, setCardDetailsComplete] = useState(false);
   const { t } = useTranslation();  
@@ -390,104 +224,35 @@ export default function DataFlowScreenMerchant({ navigation }) {
   
   const pollingRef = useRef(null);
   const lottieRef = useRef(null);
+  const [loading, setLoading] = useState(false);
 
   const dial = DIAL_CODES[country?.countryCode] || "";
   const operator = guessOperator(country?.countryCode, localNumber.replace(/\D/g, ""));
 
+  const { data: countries = [], isLoading: loadingCountries } = useCountries();
+  const { data: bundleCategories = [], isLoading: loadingCategories } = useBundleCategories();
+  const { data: bundleTypes = [], isLoading: loadingTypes } = useBundleTypes();
+  const { data: currenciesData, isLoading: loadingCurrencies } = useCurrencies();
+  const { data: slabsData, isLoading: loadingSlabs } = useSlabs();
+  const { 
+    data: contacts = [], 
+    isLoading: loadingContacts,
+    refetch: refetchContacts 
+  } = useContacts();
+  const activateBundleMutation = useActivateBundle();
+  
+  const shouldFetchProducts = step >= BASE_STEPS.PRODUCT && !!country?.id;
+  const { 
+    data: products = [], 
+    isLoading: loadingProducts 
+  } = useDataProducts(
+    country?.id, 
+    selectedCategory?.id, 
+    selectedType?.id,      
+    shouldFetchProducts
+  );
 
-  const calculateUsdAmount = (afnAmount) => {
-    if (!exchangeRate || !afnAmount) return 0;
-    const usdAmount = afnAmount * exchangeRate;
-    return parseFloat(usdAmount.toFixed(2));
-  };
-
-  const calculateBaseAmount = (afnAmount) => {
-    if (!exchangeRate || !afnAmount) return 0;
-    const baseAmount = parseFloat(afnAmount) * exchangeRate;
-    return parseFloat(baseAmount.toFixed(2));
-  };
-
-  const calculateFeeAmount = (afnAmount) => {
-    if (!exchangeRate || !afnAmount) return 0;
-    const feeAmount = afnAmount * exchangeRate * (slabPercentage / 100);
-    return parseFloat(feeAmount.toFixed(2));
-  };
-
-  const calculateTotalAfnAmount = (baseAfn) => {
-    const baseAmount = parseFloat(baseAfn) || 0;
-    let totalAmount = baseAmount;
-    
-    if (slabPercentage > 0) {
-      totalAmount += baseAmount * (slabPercentage / 100);
-    }
-    
-    return totalAmount;
-  };
-
-  const afn = product ? parseFloat(product.price) : 0;
-  const totalAfn = calculateTotalAfnAmount(afn);
-  const usd = calculateUsdAmount(afn);
-  const baseAmount = calculateBaseAmount(afn);
-  const feeAmount = calculateFeeAmount(afn);
-
- 
-  useEffect(() => {
-    const fetchRateAndSlab = async () => {
-      if (!country) return;
-
-      setLoadingData(true);
-      try {
-        const rateData = await getCurrencies();
-        console.log("Rate API Response:", JSON.stringify(rateData, null, 2));
-
-        if (rateData && rateData.success && rateData.data && rateData.data.length > 0) {
-          const afnToUsdRate = parseFloat(rateData.data[0].target_amount);
-          const usdToAfnRate = parseFloat(rateData.data[0].source_amount);
-          
-          console.log("AFN to USD Rate:", afnToUsdRate);
-          console.log("USD to AFN Rate:", usdToAfnRate);
-          
-          setExchangeRate(1 / usdToAfnRate);
-        } else {
-          console.log("Using fallback exchange rate: 0.012");
-          setExchangeRate(0.012);
-        }
-
-        const slabData = await getSlabs();
-        console.log("Slab API Response:", JSON.stringify(slabData, null, 2));
-
-        if (slabData && slabData.success && slabData.data && slabData.data.length > 0) {
-          const countrySlabs = slabData.data.filter(slab => slab.countryId === country.id);
-          console.log("All country slabs:", countrySlabs);
-
-          const totalPercentage = countrySlabs.reduce((sum, slab) => {
-            return sum + parseFloat(slab.percentage || 0);
-          }, 0);
-
-          console.log("Total slab percentage for country:", totalPercentage + "%");
-          setSlabPercentage(totalPercentage);
-        } else {
-          console.log("No slab data, setting to 0");
-          setSlabPercentage(0);
-        }
-      } catch (error) {
-        console.error("Error fetching data:", error);
-        setExchangeRate(0.012);
-        setSlabPercentage(0);
-      } finally {
-        setLoadingData(false);
-      }
-    };
-
-    if (country) {
-      const timer = setTimeout(() => {
-        fetchRateAndSlab();
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [country]);
-
-
+  // Manual polling function - same as social activation screen
   const startPollingOrderStatus = async (orderId) => {
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
@@ -499,7 +264,7 @@ export default function DataFlowScreenMerchant({ navigation }) {
     pollingRef.current = setInterval(async () => {
       try {
         pollCount++;
-        const statusResponse = await getOrderStatus(orderId);
+        const statusResponse = await checkBundleOrderStatus(orderId);
         const currentStatus = statusResponse.data?.status;
         
         console.log(`Poll ${pollCount}: Bundle order status:`, currentStatus);
@@ -510,15 +275,16 @@ export default function DataFlowScreenMerchant({ navigation }) {
           ...statusResponse.data
         }));
 
-        if (currentStatus === ORDER_STATUS.SUCCEEDED || 
-            currentStatus === ORDER_STATUS.FAILED || 
-            pollCount >= maxPolls) {
+        if (
+          currentStatus === ORDER_STATUS.SUCCEEDED || 
+          currentStatus === ORDER_STATUS.FAILED || 
+          pollCount >= maxPolls
+        ) {
           clearInterval(pollingRef.current);
           pollingRef.current = null;
           
           if (pollCount >= maxPolls) {
-            setOrderStatus(ORDER_STATUS.FAILED);
-            console.log("Max polling attempts reached");
+            console.log("Max polling attempts reached for bundle order");
           }
         }
       } catch (error) {
@@ -526,88 +292,45 @@ export default function DataFlowScreenMerchant({ navigation }) {
         if (pollCount >= maxPolls) {
           clearInterval(pollingRef.current);
           pollingRef.current = null;
-          setOrderStatus(ORDER_STATUS.FAILED);
         }
       }
     }, 3000);
   };
 
   useEffect(() => {
-    return () => {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-      }
-    };
-  }, []);
+    if (countries.length > 0 && !country) {
+      const afgCountry = countries.find((c) => c.countryCode === "AF") || countries[0];
+      setCountry(afgCountry);
+    }
+  }, [countries]);
+
+  useEffect(() => {
+    if (currenciesData && currenciesData.success && currenciesData.data && currenciesData.data.length > 0) {
+      const afnToUsdRate = parseFloat(currenciesData.data[0].target_amount);
+      const usdToAfnRate = parseFloat(currenciesData.data[0].source_amount);
+      setExchangeRate(1 / usdToAfnRate);
+    } else {
+      setExchangeRate(0.012); 
+    }
+  }, [currenciesData]);
+
+  useEffect(() => {
+    if (slabsData && slabsData.success && slabsData.data && slabsData.data.length > 0 && country) {
+      const countrySlabs = slabsData.data.filter(slab => slab.countryId === country.id);
+      const totalPercentage = countrySlabs.reduce((sum, slab) => {
+        return sum + parseFloat(slab.percentage || 0);
+      }, 0);
+      setSlabPercentage(totalPercentage);
+    } else {
+      setSlabPercentage(0);
+    }
+  }, [slabsData, country]);
 
   useEffect(() => {
     if (lottieRef.current && (orderStatus === ORDER_STATUS.SUCCEEDED || orderStatus === ORDER_STATUS.FAILED)) {
       lottieRef.current.play();
     }
   }, [orderStatus]);
-
-  useEffect(() => {
-    const getAllCountries = async () => {
-      try {
-        const res = await getCountries();
-        setCountries(res?.data || []);
-        const afgCountry = res?.data?.find((c) => c.countryCode === "AF");
-        setCountry(afgCountry || res?.data?.[0]);
-      } catch (error) {
-        console.error("Error loading countries:", error);
-        Alert.alert("Error", "Failed to load countries. Please try again.");
-      }
-    };
-    getAllCountries();
-  }, []);
-
-  useEffect(() => {
-    const fetchBundleData = async () => {
-      try {
-        const categoriesRes = await getBundleCategories();
-        setBundleCategories(categoriesRes?.data || []);
-        
-        const typesRes = await getBundleTypes();
-        setBundleTypes(typesRes?.data || []);
-        
-        if (categoriesRes?.data?.length > 0 && !selectedCategory) {
-          setSelectedCategory(categoriesRes.data[0]);
-        }
-        if (typesRes?.data?.length > 0 && !selectedType) {
-          setSelectedType(typesRes.data[0]);
-        }
-      } catch (error) {
-        console.error("Error loading bundle filters:", error);
-        Alert.alert("Error", "Failed to load bundle categories and types.");
-      }
-    };
-
-    fetchBundleData();
-  }, []);
-
-  useEffect(() => {
-    const getProductsForAgent = async () => {
-      if (!country?.id) return;
-      
-      try {
-        const filter = {
-          countryId: country?.id,
-          productCategoryId: selectedCategory?.id,
-          productTypeId: selectedType?.id,
-          productFor: "BUNDLE"
-        };
-        const res = await getDataProducts(filter);
-        console.log("Fetched Products:", res);
-        setProducts(res?.data || []);
-      } catch (error) {
-        console.error("Error fetching products:", error);
-        setProducts([]);
-        Alert.alert("Error", "Failed to load products. Please try again.");
-      }
-    };
-
-    getProductsForAgent();
-  }, [country, selectedCategory, selectedType]);
 
   useEffect(() => {
     if (contactsModalVisible) {
@@ -617,7 +340,7 @@ export default function DataFlowScreenMerchant({ navigation }) {
         easing: Easing.out(Easing.back(1)),
         useNativeDriver: true,
       }).start();
-      loadContacts();
+      refetchContacts();
     } else {
       Animated.timing(contactsSlideAnim, {
         toValue: screenHeight,
@@ -647,41 +370,70 @@ export default function DataFlowScreenMerchant({ navigation }) {
   }, [countryOpen]);
 
   useEffect(() => {
-    if (searchQuery) {
-      const filtered = contacts.filter(contact =>
-        contact.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        contact.phoneNumbers?.some(phone =>
-          phone.number?.includes(searchQuery)
-        )
-      );
-      setFilteredContacts(filtered);
-    } else {
-      setFilteredContacts(contacts);
-    }
+    // Clean up polling on unmount
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+      }
+    };
+  }, []);
+
+  const filteredContacts = useMemo(() => {
+    if (!searchQuery) return contacts;
+    return contacts.filter(contact =>
+      contact.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      contact.phoneNumbers?.some(phone =>
+        phone.number?.includes(searchQuery)
+      )
+    );
   }, [searchQuery, contacts]);
 
-  const loadContacts = async () => {
-    try {
-      const { status } = await Contacts.requestPermissionsAsync();
-      if (status === 'granted') {
-        const { data } = await Contacts.getContactsAsync({
-          fields: [Contacts.Fields.Name, Contacts.Fields.PhoneNumbers],
-        });
+  const filteredProducts = useMemo(() => {
+    if (!search.trim()) return products;
+    const q = search.trim().toLowerCase();
+    return products.filter((p) =>
+      p.productName?.toLowerCase().includes(q) ||
+      p.description?.toLowerCase().includes(q) ||
+      p.price?.toString().includes(q)
+    );
+  }, [products, search]);
 
-        if (data.length > 0) {
-          setContacts(data);
-          setFilteredContacts(data);
-        } else {
-          Alert.alert("No Contacts", "No contacts found on your device.");
-        }
-      } else {
-        Alert.alert("Permission Denied", "Cannot access contacts without permission. Please enable contacts permission in settings.");
-      }
-    } catch (error) {
-      console.error('Error loading contacts:', error);
-      Alert.alert("Error", "Failed to load contacts. Please try again.");
+  const calculateUsdAmount = useCallback((afnAmount) => {
+    if (!exchangeRate || !afnAmount) return 0;
+    const usdAmount = afnAmount * exchangeRate;
+    return parseFloat(usdAmount.toFixed(2));
+  }, [exchangeRate]);
+
+  const calculateBaseAmount = useCallback((afnAmount) => {
+    if (!exchangeRate || !afnAmount) return 0;
+    const baseAmount = parseFloat(afnAmount) * exchangeRate;
+    return parseFloat(baseAmount.toFixed(2));
+  }, [exchangeRate]);
+
+  const calculateFeeAmount = useCallback((afnAmount) => {
+    if (!exchangeRate || !afnAmount) return 0;
+    const feeAmount = afnAmount * exchangeRate * (slabPercentage / 100);
+    return parseFloat(feeAmount.toFixed(2));
+  }, [exchangeRate, slabPercentage]);
+
+  const calculateTotalAfnAmount = useCallback((baseAfn) => {
+    const baseAmount = parseFloat(baseAfn) || 0;
+    let totalAmount = baseAmount;
+    
+    if (slabPercentage > 0) {
+      totalAmount += baseAmount * (slabPercentage / 100);
     }
-  };
+    
+    return totalAmount;
+  }, [slabPercentage]);
+
+  const afn = product ? parseFloat(product.price) : 0;
+  const totalAfn = calculateTotalAfnAmount(afn);
+  const usd = calculateUsdAmount(afn);
+  const baseAmount = calculateBaseAmount(afn);
+  const feeAmount = calculateFeeAmount(afn);
+
+  const loadingData = loadingCurrencies || loadingSlabs;
 
   const canNext =
     (step === BASE_STEPS.COUNTRY && !!country) ||
@@ -720,43 +472,54 @@ export default function DataFlowScreenMerchant({ navigation }) {
       return;
     }
 
-    setLoading(true);
+    const cleanedNumber = localNumber.replace(/\D/g, "");
+    const receiverNumber = `${dial}${cleanedNumber}`.replace(/\s/g, "");
+    
+    const payload = {
+      productId: product?.id,
+      receiver: receiverNumber,
+      currency: "AFN",
+      cardCurrency: "USD",
+      paymentMethodId: paymentMethodId,
+      confirmNow: false,
+    };
+
+    console.log("🔄 Customer Bundle Activation Payload:", payload);
+
     try {
-      const cleanedNumber = localNumber.replace(/\D/g, "");
-      const receiverNumber = `${dial}${cleanedNumber}`.replace(/\s/g, "");
+      setLoading(true);
+      const res = await activateBundleMutation.mutateAsync(payload);
       
-      const payload = {
-        productId: product?.id,
-        receiver: receiverNumber,
-        currency: "AFN",
-        cardCurrency: "USD",
-        paymentMethodId: paymentMethodId,
-        confirmNow: false,
-      };
-
-      console.log("🔄 Customer Bundle Activation Payload:", payload);
-
-      const res = await activateBundleByCustomer(payload);
-      
-      console.log("✅ Customer Bundle Activation Response:", res);
+      console.log("Customer Bundle Activation Response:", res);
       
       if (res.status === true || res.orderId) {
-        setOrderStatus(ORDER_STATUS.QUEUED);
-        setOrderDetails({
+        // Set order details IMMEDIATELY with orderId - same as social activation
+        const newOrderDetails = {
           orderId: res.orderId,
           txnNumber: res.txnNumber || `TXN-${Date.now()}`,
           mobile: `${dial} ${formatLocal(localNumber)}`,
           amountAfn: product?.price,
-          usdAmount: usd,
+          usdAmount: product?.totalAmountInUSD || usd,
           productName: product?.productName,
           date: new Date().toISOString(),
           operator: operator?.name || "Unknown",
           message: res.message || "Bundle activation request submitted successfully! Payment processed and our backoffice team will activate your bundle shortly.",
-        });
+          status: ORDER_STATUS.QUEUED,
+        };
         
+        setOrderDetails(newOrderDetails);
+        setOrderStatus(ORDER_STATUS.QUEUED);
+        
+        // Start manual polling - same as social activation
         if (res.orderId) {
           await startPollingOrderStatus(res.orderId);
         }
+        
+        Alert.alert(
+          "Success",
+          "Bundle activation initiated successfully!",
+          [{ text: 'OK', onPress: () => {} }]
+        );
       } else {
         setOrderStatus(ORDER_STATUS.FAILED);
         setOrderDetails({
@@ -767,6 +530,7 @@ export default function DataFlowScreenMerchant({ navigation }) {
           date: new Date().toISOString(),
           error: res.error || "Bundle activation request failed. Please try again.",
         });
+        Alert.alert("Error", res.error || "Bundle activation request failed.");
       }
     } catch (error) {
       console.error("❌ Failed To Activate Customer Bundle:", error);
@@ -780,8 +544,11 @@ export default function DataFlowScreenMerchant({ navigation }) {
         date: new Date().toISOString(),
         error: error.response?.data?.error || error.message || "Bundle activation failed. Please try again.",
       });
+      
+      Alert.alert("Error", error.response?.data?.error || error.message || "Bundle activation failed.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleContactSelect = (phoneNumber) => {
@@ -810,17 +577,17 @@ export default function DataFlowScreenMerchant({ navigation }) {
     setLocalNumber("");
     setPaymentMethodId(null);
     setCardDetailsComplete(false);
+    
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
       pollingRef.current = null;
     }
-
+    
     if (lottieRef.current) {
       lottieRef.current.reset();
     }
   };
 
-  // Status Helper Functions
   const getStatusMessage = () => {
     switch (orderStatus) {
       case ORDER_STATUS.QUEUED:
@@ -831,55 +598,65 @@ export default function DataFlowScreenMerchant({ navigation }) {
       case ORDER_STATUS.SUCCEEDED:
         return "Bundle activated successfully! Our team has processed your request.";
       case ORDER_STATUS.FAILED:
-        return "Bundle activation failed. Please contact support if this continues.";
+        return orderDetails?.error || "Bundle activation failed. Please contact support if this continues.";
       default:
         return "Processing your request...";
     }
   };
 
-  const getStatusIcon = () => {
-    switch (orderStatus) {
-      case ORDER_STATUS.QUEUED:
-        return (
-          <View style={[styles.statusIcon, { backgroundColor: '#FFF3CD', borderColor: '#FFEAA7' }]}>
-            <Ionicons name="time-outline" size={36} color="#FFA500" />
+ const getStatusIcon = () => {
+  switch (orderStatus) {
+    case ORDER_STATUS.QUEUED:
+      return (
+        <View style={[styles.statusIconContainer, { backgroundColor: '#FFF3CD', borderColor: '#FFEAA7' }]}>
+          <View style={styles.simpleClockContainer}>
+            <Ionicons name="time-outline" size={48} color="#FFA500" />
           </View>
-        );
-      case ORDER_STATUS.PROCESSING:
-      case ORDER_STATUS.PENDING:
-        return (
-          <View style={[styles.statusIcon, { backgroundColor: '#D1ECF1', borderColor: '#B8DAE4' }]}>
-            <ActivityIndicator size="large" color={Colors.primary} />
+        </View>
+      );
+    case ORDER_STATUS.PROCESSING:
+    case ORDER_STATUS.PENDING:
+      return (
+        <View style={[styles.statusIconContainer, { backgroundColor: '#D1ECF1', borderColor: '#B8DAE4' }]}>
+          <View style={styles.simpleProcessingContainer}>
+            <Ionicons name="sync" size={48} color={Colors.primary} />
           </View>
-        );
-      case ORDER_STATUS.SUCCEEDED:
-        return (
-          <LottieView
-            ref={lottieRef}
-            source={require('../../../assets/lotties/succcess.json')}
-            autoPlay={true}
-            loop={false}
-            style={styles.lottieAnimation}
-          />
-        );
-      case ORDER_STATUS.FAILED:
-        return (
-          <LottieView
-            ref={lottieRef}
-            source={require('../../../assets/lotties/error.json')}
-            autoPlay={true}
-            loop={false}
-            style={styles.lottieAnimation}
-          />
-        );
-      default:
-        return (
-          <View style={[styles.statusIcon, { backgroundColor: '#E2E3E5', borderColor: '#D6D8DB' }]}>
-            <Ionicons name="help-circle" size={36} color="#6C757D" />
-          </View>
-        );
-    }
-  };
+        </View>
+      );
+    case ORDER_STATUS.SUCCEEDED:
+      return (
+        <LottieView
+          ref={lottieRef}
+          source={require('../../../assets/lotties/succcess.json')}
+          autoPlay={true}
+          loop={false}
+          style={styles.lottieAnimation}
+          onAnimationFinish={() => {
+            console.log('Success animation finished');
+          }}
+        />
+      );
+    case ORDER_STATUS.FAILED:
+      return (
+        <LottieView
+          ref={lottieRef}
+          source={require('../../../assets/lotties/error.json')}
+          autoPlay={true}
+          loop={false}
+          style={styles.lottieAnimation}
+          onAnimationFinish={() => {
+            console.log('Error animation finished');
+          }}
+        />
+      );
+    default:
+      return (
+        <View style={[styles.statusIconContainer, { backgroundColor: '#E2E3E5', borderColor: '#D6D8DB' }]}>
+          <Ionicons name="help-circle" size={36} color="#6C757D" />
+        </View>
+      );
+  }
+};
 
   const getStatusTitle = () => {
     switch (orderStatus) {
@@ -913,16 +690,6 @@ export default function DataFlowScreenMerchant({ navigation }) {
     }
   };
 
-  const filteredProducts = useMemo(() => {
-    if (!search.trim()) return products;
-    const q = search.trim().toLowerCase();
-    return products.filter((p) =>
-      p.productName?.toLowerCase().includes(q) ||
-      p.description?.toLowerCase().includes(q) ||
-      p.price?.toString().includes(q)
-    );
-  }, [products, search]);
-
   const getPaymentSummary = () => {
     return {
       mobile: `${dial} ${formatLocal(localNumber)}`,
@@ -940,6 +707,310 @@ export default function DataFlowScreenMerchant({ navigation }) {
     if (methodId) setPaymentMethodId(methodId);
   };
 
+  const OrderStatusScreen = () => {
+    return (
+      <View style={{ flex: 1, paddingBottom: 100 }}>
+        <ScrollView
+          contentContainerStyle={{ 
+            flexGrow: 1,
+            padding: 24, 
+            alignItems: "center",
+            justifyContent: 'center'
+          }}
+        >
+          <View style={styles.statusHeader}>
+            {getStatusIcon()}
+            <Text style={[styles.statusTitle, { color: getStatusColor() }]}>
+              {getStatusTitle()}
+            </Text>
+          </View>
+
+          <View style={styles.detailsCard}>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Receiver Number</Text>
+              <Text style={styles.detailValue}>{orderDetails?.mobile}</Text>
+            </View>
+          
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Bundle Plan</Text>
+              <Text style={styles.detailValue}>{orderDetails?.productName?.en || orderDetails?.productName}</Text>
+            </View>
+
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Transaction ID</Text>
+              <Text style={styles.detailValue}>{orderDetails?.txnNumber}</Text>
+            </View>
+
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Date</Text>
+              <Text style={styles.detailValue}>
+                {orderDetails?.date ? new Date(orderDetails.date).toLocaleString() : 'N/A'}
+              </Text>
+            </View>
+
+            <View style={styles.amountSection}>
+              <Text style={styles.amountLabel}>Total Amount</Text>
+              <Text style={styles.amountSubValue}>${orderDetails?.usdAmount || usd} USD</Text>
+            </View>
+          </View>
+
+          <View style={styles.statusMessageContainer}>
+            <Text style={[styles.statusMessage, { color: getStatusColor() }]}>
+              {getStatusMessage()}
+            </Text>
+          </View>
+
+          {(orderStatus === ORDER_STATUS.QUEUED || orderStatus === ORDER_STATUS.PROCESSING || orderStatus === ORDER_STATUS.PENDING) && (
+            <View style={styles.progressContainer}>
+              <View style={styles.progressBar}>
+                <View 
+                  style={[
+                    styles.progressFill,
+                    { 
+                      width: orderStatus === ORDER_STATUS.QUEUED ? '30%' : 
+                            (orderStatus === ORDER_STATUS.PROCESSING ? '60%' : '80%'),
+                      backgroundColor: getStatusColor()
+                    }
+                  ]} 
+                />
+              </View>
+              <Text style={styles.progressText}>
+                {orderStatus === ORDER_STATUS.QUEUED ? 'Queued' : 
+                orderStatus === ORDER_STATUS.PROCESSING ? 'Processing' : 'Finalizing...'}
+              </Text>
+            </View>
+          )}
+
+          {(orderStatus === ORDER_STATUS.SUCCEEDED || orderStatus === ORDER_STATUS.FAILED) && (
+            <TouchableOpacity
+              style={styles.doneButton}
+              onPress={() => {
+                if (pollingRef.current) {
+                  clearInterval(pollingRef.current);
+                }
+                navigation.popToTop();
+              }}
+            >
+              <Text style={styles.doneButtonText}>Yes</Text>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity onPress={resetFlow} style={styles.moreButton}>
+            <Text style={styles.moreButtonText}>
+              {orderStatus === ORDER_STATUS.FAILED ? "Try Again" : "Activate More"}
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
+    );
+  };
+
+  const ContactsModal = ({ 
+    contactsModalVisible, 
+    setContactsModalVisible, 
+    contactsSlideAnim, 
+    insets, 
+    searchQuery, 
+    setSearchQuery, 
+    filteredContacts, 
+    handleContactSelect,
+    t,
+    loadingContacts
+  }) => {
+    return (
+      <Modal
+        visible={contactsModalVisible}
+        transparent={true}
+        animationType="none"
+        statusBarTranslucent={true}
+        onRequestClose={() => setContactsModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity 
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setContactsModalVisible(false)}
+          />
+          <Animated.View 
+            style={[
+              styles.modalCard,
+              { 
+                transform: [{ translateY: contactsSlideAnim }],
+                height: '80%',
+                marginBottom: -insets.bottom
+              }
+            ]}
+          >
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{t("selectContact")}</Text>
+              <TouchableOpacity 
+                onPress={() => setContactsModalVisible(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.searchContainer}>
+              <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
+              <TextInput
+                placeholder="Search contacts..."
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                style={styles.searchInput}
+                placeholderTextColor="#999"
+              />
+            </View>
+
+            {loadingContacts ? (
+              <View style={styles.emptyContainer}>
+                <ActivityIndicator size="large" color={Colors.primary} />
+                <Text style={styles.emptyText}>Loading contacts...</Text>
+              </View>
+            ) : filteredContacts.length > 0 ? (
+              <FlatList
+                data={filteredContacts}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.contactItem}
+                    onPress={() => {
+                      if (item.phoneNumbers && item.phoneNumbers.length > 0) {
+                        handleContactSelect(item.phoneNumbers[0].number);
+                      }
+                    }}
+                  >
+                    <View style={styles.contactAvatar}>
+                      <Text style={{ color: 'white', fontWeight: 'bold' }}>
+                        {item.name ? item.name.charAt(0).toUpperCase() : '?'}
+                      </Text>
+                    </View>
+                    <View style={styles.contactInfo}>
+                      <Text style={styles.contactName}>{item.name}</Text>
+                      {item.phoneNumbers && item.phoneNumbers.length > 0 && (
+                        <Text style={styles.contactPhone}>{item.phoneNumbers[0].number}</Text>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                )}
+                ItemSeparatorComponent={() => <View style={styles.contactSeparator} />}
+              />
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="people-outline" size={48} color="#999" />
+                <Text style={styles.emptyText}>{t("noContactsFound")}</Text>
+              </View>
+            )}
+          </Animated.View>
+        </View>
+      </Modal>
+    );
+  };
+
+  const CountriesModal = ({ 
+    countryOpen, 
+    setCountryOpen, 
+    countriesSlideAnim, 
+    insets, 
+    countrySearch, 
+    setCountrySearch, 
+    countries, 
+    setCountry,
+    loadingCountries
+  }) => {
+    const filteredCountries = useMemo(() => {
+      if (!countrySearch) return countries;
+      return countries.filter(c =>
+        c.countryName?.toLowerCase().includes(countrySearch.toLowerCase()) ||
+        c.countryCode?.toLowerCase().includes(countrySearch.toLowerCase())
+      );
+    }, [countries, countrySearch]);
+
+    return (
+      <Modal
+        visible={countryOpen}
+        transparent={true}
+        animationType="none"
+        statusBarTranslucent={true}
+        onRequestClose={() => setCountryOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity 
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setCountryOpen(false)}
+          />
+          <Animated.View 
+            style={[
+              styles.modalCard,
+              { 
+                transform: [{ translateY: countriesSlideAnim }],
+                height: '80%',
+                marginBottom: -insets.bottom
+              }
+            ]}
+          >
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Country</Text>
+              <TouchableOpacity 
+                onPress={() => setCountryOpen(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.searchContainer}>
+              <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
+              <TextInput
+                placeholder="Search countries..."
+                value={countrySearch}
+                onChangeText={setCountrySearch}
+                style={styles.searchInput}
+                placeholderTextColor="#999"
+              />
+            </View>
+
+            {loadingCountries ? (
+              <View style={styles.emptyContainer}>
+                <ActivityIndicator size="large" color={Colors.primary} />
+                <Text style={styles.emptyText}>Loading countries...</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={filteredCountries}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.modalRow}
+                    onPress={() => {
+                      setCountry(item);
+                      setCountryOpen(false);
+                      setCountrySearch('');
+                    }}
+                  >
+                    <Text style={{ fontSize: 24, marginRight: 12 }}>
+                      {codeToFlag(item.countryCode)}
+                    </Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: Colors.textPrimary, fontSize: 16, fontWeight: '500' }}>
+                        {item.countryName}
+                      </Text>
+                      <Text style={{ color: Colors.textSecondary, fontSize: 14 }}>
+                        {DIAL_CODES[item.countryCode] || ""}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                )}
+                ItemSeparatorComponent={() => <View style={styles.contactSeparator} />}
+              />
+            )}
+          </Animated.View>
+        </View>
+      </Modal>
+    );
+  };
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
       <ServiceHeader 
@@ -948,17 +1019,7 @@ export default function DataFlowScreenMerchant({ navigation }) {
       />
 
       {orderStatus ? (
-        <OrderStatusScreen 
-          orderStatus={orderStatus}
-          orderDetails={orderDetails}
-          getStatusIcon={getStatusIcon}
-          getStatusTitle={getStatusTitle}
-          getStatusColor={getStatusColor}
-          getStatusMessage={getStatusMessage}
-          resetFlow={resetFlow}
-          navigation={navigation}
-          pollingRef={pollingRef}
-        />
+        <OrderStatusScreen />
       ) : (
         <KeyboardAvoidingView
           style={{ flex: 1 }}
@@ -973,6 +1034,7 @@ export default function DataFlowScreenMerchant({ navigation }) {
               <StepCountry
                 country={country}
                 onOpen={() => setCountryOpen(true)}
+                loading={loadingCountries}
               />
             )}
 
@@ -1005,6 +1067,8 @@ export default function DataFlowScreenMerchant({ navigation }) {
                 setProduct={setProduct}
                 onEditNumber={() => jumpTo(BASE_STEPS.NUMBER)}
                 summary={{ dial, localNumber, product }}
+                isLoading={loadingCategories || loadingTypes}
+                isLoadingProducts={loadingProducts}
               />
             )}
 
@@ -1019,7 +1083,7 @@ export default function DataFlowScreenMerchant({ navigation }) {
             <PrimaryButton
               label={
                 step === lastStep
-                  ? `Pay $${usd} USD`
+                  ? "Pay"
                   : "Continue"
               }
               onPress={goNext}
@@ -1047,6 +1111,7 @@ export default function DataFlowScreenMerchant({ navigation }) {
         filteredContacts={filteredContacts}
         handleContactSelect={handleContactSelect}
         t={t}
+        loadingContacts={loadingContacts}
       />
 
       <CountriesModal
@@ -1058,10 +1123,12 @@ export default function DataFlowScreenMerchant({ navigation }) {
         setCountrySearch={setCountrySearch}
         countries={countries}
         setCountry={setCountry}
+        loadingCountries={loadingCountries}
       />
 
       {loading && (
         <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color={Colors.primary} />
           <Text style={styles.loadingText}>Processing Payment...</Text>
         </View>
       )}
@@ -1069,20 +1136,29 @@ export default function DataFlowScreenMerchant({ navigation }) {
   );
 }
 
+export default function DataFlowScreenMerchantWrapper({ navigation }) {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <DataFlowScreenMerchant navigation={navigation} />
+    </QueryClientProvider>
+  );
+}
+
 const styles = StyleSheet.create({
-  // ... (styles remain the same as your original file)
+  // Status Screen Styles
   statusHeader: {
     alignItems: 'center',
     marginBottom: 24,
   },
-  statusIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+  statusIconContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 3,
+    borderWidth: 4,
     marginBottom: 16,
+    overflow: 'hidden',
   },
   statusTitle: {
     fontSize: 24,
@@ -1090,8 +1166,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   lottieAnimation: {
-    width: 80,
-    height: 80,
+    width: 140,
+    height: 140,
   },
   detailsCard: {
     backgroundColor: '#fff',
@@ -1102,9 +1178,22 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 8,
+    elevation: 4,
   },
+  simpleClockContainer: {
+    width: 80,
+    height: 80,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  simpleProcessingContainer: {
+    width: 80,
+    height: 80,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
   detailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1134,11 +1223,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     marginBottom: 8,
-  },
-  amountValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
   },
   amountSubValue: {
     fontSize: 16,
@@ -1178,6 +1262,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     fontWeight: '500',
+  },
+  doneButton: {
+    backgroundColor: Colors.primary,
+    borderRadius: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    alignItems: 'center',
+    marginBottom: 12,
+    width: '100%',
+  },
+  doneButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   moreButton: {
     marginTop: 16,
@@ -1302,5 +1400,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.textPrimary,
     fontWeight: "600",
+    marginTop: 12,
   },
 });

@@ -200,23 +200,29 @@ useEffect(() => {
     return data;
   };
 
-  const loginPasswordFn = async ({ identifier, password }) => {
-    const data = await loginWithPassword({ identifier, password });
-    
+const loginPasswordFn = async ({ identifier, password }) => {
+  const data = await loginWithPassword({ identifier, password });
+  
+  console.log("Login response:", data); 
+  
 
-    const userProfile = await fetchUserProfile(data.access_token);
-    
-    await setRoleLocal("b2b");
-    await setToken(data.access_token, {
-      role: "b2b",
-      role_id: data.role_id,
-      id: userProfile?.id,
-      username: userProfile?.username,
-      ...userProfile 
-    });
-    setPending(null);
-    return data;
-  };
+  const userId = data.id; 
+  const username = data.username; 
+  
+  console.log("User ID from login response:", userId);
+  console.log("Username from login response:", username);
+  
+  await setRoleLocal("b2b");
+  await setToken(data.access_token, {
+    role: "b2b",
+    role_id: data.role_id,
+    id: userId, 
+    username: username, 
+  });
+  
+  setPending(null);
+  return data;
+};
 
   const loginOtpSendFn = async (identifier) => {
     const data = await loginOtpGenerate(identifier);

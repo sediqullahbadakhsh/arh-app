@@ -1,272 +1,456 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
+  SafeAreaView,
   ScrollView,
   TouchableOpacity,
   Alert,
-  SafeAreaView,
+  StatusBar,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
+  TextInput,
 } from 'react-native';
-import { TextInput, HelperText } from 'react-native-paper';
-import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
-import * as Yup from 'yup';
-import { Formik } from 'formik';
-
-
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { resetAgentPassword } from '../../services/authApi';
 import ServiceHeader from '../../components/ServiceHeader';
 import SuccessModal from '../../components/modals/SuccessModal';
 import ErrorModal from '../../components/modals/ErrorModal';
-import LoadingModal from '../../components/modals/LoadingModal';
 import { Colors } from '../../theme/colors';
 import { scale } from '../../utils/normalizeSize';
-import api from '../../api/apiClient';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 
-const passwordSchema = Yup.object().shape({
-  currentPassword: Yup.string().required('Current password is required'),
-  newPassword: Yup.string()
-    .required('New password is required')
-    .min(8, 'Password must be at least 8 characters')
-    .matches(/[a-z]/, 'Must contain at least one lowercase letter')
-    .matches(/[A-Z]/, 'Must contain at least one uppercase letter')
-    .matches(/[0-9]/, 'Must contain at least one number')
-    .matches(/[^A-Za-z0-9]/, 'Must contain at least one special character'),
-  confirmPassword: Yup.string()
-    .required('Confirm password is required')
-    .oneOf([Yup.ref('newPassword'), null], 'Passwords must match'),
+const CustomButton = React.memo(({ 
+  title, 
+  onPress, 
+  loading = false, 
+  disabled = false,
+  icon,
+  style = {} 
+}) => {
+  return (
+    <TouchableOpacity
+      style={[
+        styles.customButton,
+        disabled || loading ? styles.buttonDisabled : {},
+        style
+      ]}
+      onPress={onPress}
+      disabled={disabled || loading}
+      activeOpacity={0.8}
+      hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+    >
+      {loading ? (
+        <ActivityIndicator size="small" color="#fff" />
+      ) : (
+        <>
+          {icon && (
+            <MaterialIcons 
+              name={icon} 
+              size={20} 
+              color="#fff" 
+              style={styles.buttonIcon}
+            />
+          )}
+          <Text style={styles.buttonText}>{title}</Text>
+        </>
+      )}
+    </TouchableOpacity>
+  );
 });
 
-const ChangePasswordScreen = () => {
-  const navigation = useNavigation();
+// Custom Password Input Component - Moved completely outside
+const PasswordInput = React.memo(({ 
+  label, 
+  placeholder, 
+  value, 
+  onChangeText, 
+  error, 
+  showPassword, 
+  onToggleVisibility,
+  inputRef,
+  onSubmitEditing,
+  returnKeyType,
+  iconName,
+  helperText 
+}) => {
+  const [isFocused, setIsFocused] = useState(false);
+
+  return (
+    <View style={styles.inputContainer}>
+      <Text style={styles.inputLabel}>{label}</Text>
+      
+      <View style={[
+        styles.inputWrapper, 
+        error ? styles.inputError : {},
+        isFocused ? styles.inputFocused : {}
+      ]}>
+        <MaterialIcons 
+          name={iconName} 
+          size={20} 
+          color={isFocused ? Colors.primary : "#666"} 
+          style={styles.inputIcon}
+        />
+        
+        <TextInput
+          ref={inputRef}
+          style={styles.textInput}
+          placeholder={placeholder}
+          placeholderTextColor="#999"
+          value={value}
+          onChangeText={onChangeText}
+          secureTextEntry={!showPassword}
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType={returnKeyType}
+          onSubmitEditing={onSubmitEditing}
+          blurOnSubmit={returnKeyType !== 'next'}
+          enablesReturnKeyAutomatically={true}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+          selectionColor={Colors.primary}
+          contextMenuHidden={false}
+          textContentType="none"
+          autoComplete="off"
+        />
+        
+        <TouchableOpacity 
+          onPress={onToggleVisibility}
+          style={styles.eyeIcon}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <MaterialIcons 
+            name={showPassword ? "visibility-off" : "visibility"} 
+            size={20} 
+            color="#666" 
+          />
+        </TouchableOpacity>
+      </View>
+      
+      {error ? (
+        <Text style={styles.errorText}>{error}</Text>
+      ) : helperText ? (
+        <Text style={styles.helperText}>{helperText}</Text>
+      ) : null}
+    </View>
+  );
+});
+
+const ChangePassword = ({ navigation }) => {
   const { t } = useTranslation();
-  
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
-  const [showLoading, setShowLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  
+  // Using useRef for form data to prevent re-renders on every keystroke
+  const formDataRef = useRef({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  
+  const [formData, setFormData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  
+  // Password visibility
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
+  // Refs for input fields
+  const currentPasswordRef = useRef();
+  const newPasswordRef = useRef();
+  const confirmPasswordRef = useRef();
 
-  const goBack = () => navigation.goBack();
-
-  const handleSuccessClose = () => {
+  const goBack = useCallback(() => navigation.goBack(), [navigation]);
+  
+  // Modal handlers
+  const handleSuccessClose = useCallback(() => {
     setShowSuccessModal(false);
-    if (successMessage.includes('login again')) {
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Login' }],
-      });
-    }
-  };
-
-  const handleErrorClose = () => {
+    setSuccessMessage('');
+    setTimeout(() => {
+      navigation.goBack();
+    }, 500);
+  }, [navigation]);
+  
+  const handleErrorClose = useCallback(() => {
     setShowErrorModal(false);
     setErrorMessage('');
-  };
-
-  const handleChangePassword = async (values) => {
-    try {
-      setShowLoading(true);
-      
-      const response = await api.post('/auth/change-password', {
-        currentPassword: values.currentPassword,
-        newPassword: values.newPassword,
-        confirmPassword: values.confirmPassword,
-      });
-
-      if (response.data.status) {
-        setSuccessMessage(response.data.message);
-        setShowSuccessModal(true);
-      }
-    } catch (error) {
-      console.error('Change password error:', error);
-      
-      if (error.response) {
-        const errorMsg = error.response.data?.error || 'Failed to change password';
-        setErrorMessage(errorMsg);
-      } else if (error.request) {
-        setErrorMessage('Network error. Please check your connection.');
-      } else {
-        setErrorMessage('An unexpected error occurred.');
-      }
-      
-      setShowErrorModal(true);
-    } finally {
-      setShowLoading(false);
+  }, []);
+  
+  const showCustomSuccessModal = useCallback((message) => {
+    setSuccessMessage(message);
+    setShowSuccessModal(true);
+  }, []);
+  
+  const showCustomErrorModal = useCallback((message) => {
+    setErrorMessage(message);
+    setShowErrorModal(true);
+  }, []);
+  
+  // Handle input change - optimized version
+  const handleInputChange = useCallback((field, value) => {
+    // Update ref immediately
+    formDataRef.current = {
+      ...formDataRef.current,
+      [field]: value
+    };
+    
+    // Update state for display (batched for better performance)
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    
+    // Clear error for this field
+    if (errors[field]) {
+      setErrors(prev => ({
+        ...prev,
+        [field]: ''
+      }));
     }
-  };
+  }, [errors]);
+  
+  // Toggle password visibility
+  const togglePasswordVisibility = useCallback((field) => {
+    switch (field) {
+      case 'current':
+        setShowCurrentPassword(prev => !prev);
+        break;
+      case 'new':
+        setShowNewPassword(prev => !prev);
+        break;
+      case 'confirm':
+        setShowConfirmPassword(prev => !prev);
+        break;
+      default:
+        break;
+    }
+  }, []);
+  
+  // Validate form using ref to avoid dependency on formData state
+  const validateForm = useCallback(() => {
+    const currentFormData = formDataRef.current;
+    const newErrors = {};
+    
+    if (!currentFormData.currentPassword.trim()) {
+      newErrors.currentPassword = t('currentPasswordRequired');
+    }
+    
+    if (!currentFormData.newPassword.trim()) {
+      newErrors.newPassword = t('newPasswordRequired');
+    } else if (currentFormData.newPassword.length < 8) {
+      newErrors.newPassword = t('passwordMinLength');
+    }
+    
+    if (!currentFormData.confirmPassword.trim()) {
+      newErrors.confirmPassword = t('confirmPasswordRequired');
+    } else if (currentFormData.newPassword !== currentFormData.confirmPassword) {
+      newErrors.confirmPassword = t('passwordsDoNotMatch');
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  }, [t]);
+  
 
+const handleResetPassword = useCallback(async () => {
+  if (!validateForm()) {
+    return;
+  }
+  
+  setLoading(true);
+  
+  try {
+    const lang = await AsyncStorage.getItem('i18nextLng') || 'en';
+    const payload = {
+      ...formDataRef.current,
+      lang
+    };
+    
+    const response = await resetAgentPassword(payload);
+    
+    if (response.status === true) {
+      showCustomSuccessModal(response.message || t('passwordResetSuccess'));
+      
+      // Reset form data
+      formDataRef.current = {
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+      };
+      
+      setFormData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+      });
+      
+      // IMPORTANT: Always logout after password reset
+      // Clear user session regardless of response.logoutRequired
+      await AsyncStorage.removeItem('userToken');
+      await AsyncStorage.removeItem('userInfo');
+      
+      // Show logout message after success modal
+      setTimeout(() => {
+        Alert.alert(
+          t('passwordChanged'),
+          t('passwordResetLogoutMessage') || 'For security reasons, you have been logged out. Please login again with your new password.',
+          [
+            {
+              text: t('ok'),
+              onPress: () => {
+                // Navigate to login screen
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: 'Login' }],
+                });
+              }
+            }
+          ]
+        );
+      }, 1500);
+      
+    } else {
+      showCustomErrorModal(response.message || t('passwordResetFailed'));
+    }
+  } catch (error) {
+    console.error('Reset password error:', error);
+    
+    let errorMsg = t('somethingWentWrong');
+    if (error.response) {
+      errorMsg = error.response.data?.error || 
+                 error.response.data?.message || 
+                 t('passwordResetFailed');
+    } else if (error.request) {
+      errorMsg = t('networkError');
+    }
+    
+    showCustomErrorModal(errorMsg);
+  } finally {
+    setLoading(false);
+  }
+}, [validateForm, showCustomSuccessModal, showCustomErrorModal, t, navigation]);
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
+      
       <ServiceHeader 
         title={t('changePassword')} 
         onBack={goBack}
-        showBackButton={true}
       />
       
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         <ScrollView 
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingBottom: 30 }}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.headerContainer}>
-            <Text style={styles.title}>{t('changeYourPassword')}</Text>
-            <Text style={styles.subtitle}>
-              {t('changePasswordInstructions')}
-            </Text>
-          </View>
-
-          <Formik
-            initialValues={{
-              currentPassword: '',
-              newPassword: '',
-              confirmPassword: '',
-            }}
-            validationSchema={passwordSchema}
-            onSubmit={handleChangePassword}
-          >
-            {({
-              handleChange,
-              handleBlur,
-              handleSubmit,
-              values,
-              errors,
-              touched,
-              isValid,
-              dirty,
-            }) => (
-              <View style={styles.formContainer}>
-                <View style={styles.inputContainer}>
-                  <Text style={styles.label}>{t('currentPassword')}</Text>
-                  <TextInput
-                    mode="outlined"
-                    value={values.currentPassword}
-                    onChangeText={handleChange('currentPassword')}
-                    onBlur={handleBlur('currentPassword')}
-                    secureTextEntry={!showCurrentPassword}
-                    style={styles.input}
-                    outlineColor={Colors.greyLight}
-                    activeOutlineColor={Colors.primary}
-                    right={
-                      <TextInput.Icon
-                        icon={showCurrentPassword ? 'eye-off' : 'eye'}
-                        onPress={() => setShowCurrentPassword(!showCurrentPassword)}
-                        color={Colors.grey}
-                      />
-                    }
-                  />
-                  {touched.currentPassword && errors.currentPassword && (
-                    <HelperText type="error" visible={true}>
-                      {errors.currentPassword}
-                    </HelperText>
-                  )}
+          <View style={styles.container}>
+            <View style={styles.headerContainer}>
+              <Text style={styles.title}>{t('resetYourPassword')}</Text>
+              <Text style={styles.subtitle}>
+                {t('resetPasswordDescription')}
+              </Text>
+            </View>
+            
+            <View style={styles.formContainer}>
+              {/* Current Password */}
+              <PasswordInput
+                label={t('currentPassword')}
+                placeholder={t('enterCurrentPassword')}
+                value={formData.currentPassword}
+                onChangeText={(value) => handleInputChange('currentPassword', value)}
+                showPassword={showCurrentPassword}
+                onToggleVisibility={() => togglePasswordVisibility('current')}
+                inputRef={currentPasswordRef}
+                returnKeyType="next"
+                onSubmitEditing={() => newPasswordRef.current?.focus()}
+                iconName="lock"
+                error={errors.currentPassword}
+              />
+              
+              {/* New Password */}
+              <PasswordInput
+                label={t('newPassword')}
+                placeholder={t('enterNewPassword')}
+                value={formData.newPassword}
+                onChangeText={(value) => handleInputChange('newPassword', value)}
+                showPassword={showNewPassword}
+                onToggleVisibility={() => togglePasswordVisibility('new')}
+                inputRef={newPasswordRef}
+                returnKeyType="next"
+                onSubmitEditing={() => confirmPasswordRef.current?.focus()}
+                iconName="lock-open"
+                error={errors.newPassword}
+                helperText={t('passwordRequirements')}
+              />
+              
+              {/* Confirm Password */}
+              <PasswordInput
+                label={t('confirmPassword')}
+                placeholder={t('confirmNewPassword')}
+                value={formData.confirmPassword}
+                onChangeText={(value) => handleInputChange('confirmPassword', value)}
+                showPassword={showConfirmPassword}
+                onToggleVisibility={() => togglePasswordVisibility('confirm')}
+                inputRef={confirmPasswordRef}
+                returnKeyType="done"
+                iconName="check-circle"
+                error={errors.confirmPassword}
+              />
+              
+              {/* Warning Message */}
+              <View style={styles.warningContainer}>
+                <View style={styles.warningIcon}>
+                  <MaterialIcons name="warning" size={20} color="#856404" />
                 </View>
-
-                <View style={styles.inputContainer}>
-                  <Text style={styles.label}>{t('newPassword')}</Text>
-                  <TextInput
-                    mode="outlined"
-                    value={values.newPassword}
-                    onChangeText={handleChange('newPassword')}
-                    onBlur={handleBlur('newPassword')}
-                    secureTextEntry={!showNewPassword}
-                    style={styles.input}
-                    outlineColor={Colors.greyLight}
-                    activeOutlineColor={Colors.primary}
-                    right={
-                      <TextInput.Icon
-                        icon={showNewPassword ? 'eye-off' : 'eye'}
-                        onPress={() => setShowNewPassword(!showNewPassword)}
-                        color={Colors.grey}
-                      />
-                    }
-                  />
-                  {touched.newPassword && errors.newPassword && (
-                    <HelperText type="error" visible={true}>
-                      {errors.newPassword}
-                    </HelperText>
-                  )}
-                  <View style={styles.passwordRequirements}>
-                    <Text style={styles.requirementsTitle}>
-                      {t('passwordRequirements')}:
-                    </Text>
-                    <Text style={styles.requirementItem}>
-                      • {t('atLeast8Characters')}
-                    </Text>
-                    <Text style={styles.requirementItem}>
-                      • {t('uppercaseAndLowercase')}
-                    </Text>
-                    <Text style={styles.requirementItem}>
-                      • {t('atLeastOneNumber')}
-                    </Text>
-                    <Text style={styles.requirementItem}>
-                      • {t('atLeastOneSpecialCharacter')}
-                    </Text>
-                  </View>
-                </View>
-                <View style={styles.inputContainer}>
-                  <Text style={styles.label}>{t('confirmPassword')}</Text>
-                  <TextInput
-                    mode="outlined"
-                    value={values.confirmPassword}
-                    onChangeText={handleChange('confirmPassword')}
-                    onBlur={handleBlur('confirmPassword')}
-                    secureTextEntry={!showConfirmPassword}
-                    style={styles.input}
-                    outlineColor={Colors.greyLight}
-                    activeOutlineColor={Colors.primary}
-                    right={
-                      <TextInput.Icon
-                        icon={showConfirmPassword ? 'eye-off' : 'eye'}
-                        onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                        color={Colors.grey}
-                      />
-                    }
-                  />
-                  {touched.confirmPassword && errors.confirmPassword && (
-                    <HelperText type="error" visible={true}>
-                      {errors.confirmPassword}
-                    </HelperText>
-                  )}
-                </View>
-
-                <TouchableOpacity
-                  style={[
-                    styles.submitButton,
-                    (!isValid || !dirty) && styles.submitButtonDisabled,
-                  ]}
-                  onPress={handleSubmit}
-                  disabled={!isValid || !dirty}
-                >
-                  <Text style={styles.submitButtonText}>
-                    {t('changePassword')}
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.forgotPasswordLink}
-                  onPress={() => navigation.navigate('ForgotPassword')}
-                >
-                  <Text style={styles.forgotPasswordText}>
-                    {t('forgotPassword')}
-                  </Text>
-                </TouchableOpacity>
+                <Text style={styles.warningText}>
+                  {t('resetPasswordWarning')}
+                </Text>
               </View>
-            )}
-          </Formik>
+              
+              {/* Submit Button */}
+              <CustomButton
+                title={loading ? t('resetting') : t('resetPassword')}
+                onPress={handleResetPassword}
+                loading={loading}
+                disabled={loading}
+                icon={loading ? null : "lock-reset"}
+                style={styles.submitButton}
+              />
+              
+              {/* Cancel Button */}
+              <TouchableOpacity
+                onPress={goBack}
+                style={styles.cancelButton}
+                disabled={loading}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Text style={styles.cancelButtonText}>
+                  {t('cancel')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
-
+      
+      {/* Success Modal */}
       <SuccessModal
         visible={showSuccessModal}
         onClose={handleSuccessClose}
@@ -274,7 +458,8 @@ const ChangePasswordScreen = () => {
         message={successMessage}
         buttonText={t('continue')}
       />
-
+      
+      {/* Error Modal */}
       <ErrorModal
         visible={showErrorModal}
         onClose={handleErrorClose}
@@ -282,103 +467,145 @@ const ChangePasswordScreen = () => {
         message={errorMessage}
         buttonText={t('tryAgain')}
       />
-
-      <LoadingModal
-        visible={showLoading}
-        message={t('changingPassword')}
-      />
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
+const styles = {
   container: {
     flex: 1,
-    backgroundColor: Colors.white,
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingBottom: scale.hp(4),
+    paddingHorizontal: scale.wp(5),
+    paddingTop: scale.hp(2),
   },
   headerContainer: {
-    paddingHorizontal: scale.wp(6),
-    paddingTop: scale.hp(3),
-    paddingBottom: scale.hp(2),
+    marginBottom: scale.hp(4),
+    paddingHorizontal: scale.wp(2),
   },
   title: {
     fontSize: scale.hp(3),
     fontWeight: '700',
-    color: Colors.dark,
+    color: Colors.primary || '#CD0202',
     marginBottom: scale.hp(1),
+    textAlign: 'center',
   },
   subtitle: {
     fontSize: scale.hp(1.9),
-    color: Colors.grey,
+    color: Colors.textSecondary || '#666',
     lineHeight: scale.hp(2.5),
+    textAlign: 'center',
   },
   formContainer: {
-    paddingHorizontal: scale.wp(6),
+    paddingHorizontal: scale.wp(2),
   },
+  // Input styles
   inputContainer: {
     marginBottom: scale.hp(2.5),
   },
-  label: {
-    fontSize: scale.hp(1.9),
-    fontWeight: '600',
-    color: Colors.dark,
+  inputLabel: {
+    fontSize: scale.hp(1.8),
+    fontWeight: '500',
+    color: '#333',
     marginBottom: scale.hp(1),
   },
-  input: {
-    backgroundColor: Colors.white,
-  },
-  passwordRequirements: {
-    marginTop: scale.hp(1.5),
-    padding: scale.hp(1.5),
-    backgroundColor: Colors.lightBlue,
-    borderRadius: scale.hp(1),
-  },
-  requirementsTitle: {
-    fontSize: scale.hp(1.8),
-    fontWeight: '600',
-    color: Colors.dark,
-    marginBottom: scale.hp(0.5),
-  },
-  requirementItem: {
-    fontSize: scale.hp(1.7),
-    color: Colors.greyDark,
-    marginBottom: scale.hp(0.3),
-  },
-  submitButton: {
-    backgroundColor: Colors.primary,
-    paddingVertical: scale.hp(2),
-    borderRadius: scale.hp(1),
+  inputWrapper: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: scale.hp(2),
-    marginBottom: scale.hp(3),
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 10,
+    backgroundColor: '#fff',
+    height: scale.hp(6),
   },
-  submitButtonDisabled: {
-    backgroundColor: Colors.greyLight,
+  inputFocused: {
+    borderColor: Colors.primary || '#CD0202',
+    borderWidth: 2,
   },
-  submitButtonText: {
-    color: Colors.white,
-    fontSize: scale.hp(2),
-    fontWeight: '600',
+  inputError: {
+    borderColor: '#dc3545',
   },
-  forgotPasswordLink: {
-    alignItems: 'center',
-    marginTop: scale.hp(1),
+  inputIcon: {
+    marginLeft: 15,
+    marginRight: 10,
   },
-  forgotPasswordText: {
-    color: Colors.primary,
+  textInput: {
+    flex: 1,
     fontSize: scale.hp(1.9),
+    color: '#333',
+    paddingVertical: scale.hp(1),
+    height: '100%',
+    paddingHorizontal: 5,
+    paddingRight: 40,
+  },
+  eyeIcon: {
+    position: 'absolute',
+    right: 10,
+    padding: 10,
+  },
+  errorText: {
+    fontSize: scale.hp(1.6),
+    color: '#dc3545',
+    marginTop: 5,
+  },
+  helperText: {
+    fontSize: scale.hp(1.6),
+    color: '#666',
+    marginTop: 5,
+    fontStyle: 'italic',
+  },
+  // Warning styles
+  warningContainer: {
+    backgroundColor: '#FFF3CD',
+    borderColor: '#FFEEBA',
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 15,
+    marginTop: scale.hp(1),
+    marginBottom: scale.hp(3),
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  warningIcon: {
+    marginRight: 10,
+    marginTop: 2,
+  },
+  warningText: {
+    flex: 1,
+    fontSize: scale.hp(1.8),
+    color: '#856404',
+    lineHeight: scale.hp(2.3),
+  },
+  // Button styles
+  customButton: {
+    backgroundColor: Colors.primary || '#CD0202',
+    borderRadius: 10,
+    height: scale.hp(6),
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+    marginTop: scale.hp(1),
+    marginBottom: scale.hp(2),
+  },
+  buttonDisabled: {
+    backgroundColor: '#cccccc',
+    opacity: 0.7,
+  },
+  buttonIcon: {
+    marginRight: 10,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: scale.hp(1.9),
+    fontWeight: '600',
+  },
+  cancelButton: {
+    paddingVertical: 15,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    fontSize: scale.hp(1.9),
+    color: Colors.textSecondary || '#666',
     fontWeight: '500',
   },
-});
+};
 
-export default ChangePasswordScreen;
+export default ChangePassword;

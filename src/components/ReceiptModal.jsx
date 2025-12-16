@@ -12,7 +12,8 @@ import {
   Share,
   StyleSheet,
   Image,
-  Platform
+  Platform,
+  Linking
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import LottieView from 'lottie-react-native';
@@ -20,11 +21,9 @@ import { captureRef } from 'react-native-view-shot';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-
 import { useTranslation } from 'react-i18next';
 import { Colors } from '../theme/colors';
 import { scale } from '../utils/normalizeSize';
-
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 
@@ -33,8 +32,8 @@ const ReceiptModal1 = ({ visible, onClose, transaction, transactionType }) => {
   const { t } = useTranslation();
   const lottieRef = useRef(null);
   const receiptCaptureRef = useRef(null);
-  const [hasMediaPermission, setHasMediaPermission] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [mediaPermissionChecked, setMediaPermissionChecked] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -58,18 +57,9 @@ const ReceiptModal1 = ({ visible, onClose, transaction, transactionType }) => {
     }
   }, [visible]);
 
-  useEffect(() => {
-    (async () => {
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      setHasMediaPermission(status === 'granted');
-    })();
-  }, []);
-
-
   const getStockStatus = () => {
     return 'completed';
   };
-
 
   const getActualStatus = () => {
     if (transactionType === 'stock') {
@@ -126,7 +116,6 @@ const ReceiptModal1 = ({ visible, onClose, transaction, transactionType }) => {
         );
       }
     }
-
 
     switch (status) {
       case 'succeeded':
@@ -185,14 +174,52 @@ const ReceiptModal1 = ({ visible, onClose, transaction, transactionType }) => {
       return t('receipt.stockTransaction');
     }
     
+    const serviceType = transaction?.type || 'recharge';
+    
     switch (status) {
       case 'succeeded':
       case 'completed':
-        return t('receipt.topupSuccessful');
+        switch (serviceType) {
+          case 'recharge':
+          case 'stripe_card':
+            return t('receipt.topupSuccessful');
+          case 'bundle':
+            return t('receipt.bundleActivated');
+          case 'games':
+            return t('receipt.gameActivated');
+          case 'social':
+            return t('receipt.socialRechargeSuccess');
+          default:
+            return t('receipt.transactionSuccessful');
+        }
       case 'failed':
-        return t('receipt.topupFailed');
+        switch (serviceType) {
+          case 'recharge':
+          case 'stripe_card':
+            return t('receipt.topupFailed');
+          case 'bundle':
+            return t('receipt.bundleActivationFailed');
+          case 'games':
+            return t('receipt.gameActivationFailed');
+          case 'social':
+            return t('receipt.socialRechargeFailed');
+          default:
+            return t('receipt.transactionFailed');
+        }
       case 'pending':
-        return t('receipt.processingTopup');
+        switch (serviceType) {
+          case 'recharge':
+          case 'stripe_card':
+            return t('receipt.processingTopup');
+          case 'bundle':
+            return t('receipt.processingBundle');
+          case 'games':
+            return t('receipt.processingGame');
+          case 'social':
+            return t('receipt.processingSocial');
+          default:
+            return t('receipt.processingTransaction');
+        }
       default:
         return t('receipt.transactionDetails');
     }
@@ -227,16 +254,42 @@ const ReceiptModal1 = ({ visible, onClose, transaction, transactionType }) => {
         : t('services.stockOut');
     }
     
-    switch (transaction?.source || transaction?.type) {
+    const serviceType = transaction?.source || transaction?.type || 'recharge';
+    
+    switch (serviceType) {
       case 'stripe_card':
       case 'recharge':
         return t('services.mobileTopup');
-      case 'data_bundle':
+      case 'bundle':
         return t('services.dataBundle');
-      case 'game_coins':
+      case 'games':
         return t('services.gameCoins');
+      case 'social':
+        return t('services.socialMedia');
       default:
         return t('transaction');
+    }
+  };
+
+  const getModalTitle = () => {
+    if (transactionType === 'stock') {
+      return t('receipt.stockReceipt');
+    }
+    
+    const serviceType = transaction?.source || transaction?.type || 'recharge';
+    
+    switch (serviceType) {
+      case 'stripe_card':
+      case 'recharge':
+        return t('receipt.topupReceipt');
+      case 'bundle':
+        return t('receipt.bundleReceipt');
+      case 'games':
+        return t('receipt.gameReceipt');
+      case 'social':
+        return t('receipt.socialReceipt');
+      default:
+        return t('receipt.transactionReceipt');
     }
   };
 
@@ -297,6 +350,73 @@ const ReceiptModal1 = ({ visible, onClose, transaction, transactionType }) => {
     }
   };
 
+  const checkAndRequestMediaPermission = async () => {
+    try {
+      // Check current permission status
+      const permission = await MediaLibrary.getPermissionsAsync();
+      
+      if (permission.granted) {
+        return true;
+      }
+      
+      if (permission.canAskAgain) {
+        // Request permission only when needed
+        const newPermission = await MediaLibrary.requestPermissionsAsync();
+        
+        if (newPermission.granted) {
+          return true;
+        } else {
+          Alert.alert(
+            t('receipt.permissionRequired'),
+            t('receipt.needPermissionToSave'),
+            [
+              { 
+                text: t('common.cancel'), 
+                style: 'cancel' 
+              },
+              { 
+                text: t('receipt.openSettings'), 
+                onPress: () => {
+                  if (Platform.OS === 'ios') {
+                    Linking.openURL('app-settings:');
+                  } else {
+                    Linking.openSettings();
+                  }
+                }
+              }
+            ]
+          );
+          return false;
+        }
+      } else {
+        Alert.alert(
+          t('receipt.permissionDenied'),
+          t('receipt.permissionDeniedMessage'),
+          [
+            { 
+              text: t('common.cancel'), 
+              style: 'cancel' 
+            },
+            { 
+              text: t('receipt.openSettings'), 
+              onPress: () => {
+                if (Platform.OS === 'ios') {
+                  Linking.openURL('app-settings:');
+                } else {
+                  Linking.openSettings();
+                }
+              }
+            }
+          ]
+        );
+        return false;
+      }
+    } catch (error) {
+      console.error('Error checking media permission:', error);
+      return false;
+    }
+  };
+
   const shareReceipt = async () => {
     try {
       if (isCapturing) {
@@ -346,7 +466,6 @@ const ReceiptModal1 = ({ visible, onClose, transaction, transactionType }) => {
     } catch (error) {
       console.error('Error sharing receipt:', error);
       
- 
       const amountInfo = getTransactionAmount();
       const serviceName = getServiceName();
       const statusText = getStatusText();
@@ -381,47 +500,65 @@ ${t('receipt.thankYou')}
         return;
       }
 
-      if (!hasMediaPermission) {
+      // First, capture the receipt
+      console.log('Starting receipt capture for download...');
+      const receiptUri = await captureReceipt();
+      
+      if (!receiptUri) {
+        throw new Error('Failed to capture receipt');
+      }
+
+      // Check and request permission only when we need to save
+      const hasPermission = await checkAndRequestMediaPermission();
+      
+      if (!hasPermission) {
+        // User denied permission, offer alternative (share instead)
         Alert.alert(
-          t('receipt.permissionRequired'),
-          t('receipt.grantPermission'),
-          [{ text: 'OK' }]
+          t('receipt.permissionDenied'),
+          t('receipt.permissionDeniedShareInstead'),
+          [
+            { text: t('common.cancel'), style: 'cancel' },
+            { 
+              text: t('receipt.shareInstead'), 
+              onPress: shareReceipt 
+            }
+          ]
         );
         return;
       }
 
-      console.log('Starting receipt capture for download...');
-      const receiptUri = await captureReceipt();
+      // Now save the file
+      console.log('Saving receipt to gallery...');
       
-      if (receiptUri) {
-        console.log('Downloading receipt:', receiptUri);
-        
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const filename = `Receipt-${transaction.txnNumber || transaction.id}-${timestamp}.png`;
-        
-        const asset = await MediaLibrary.createAssetAsync(receiptUri);
-        const album = await MediaLibrary.getAlbumAsync('Receipts');
-        
-        if (album) {
-          await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
-        } else {
-          await MediaLibrary.createAlbumAsync('Receipts', asset, false);
-        }
-        
-        Alert.alert(
-          t('receipt.downloadSuccess'),
-          t('receipt.downloadSuccessMessage'),
-          [{ text: 'OK' }]
-        );
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = `Receipt-${transaction.txnNumber || transaction.id}-${timestamp}.png`;
+      
+      const asset = await MediaLibrary.createAssetAsync(receiptUri);
+      const album = await MediaLibrary.getAlbumAsync('Receipts');
+      
+      if (album) {
+        await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
       } else {
-        throw new Error('Failed to capture receipt');
+        await MediaLibrary.createAlbumAsync('Receipts', asset, false);
       }
+      
+      Alert.alert(
+        t('receipt.downloadSuccess'),
+        t('receipt.downloadSuccessMessage'),
+        [{ text: 'OK' }]
+      );
     } catch (error) {
       console.error('Error downloading receipt:', error);
       Alert.alert(
         t('receipt.downloadError'),
         t('receipt.downloadErrorMessage'),
-        [{ text: 'OK' }]
+        [
+          { text: 'OK', style: 'cancel' },
+          { 
+            text: t('receipt.trySharing'), 
+            onPress: shareReceipt 
+          }
+        ]
       );
     }
   };
@@ -544,24 +681,11 @@ ${t('receipt.thankYou')}
             </View>
             
             <View style={styles.receiptHeaderCenter}>
-              <Text style={styles.receiptTitle}>{t('receipt.title')}</Text>
+              <Text style={styles.receiptTitle}>{getModalTitle()}</Text>
             </View>
             
             <View style={styles.receiptHeaderRight}>
-              <TouchableOpacity 
-                onPress={shareReceipt} 
-                style={styles.receiptHeaderActionButton}
-                disabled={isCapturing}
-              >
-                <Ionicons name="share-outline" size={20} color="#fff" />
-              </TouchableOpacity>
-              <TouchableOpacity 
-                onPress={downloadReceipt} 
-                style={styles.receiptHeaderActionButton}
-                disabled={isCapturing}
-              >
-                <Ionicons name="download-outline" size={20} color="#fff" />
-              </TouchableOpacity>
+              {/* Removed header buttons since they're now at the bottom */}
             </View>
           </View>
 
@@ -612,12 +736,8 @@ ${t('receipt.thankYou')}
                   {getServiceName()}
                 </Text>
               </View>
-
-          
-             
             </View>
 
-            
             <View style={styles.receiptAmountSection}>
               <Text style={styles.receiptAmountLabel}>{t('receipt.totalAmount')}</Text>
               <Text style={styles.receiptAmountValue}>
@@ -626,6 +746,7 @@ ${t('receipt.thankYou')}
             </View>
             
             <View style={styles.receiptActions}>
+           
               <TouchableOpacity 
                 style={[
                   styles.receiptPrimaryButton,
@@ -638,6 +759,52 @@ ${t('receipt.thankYou')}
                   {isCapturing ? t('receipt.processing') : t('receipt.done')}
                 </Text>
               </TouchableOpacity>
+
+        
+              <View style={styles.secondaryActionsRow}>
+        
+                <TouchableOpacity 
+                  style={[
+                    styles.secondaryActionButton,
+                    styles.shareButton,
+                    isCapturing && styles.secondaryButtonDisabled
+                  ]}
+                  onPress={shareReceipt}
+                  disabled={isCapturing}
+                >
+                  <Ionicons name="share-outline" size={20} color="#fff" />
+                  <Text style={styles.secondaryActionButtonText}>
+                    {t('receipt.shareReceipt')}
+                  </Text>
+                </TouchableOpacity>
+
+            
+                <TouchableOpacity 
+                  style={[
+                    styles.secondaryActionButton,
+                    styles.downloadButton,
+                    isCapturing && styles.secondaryButtonDisabled
+                  ]}
+                  onPress={downloadReceipt}
+                  disabled={isCapturing}
+                >
+                  {isCapturing ? (
+                    <>
+                      <Ionicons name="hourglass-outline" size={20} color="#fff" />
+                      <Text style={styles.secondaryActionButtonText}>
+                        {t('receipt.processing')}
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      <Ionicons name="download-outline" size={20} color="#fff" />
+                      <Text style={styles.secondaryActionButtonText}>
+                        {t('receipt.downloadReceipt')}
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
           </ScrollView>
         </Animated.View>
@@ -830,15 +997,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  receiptHeaderActionButton: {
-    width: scale.wp(9),
-    height: scale.wp(9),
-    borderRadius: scale.wp(4.5),
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: scale.wp(2),
-  },
   receiptTitle: {
     fontSize: scale.hp(2.25),
     fontWeight: 'bold',
@@ -851,7 +1009,6 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: scale.hp(2.5),
   },
   logoImage: {
     marginTop: scale.hp(4),
@@ -899,12 +1056,12 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F3F4F6',
   },
   receiptDetailLabel: {
-    fontSize: scale.hp(1.75),
+    fontSize: scale.hp(1.65),
     color: '#6B7280',
     flex: 1,
   },
   receiptDetailValue: {
-    fontSize: scale.hp(1.75),
+    fontSize: scale.hp(1.65),
     fontWeight: '500',
     color: Colors.textPrimary,
     flex: 1,
@@ -912,7 +1069,7 @@ const styles = StyleSheet.create({
   },
   receiptAmountSection: {
     alignItems: 'center',
-    marginVertical: scale.hp(2),
+    marginVertical: scale.hp(1.5),
     backgroundColor: '#F8FFE6',
     borderRadius: scale.hp(1.5),
     padding: scale.hp(2),
@@ -930,7 +1087,7 @@ const styles = StyleSheet.create({
   receiptActions: {
     padding: scale.hp(2.5),
     paddingTop: 0,
-    marginTop: scale.hp(1),
+    marginTop: scale.hp(0),
   },
   receiptPrimaryButton: {
     backgroundColor: Colors.primary,
@@ -940,6 +1097,14 @@ const styles = StyleSheet.create({
     marginBottom: scale.hp(2),
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   receiptButtonDisabled: {
     backgroundColor: '#9CA3AF',
@@ -948,6 +1113,46 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: scale.hp(2),
     fontWeight: '600',
+  },
+  // New styles for secondary action buttons
+  secondaryActionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginTop: scale.hp(0),
+  },
+  secondaryActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: scale.hp(1.25),
+    paddingHorizontal: scale.wp(4),
+    borderRadius: scale.hp(2),
+    flex: 1,
+    marginHorizontal: scale.wp(1),
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.41,
+    elevation: 2,
+  },
+  shareButton: {
+    backgroundColor: '#CD0202', 
+  },
+  downloadButton: {
+    backgroundColor: '#CD0202', 
+  },
+  secondaryButtonDisabled: {
+    backgroundColor: '#9CA3AF',
+  },
+  secondaryActionButtonText: {
+    color: '#fff',
+    fontSize: scale.hp(1.6),
+    fontWeight: '500',
+    marginLeft: scale.wp(1.5),
   },
 });
 

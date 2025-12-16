@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from "react";
+import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -19,6 +19,13 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import {
+  QueryClient,
+  QueryClientProvider,
+  useQuery,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { Colors } from "../../theme/colors";
 import ServiceHeader from "../../components/ServiceHeader";
 import PrimaryButton from "../../components/PrimaryButton";
@@ -55,6 +62,147 @@ const ORDER_STATUS = {
   PENDING: 'pending'
 };
 
+// Create Query Client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      cacheTime: 10 * 60 * 1000, // 10 minutes
+      retry: 1,
+    },
+  },
+});
+
+// Query Keys
+const QUERY_KEYS = {
+  COUNTRIES: ['countries'],
+  BUNDLE_CATEGORIES: ['bundle-categories'],
+  BUNDLE_TYPES: ['bundle-types'],
+  DATA_PRODUCTS: (countryId, categoryId, typeId) => ['data-products', countryId, categoryId, typeId],
+  ORDER_STATUS: (orderId) => ['order-status', orderId],
+  CONTACTS: ['contacts'],
+};
+
+// API Service Functions with React Query
+const useCountries = () => {
+  return useQuery({
+    queryKey: QUERY_KEYS.COUNTRIES,
+    queryFn: async () => {
+      const response = await getCountries();
+      return response?.data || [];
+    },
+    staleTime: 30 * 60 * 1000, // 30 minutes
+  });
+};
+
+const useBundleCategories = () => {
+  return useQuery({
+    queryKey: QUERY_KEYS.BUNDLE_CATEGORIES,
+    queryFn: async () => {
+      const response = await getBundleCategories();
+      return response?.data || [];
+    },
+    staleTime: 30 * 60 * 1000,
+  });
+};
+
+const useBundleTypes = () => {
+  return useQuery({
+    queryKey: QUERY_KEYS.BUNDLE_TYPES,
+    queryFn: async () => {
+      const response = await getBundleTypes();
+      return response?.data || [];
+    },
+    staleTime: 30 * 60 * 1000,
+  });
+};
+
+const useDataProducts = (countryId, categoryId, typeId, enabled = false) => {
+  return useQuery({
+    queryKey: QUERY_KEYS.DATA_PRODUCTS(countryId, categoryId, typeId),
+    queryFn: async () => {
+      if (!countryId) return [];
+      
+      const filter = {
+        countryId,
+        productCategoryId: categoryId,
+        productTypeId: typeId,
+        productFor: "BUNDLE"
+      };
+      
+      const response = await getDataProducts(filter);
+      return response?.data || [];
+    },
+    enabled: !!countryId && enabled,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+};
+
+const useOrderStatus = (orderId, enabled = false) => {
+  return useQuery({
+    queryKey: QUERY_KEYS.ORDER_STATUS(orderId),
+    queryFn: async () => {
+      if (!orderId) return null;
+      const response = await getOrderStatus(orderId);
+      return response;
+    },
+    enabled: !!orderId && enabled,
+    refetchInterval: (data) => {
+      if (!data?.data?.status) return false;
+      const status = data.data.status;
+      return status === ORDER_STATUS.QUEUED || 
+             status === ORDER_STATUS.PROCESSING || 
+             status === ORDER_STATUS.PENDING ? 3000 : false;
+    },
+    refetchIntervalInBackground: true,
+  });
+};
+
+const useContacts = () => {
+  return useQuery({
+    queryKey: QUERY_KEYS.CONTACTS,
+    queryFn: async () => {
+      const { status } = await Contacts.requestPermissionsAsync();
+      if (status !== 'granted') {
+        throw new Error('Contacts permission denied');
+      }
+      
+      const { data } = await Contacts.getContactsAsync({
+        fields: [Contacts.Fields.Name, Contacts.Fields.PhoneNumbers],
+      });
+      
+      return data || [];
+    },
+    enabled: false,
+    staleTime: Infinity,
+    cacheTime: Infinity,
+  });
+};
+
+const useActivateBundle = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (payload) => {
+      const response = await activateDataBundle(payload);
+      return response;
+    },
+    onSuccess: (data, variables) => {
+      if (data.orderId) {
+        // Invalidate order status query
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ORDER_STATUS(data.orderId) });
+        
+        // You might want to invalidate user transactions or balance here
+        // queryClient.invalidateQueries({ queryKey: ['user-transactions'] });
+        // queryClient.invalidateQueries({ queryKey: ['user-balance'] });
+      }
+    },
+    onError: (error) => {
+      console.error('Bundle activation mutation error:', error);
+    },
+  });
+};
+
 const OrderStatusScreen = ({ 
   orderStatus, 
   orderDetails, 
@@ -63,8 +211,7 @@ const OrderStatusScreen = ({
   getStatusColor, 
   getStatusMessage, 
   resetFlow, 
-  navigation,
-  pollingRef 
+  navigation 
 }) => {
   return (
     <View style={{ flex: 1, paddingBottom: 100 }}>
@@ -144,9 +291,6 @@ const OrderStatusScreen = ({
           <PrimaryButton
             label="Done"
             onPress={() => {
-              if (pollingRef.current) {
-                clearInterval(pollingRef.current);
-              }
               navigation.popToTop();
             }}
             style={{ width: "100%", marginTop: 20 }}
@@ -163,7 +307,6 @@ const OrderStatusScreen = ({
   );
 };
 
-
 const ContactsModal = ({ 
   contactsModalVisible, 
   setContactsModalVisible, 
@@ -173,7 +316,8 @@ const ContactsModal = ({
   setSearchQuery, 
   filteredContacts, 
   handleContactSelect,
-  t 
+  t,
+  loadingContacts
 }) => {
   return (
     <Modal
@@ -220,7 +364,12 @@ const ContactsModal = ({
             />
           </View>
 
-          {filteredContacts.length > 0 ? (
+          {loadingContacts ? (
+            <View style={styles.emptyContainer}>
+              <ActivityIndicator size="large" color={Colors.primary} />
+              <Text style={styles.emptyText}>Loading contacts...</Text>
+            </View>
+          ) : filteredContacts.length > 0 ? (
             <FlatList
               data={filteredContacts}
               keyExtractor={(item) => item.id}
@@ -260,7 +409,6 @@ const ContactsModal = ({
   );
 };
 
-// Countries Modal Component
 const CountriesModal = ({ 
   countryOpen, 
   setCountryOpen, 
@@ -269,8 +417,17 @@ const CountriesModal = ({
   countrySearch, 
   setCountrySearch, 
   countries, 
-  setCountry 
+  setCountry,
+  loadingCountries
 }) => {
+  const filteredCountries = useMemo(() => {
+    if (!countrySearch) return countries;
+    return countries.filter(c =>
+      c.countryName?.toLowerCase().includes(countrySearch.toLowerCase()) ||
+      c.countryCode?.toLowerCase().includes(countrySearch.toLowerCase())
+    );
+  }, [countries, countrySearch]);
+
   return (
     <Modal
       visible={countryOpen}
@@ -316,63 +473,59 @@ const CountriesModal = ({
             />
           </View>
 
-          <FlatList
-            data={countries.filter(c =>
-              c.countryName?.toLowerCase().includes(countrySearch.toLowerCase()) ||
-              c.countryCode?.toLowerCase().includes(countrySearch.toLowerCase())
-            )}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.modalRow}
-                onPress={() => {
-                  setCountry(item);
-                  setCountryOpen(false);
-                  setCountrySearch('');
-                }}
-              >
-                <Text style={{ fontSize: 24, marginRight: 12 }}>
-                  {codeToFlag(item.countryCode)}
-                </Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: Colors.textPrimary, fontSize: 16, fontWeight: '500' }}>
-                    {item.countryName}
+          {loadingCountries ? (
+            <View style={styles.emptyContainer}>
+              <ActivityIndicator size="large" color={Colors.primary} />
+              <Text style={styles.emptyText}>Loading countries...</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={filteredCountries}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.modalRow}
+                  onPress={() => {
+                    setCountry(item);
+                    setCountryOpen(false);
+                    setCountrySearch('');
+                  }}
+                >
+                  <Text style={{ fontSize: 24, marginRight: 12 }}>
+                    {codeToFlag(item.countryCode)}
                   </Text>
-                  <Text style={{ color: Colors.textSecondary, fontSize: 14 }}>
-                    {DIAL_CODES[item.countryCode] || ""}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            )}
-            ItemSeparatorComponent={() => <View style={styles.contactSeparator} />}
-          />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: Colors.textPrimary, fontSize: 16, fontWeight: '500' }}>
+                      {item.countryName}
+                    </Text>
+                    <Text style={{ color: Colors.textSecondary, fontSize: 14 }}>
+                      {DIAL_CODES[item.countryCode] || ""}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+              ItemSeparatorComponent={() => <View style={styles.contactSeparator} />}
+            />
+          )}
         </Animated.View>
       </View>
     </Modal>
   );
 };
 
-// Main Component
-export default function DataFlowScreenMerchant({ navigation }) {
+function DataFlowScreenMerchant({ navigation }) {
   const { user } = useAuth?.() || { user: null };
   const isB2B = (user?.role || "").toLowerCase().includes("b2b");
   const lastStep = isB2B ? BASE_STEPS.PRODUCT : BASE_STEPS.PAY;
-  const [countries, setCountries] = useState([]);
-  const [bundleCategories, setBundleCategories] = useState([]);
-  const [bundleTypes, setBundleTypes] = useState([]);
   const [step, setStep] = useState(0);
   const [orderStatus, setOrderStatus] = useState(null);
   const [orderDetails, setOrderDetails] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [contacts, setContacts] = useState([]);
-  const [filteredContacts, setFilteredContacts] = useState([]);
   const [contactsModalVisible, setContactsModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [country, setCountry] = useState(null);
   const [countryOpen, setCountryOpen] = useState(false);
   const [countrySearch, setCountrySearch] = useState('');
   const [localNumber, setLocalNumber] = useState("");
-  const [products, setProducts] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedType, setSelectedType] = useState(null);
   const [product, setProduct] = useState(null);
@@ -382,134 +535,76 @@ export default function DataFlowScreenMerchant({ navigation }) {
   const [countriesSlideAnim] = useState(new Animated.Value(screenHeight));
   const insets = useSafeAreaInsets();
   
-  const pollingRef = useRef(null);
   const lottieRef = useRef(null);
 
   const dial = DIAL_CODES[country?.countryCode] || "";
   const operator = guessOperator(country?.countryCode, localNumber.replace(/\D/g, ""));
 
-  // Order Status Polling
-  const startPollingOrderStatus = async (orderId) => {
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current);
-    }
+  // React Query hooks
+  const { data: countries = [], isLoading: loadingCountries } = useCountries();
+  const { data: bundleCategories = [], isLoading: loadingCategories } = useBundleCategories();
+  const { data: bundleTypes = [], isLoading: loadingTypes } = useBundleTypes();
+  const { 
+    data: orderStatusData, 
+    isFetching: pollingOrderStatus 
+  } = useOrderStatus(orderDetails?.orderId, !!orderDetails?.orderId);
+  const { 
+    data: contacts = [], 
+    isLoading: loadingContacts,
+    refetch: refetchContacts 
+  } = useContacts();
+  const activateBundleMutation = useActivateBundle();
+  
+  // Enable products query only when country is selected and we're on PRODUCT step
+  const shouldFetchProducts = step >= BASE_STEPS.PRODUCT && !!country?.id;
+  const { 
+    data: products = [], 
+    isLoading: loadingProducts 
+  } = useDataProducts(
+    country?.id, 
+    selectedCategory?.id, 
+    selectedType?.id, 
+    shouldFetchProducts
+  );
 
-    let pollCount = 0;
-    const maxPolls = 60;
-
-    pollingRef.current = setInterval(async () => {
-      try {
-        pollCount++;
-        const statusResponse = await getOrderStatus(orderId);
-        const currentStatus = statusResponse.data?.status;
-        
-        console.log(`Poll ${pollCount}: Bundle order status:`, currentStatus);
-        
-        setOrderStatus(currentStatus);
-        setOrderDetails(prev => ({
-          ...prev,
-          ...statusResponse.data
-        }));
-
-        if (currentStatus === ORDER_STATUS.SUCCEEDED || 
-            currentStatus === ORDER_STATUS.FAILED || 
-            pollCount >= maxPolls) {
-          clearInterval(pollingRef.current);
-          pollingRef.current = null;
-          
-          if (pollCount >= maxPolls) {
-            setOrderStatus(ORDER_STATUS.FAILED);
-            console.log("Max polling attempts reached");
-          }
-        }
-      } catch (error) {
-        console.error("Error polling bundle order status:", error);
-        if (pollCount >= maxPolls) {
-          clearInterval(pollingRef.current);
-          pollingRef.current = null;
-          setOrderStatus(ORDER_STATUS.FAILED);
-        }
-      }
-    }, 3000);
-  };
-
+  // Set initial country from cached data
   useEffect(() => {
-    return () => {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-      }
-    };
-  }, []);
+    if (countries.length > 0 && !country) {
+      const afgCountry = countries.find((c) => c.countryCode === "AF") || countries[0];
+      setCountry(afgCountry);
+    }
+  }, [countries]);
 
+  // Set initial category and type from cached data
+  useEffect(() => {
+    if (bundleCategories.length > 0 && !selectedCategory) {
+      setSelectedCategory(bundleCategories[0]);
+    }
+    if (bundleTypes.length > 0 && !selectedType) {
+      setSelectedType(bundleTypes[0]);
+    }
+  }, [bundleCategories, bundleTypes]);
+
+  // Update order status from React Query polling
+  useEffect(() => {
+    if (orderStatusData?.data?.status) {
+      const currentStatus = orderStatusData.data.status;
+      setOrderStatus(currentStatus);
+      setOrderDetails(prev => ({
+        ...prev,
+        ...orderStatusData.data
+      }));
+    }
+  }, [orderStatusData]);
+
+  // Lottie animation
   useEffect(() => {
     if (lottieRef.current && (orderStatus === ORDER_STATUS.SUCCEEDED || orderStatus === ORDER_STATUS.FAILED)) {
       lottieRef.current.play();
     }
   }, [orderStatus]);
 
-  useEffect(() => {
-    const getAllCountries = async () => {
-      try {
-        const res = await getCountries();
-        setCountries(res?.data || []);
-        const afgCountry = res?.data?.find((c) => c.countryCode === "AF");
-        setCountry(afgCountry || res?.data?.[0]);
-      } catch (error) {
-        console.error("Error loading countries:", error);
-        Alert.alert("Error", "Failed to load countries. Please try again.");
-      }
-    };
-    getAllCountries();
-  }, []);
-
-  useEffect(() => {
-    const fetchBundleData = async () => {
-      try {
-        const categoriesRes = await getBundleCategories();
-        setBundleCategories(categoriesRes?.data || []);
-        
-        const typesRes = await getBundleTypes();
-        setBundleTypes(typesRes?.data || []);
-        
-        if (categoriesRes?.data?.length > 0 && !selectedCategory) {
-          setSelectedCategory(categoriesRes.data[0]);
-        }
-        if (typesRes?.data?.length > 0 && !selectedType) {
-          setSelectedType(typesRes.data[0]);
-        }
-      } catch (error) {
-        console.error("Error loading bundle filters:", error);
-        Alert.alert("Error", "Failed to load bundle categories and types.");
-      }
-    };
-
-    fetchBundleData();
-  }, []);
-
-  useEffect(() => {
-    const getProductsForAgent = async () => {
-      if (!country?.id) return;
-      
-      try {
-        const filter = {
-          countryId: country?.id,
-          productCategoryId: selectedCategory?.id,
-          productTypeId: selectedType?.id,
-          productFor: "BUNDLE"
-        };
-        const res = await getDataProducts(filter);
-        console.log("Fetched Products:", res);
-        setProducts(res?.data || []);
-      } catch (error) {
-        console.error("Error fetching products:", error);
-        setProducts([]);
-        Alert.alert("Error", "Failed to load products. Please try again.");
-      }
-    };
-
-    getProductsForAgent();
-  }, [country, selectedCategory, selectedType]);
-
+  // Animation effects
   useEffect(() => {
     if (contactsModalVisible) {
       Animated.timing(contactsSlideAnim, {
@@ -518,7 +613,7 @@ export default function DataFlowScreenMerchant({ navigation }) {
         easing: Easing.out(Easing.back(1)),
         useNativeDriver: true,
       }).start();
-      loadContacts();
+      refetchContacts();
     } else {
       Animated.timing(contactsSlideAnim, {
         toValue: screenHeight,
@@ -547,42 +642,27 @@ export default function DataFlowScreenMerchant({ navigation }) {
     }
   }, [countryOpen]);
 
-  useEffect(() => {
-    if (searchQuery) {
-      const filtered = contacts.filter(contact =>
-        contact.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        contact.phoneNumbers?.some(phone =>
-          phone.number?.includes(searchQuery)
-        )
-      );
-      setFilteredContacts(filtered);
-    } else {
-      setFilteredContacts(contacts);
-    }
+  // Filter contacts locally
+  const filteredContacts = useMemo(() => {
+    if (!searchQuery) return contacts;
+    return contacts.filter(contact =>
+      contact.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      contact.phoneNumbers?.some(phone =>
+        phone.number?.includes(searchQuery)
+      )
+    );
   }, [searchQuery, contacts]);
 
-  const loadContacts = async () => {
-    try {
-      const { status } = await Contacts.requestPermissionsAsync();
-      if (status === 'granted') {
-        const { data } = await Contacts.getContactsAsync({
-          fields: [Contacts.Fields.Name, Contacts.Fields.PhoneNumbers],
-        });
-
-        if (data.length > 0) {
-          setContacts(data);
-          setFilteredContacts(data);
-        } else {
-          Alert.alert("No Contacts", "No contacts found on your device.");
-        }
-      } else {
-        Alert.alert("Permission Denied", "Cannot access contacts without permission. Please enable contacts permission in settings.");
-      }
-    } catch (error) {
-      console.error('Error loading contacts:', error);
-      Alert.alert("Error", "Failed to load contacts. Please try again.");
-    }
-  };
+  // Filter products locally
+  const filteredProducts = useMemo(() => {
+    if (!search.trim()) return products;
+    const q = search.trim().toLowerCase();
+    return products.filter((p) =>
+      p.productName?.toLowerCase().includes(q) ||
+      p.description?.toLowerCase().includes(q) ||
+      p.price?.toString().includes(q)
+    );
+  }, [products, search]);
 
   const canNext =
     (step === BASE_STEPS.COUNTRY && !!country) ||
@@ -610,25 +690,25 @@ export default function DataFlowScreenMerchant({ navigation }) {
 
   const jumpTo = (i) => setStep(i);
 
+  // Reset local number and product when country changes
   useEffect(() => {
     setLocalNumber("");
     setProduct(null);
   }, [country?.countryCode]);
 
   const activateBundle = async () => {
-    setLoading(true);
+    const cleanedNumber = localNumber.replace(/\D/g, "");
+    const receiverNumber = `${dial}${cleanedNumber}`.replace(/\s/g, "");
+    
+    const payload = {
+      productId: product?.id,
+      receiver: receiverNumber,
+    };
+
+    console.log("🔄 Activation Payload:", payload);
+
     try {
-      const cleanedNumber = localNumber.replace(/\D/g, "");
-      const receiverNumber = `${dial}${cleanedNumber}`.replace(/\s/g, "");
-      
-      const payload = {
-        productId: product?.id,
-        receiver: receiverNumber,
-      };
-
-      console.log("🔄 Activation Payload:", payload);
-
-      const res = await activateDataBundle(payload);
+      const res = await activateBundleMutation.mutateAsync(payload);
       
       console.log("✅ Activation Response:", res);
       
@@ -644,10 +724,6 @@ export default function DataFlowScreenMerchant({ navigation }) {
           operator: operator?.name || "Unknown",
           message: res.message || "Bundle activation initiated successfully!",
         });
-        
-        if (res.orderId) {
-          await startPollingOrderStatus(res.orderId);
-        }
       } else {
         setOrderStatus(ORDER_STATUS.FAILED);
         setOrderDetails({
@@ -670,10 +746,9 @@ export default function DataFlowScreenMerchant({ navigation }) {
         error: error.response?.data?.error || "Activation failed. Please try again.",
       });
     }
-    setLoading(false);
   };
 
-  const handleContactSelect = (phoneNumber) => {
+  const handleContactSelect = useCallback((phoneNumber) => {
     if (!phoneNumber) {
       Alert.alert("Error", "Invalid phone number selected");
       return;
@@ -689,7 +764,7 @@ export default function DataFlowScreenMerchant({ navigation }) {
     setLocalNumber(number);
     setContactsModalVisible(false);
     setSearchQuery('');
-  };
+  }, [country]);
 
   const resetFlow = () => {
     setOrderStatus(null);
@@ -697,18 +772,14 @@ export default function DataFlowScreenMerchant({ navigation }) {
     setStep(0);
     setProduct(null);
     setLocalNumber("");
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current);
-      pollingRef.current = null;
-    }
-
+    
     if (lottieRef.current) {
       lottieRef.current.reset();
     }
   };
 
   // Status Helper Functions
-  const getStatusMessage = () => {
+  const getStatusMessage = useCallback(() => {
     switch (orderStatus) {
       case ORDER_STATUS.QUEUED:
         return "Your bundle activation has been queued and will be processed shortly.";
@@ -722,9 +793,9 @@ export default function DataFlowScreenMerchant({ navigation }) {
       default:
         return "Processing your request...";
     }
-  };
+  }, [orderStatus]);
 
-  const getStatusIcon = () => {
+  const getStatusIcon = useCallback(() => {
     switch (orderStatus) {
       case ORDER_STATUS.QUEUED:
         return (
@@ -766,9 +837,9 @@ export default function DataFlowScreenMerchant({ navigation }) {
           </View>
         );
     }
-  };
+  }, [orderStatus]);
 
-  const getStatusTitle = () => {
+  const getStatusTitle = useCallback(() => {
     switch (orderStatus) {
       case ORDER_STATUS.QUEUED:
         return "Bundle Queued";
@@ -782,9 +853,9 @@ export default function DataFlowScreenMerchant({ navigation }) {
       default:
         return "Processing";
     }
-  };
+  }, [orderStatus]);
 
-  const getStatusColor = () => {
+  const getStatusColor = useCallback(() => {
     switch (orderStatus) {
       case ORDER_STATUS.QUEUED:
         return "#FFA500";
@@ -798,17 +869,9 @@ export default function DataFlowScreenMerchant({ navigation }) {
       default:
         return "#6C757D";
     }
-  };
+  }, [orderStatus]);
 
-  const filteredProducts = useMemo(() => {
-    if (!search.trim()) return products;
-    const q = search.trim().toLowerCase();
-    return products.filter((p) =>
-      p.productName?.toLowerCase().includes(q) ||
-      p.description?.toLowerCase().includes(q) ||
-      p.price?.toString().includes(q)
-    );
-  }, [products, search]);
+  const loading = activateBundleMutation.isLoading || pollingOrderStatus;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
@@ -827,7 +890,6 @@ export default function DataFlowScreenMerchant({ navigation }) {
           getStatusMessage={getStatusMessage}
           resetFlow={resetFlow}
           navigation={navigation}
-          pollingRef={pollingRef}
         />
       ) : (
         <KeyboardAvoidingView
@@ -843,6 +905,7 @@ export default function DataFlowScreenMerchant({ navigation }) {
               <StepCountry
                 country={country}
                 onOpen={() => setCountryOpen(true)}
+                loading={loadingCountries}
               />
             )}
 
@@ -875,6 +938,7 @@ export default function DataFlowScreenMerchant({ navigation }) {
                 setProduct={setProduct}
                 onEditNumber={() => jumpTo(BASE_STEPS.NUMBER)}
                 summary={{ dial, localNumber, product }}
+                loading={loadingProducts}
               />
             )}
 
@@ -922,6 +986,7 @@ export default function DataFlowScreenMerchant({ navigation }) {
         filteredContacts={filteredContacts}
         handleContactSelect={handleContactSelect}
         t={t}
+        loadingContacts={loadingContacts}
       />
 
       <CountriesModal
@@ -933,6 +998,7 @@ export default function DataFlowScreenMerchant({ navigation }) {
         setCountrySearch={setCountrySearch}
         countries={countries}
         setCountry={setCountry}
+        loadingCountries={loadingCountries}
       />
 
       {loading && (
@@ -941,6 +1007,15 @@ export default function DataFlowScreenMerchant({ navigation }) {
         </View>
       )}
     </SafeAreaView>
+  );
+}
+
+// Wrap the component with QueryClientProvider
+export default function DataFlowScreenMerchantWrapper({ navigation }) {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <DataFlowScreenMerchant navigation={navigation} />
+    </QueryClientProvider>
   );
 }
 

@@ -5,33 +5,37 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk",
+        "gradleCommand": ":app:assembleDebug",
         "env": {
+          "EXPO_PUSH_NOTIFICATIONS": "true",
+          "EXPO_USE_FCM": "false",
           "EXPO_ENABLE_NEW_ARCHITECTURE": "true",
-          "NODE_ENV": "development"
-        }
+          "NODE_ENV": "development",
+          "EXPO_PUBLIC_API_URL": "http://3.67.144.22/backend/v1"
+        },
+        "withoutCredentials": false
       }
     },
     "production": {
       "distribution": "internal",
       "android": {
         "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease",
         "env": {
+          "EXPO_PUSH_NOTIFICATIONS": "true",
+          "EXPO_USE_FCM": "false",
           "EXPO_ENABLE_NEW_ARCHITECTURE": "true",
           "NODE_ENV": "production",
           "EXPO_PUBLIC_API_URL": "http://3.67.144.22/backend/v1"
-        }
-      }
-    },
-    "preview": {
-      "distribution": "internal",
-      "android": {
-        "buildType": "apk",
-        "env": {
-          "EXPO_ENABLE_NEW_ARCHITECTURE": "true",
-          "NODE_ENV": "production",
-          "EXPO_PUBLIC_API_URL": "http://3.67.144.22/backend/v1"
-        }
+        },
+        "withoutCredentials": false,
+        "credentialsSource": "remote"
       }
     }
+  },
+  "cli": {
+    "appVersionSource": "local",
+    "requireCommit": false,
+    "promptToConfigurePushNotifications": false
   }
 }

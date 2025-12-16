@@ -24,12 +24,26 @@ import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { Ionicons } from "@expo/vector-icons";
 import LottieView from 'lottie-react-native';
+import {
+  QueryClient,
+  QueryClientProvider,
+  useQuery,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { Colors } from "../../theme/colors";
 import ServiceHeader from "../../components/ServiceHeader";
 import PrimaryButton from "../../components/PrimaryButton";
 import { codeToFlag } from "../../utils/flag";
 import { DIAL_CODES, guessOperator } from "../../constants/dialing";
-import { getCountries, makeRecharge, getCurrencies, getSlabs, getOrderStatus, activateBundleByCustomer } from "../../services/customerAPIOrder";
+import {
+  getCountries,
+  makeRecharge,
+  getCurrencies,
+  getSlabs,
+  getOrderStatus,
+  activateBundleByCustomer,
+} from "../../services/customerAPIOrder";
 import { getSetaraganMnoId } from "../../utils/getCompanyIdForSetaragan";
 import * as Contacts from 'expo-contacts';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -56,7 +70,111 @@ const ORDER_STATUS = {
   PENDING: 'pending'
 };
 
-// Move PromoCodeModal outside the main component
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,
+      cacheTime: 10 * 60 * 1000,
+      retry: 1,
+    },
+  },
+});
+
+const QUERY_KEYS = {
+  COUNTRIES: ['countries'],
+  CURRENCIES: ['currencies'],
+  SLABS: ['slabs'],
+  ORDER_STATUS: (orderId) => ['order-status', orderId],
+  PROMO_CODE: (code, amount) => ['promo-code', code, amount],
+  CONTACTS: ['contacts'],
+};
+
+const useCountries = () => {
+  return useQuery({
+    queryKey: QUERY_KEYS.COUNTRIES,
+    queryFn: async () => {
+      const response = await getCountries();
+      return response?.data || [];
+    },
+    staleTime: 30 * 60 * 1000,
+  });
+};
+
+const useCurrencies = () => {
+  return useQuery({
+    queryKey: QUERY_KEYS.CURRENCIES,
+    queryFn: async () => {
+      const response = await getCurrencies();
+      return response;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+};
+
+const useSlabs = () => {
+  return useQuery({
+    queryKey: QUERY_KEYS.SLABS,
+    queryFn: async () => {
+      const response = await getSlabs();
+      return response;
+    },
+    staleTime: 10 * 60 * 1000,
+  });
+};
+
+// REMOVED React Query polling and replaced with manual polling
+const usePromoCodeValidation = () => {
+  return useMutation({
+    mutationFn: async ({ code, orderAmount }) => {
+      const response = await validatePromoCode({
+        code,
+        orderAmount
+      });
+      return response;
+    },
+    onSuccess: (data) => {
+      if (!data.status) {
+        throw new Error(data.error || 'Invalid promo code');
+      }
+    },
+  });
+};
+
+const useRechargeMutation = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (payload) => {
+      const response = await makeRecharge(payload);
+      return response;
+    },
+    onError: (error) => {
+      console.error('Recharge mutation error:', error);
+    },
+  });
+};
+
+const useContacts = () => {
+  return useQuery({
+    queryKey: QUERY_KEYS.CONTACTS,
+    queryFn: async () => {
+      const { status } = await Contacts.requestPermissionsAsync();
+      if (status !== 'granted') {
+        throw new Error('Contacts permission denied');
+      }
+      
+      const { data } = await Contacts.getContactsAsync({
+        fields: [Contacts.Fields.Name, Contacts.Fields.PhoneNumbers],
+      });
+      
+      return data || [];
+    },
+    enabled: false,
+    staleTime: Infinity,
+    cacheTime: Infinity,
+  });
+};
+
 const PromoCodeModal = React.memo(({ 
   visible, 
   onClose, 
@@ -85,6 +203,7 @@ const PromoCodeModal = React.memo(({
       visible={visible}
       transparent={true}
       animationType="slide"
+      statusBarTranslucent={true}
       onRequestClose={handleClose}
     >
       <View style={modalStyles.modalOverlay}>
@@ -145,17 +264,13 @@ const PromoCodeModal = React.memo(({
   );
 });
 
-export default function TopupFlowScreen({ navigation, route }) {
+function TopupFlowScreen({ navigation, route }) {
   const { t } = useTranslation();
   const { confirmPayment } = useStripe();
   const lastStep = BASE_STEPS.PAY;
-  const [countries, setCountries] = useState([])
   const [step, setStep] = useState(0);
   const [orderStatus, setOrderStatus] = useState(null);
   const [orderDetails, setOrderDetails] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [contacts, setContacts] = useState([]);
-  const [filteredContacts, setFilteredContacts] = useState([]);
   const [contactsModalVisible, setContactsModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [country, setCountry] = useState(null);
@@ -163,7 +278,6 @@ export default function TopupFlowScreen({ navigation, route }) {
   const [countrySearch, setCountrySearch] = useState('');
   const [exchangeRate, setExchangeRate] = useState(null);
   const [slabPercentage, setSlabPercentage] = useState(0);
-  const [loadingData, setLoadingData] = useState(false);
   const [serviceType, setServiceType] = useState('recharge');
   const [showPopularAmounts, setShowPopularAmounts] = useState(true);
   const [showContinueButton, setShowContinueButton] = useState(false);
@@ -177,19 +291,73 @@ export default function TopupFlowScreen({ navigation, route }) {
   const [countriesSlideAnim] = useState(new Animated.Value(screenHeight));
   const insets = useSafeAreaInsets();
   const continueButtonAnim = useRef(new Animated.Value(0)).current;
-  const pollingRef = useRef(null);
+  const pollingRef = useRef(null); // Manual polling reference
   const lottieRef = useRef(null);
   const [promoModalVisible, setPromoModalVisible] = useState(false);
   const [promoCode, setPromoCode] = useState("");
   const [appliedPromoCode, setAppliedPromoCode] = useState(null);
-  const [validatingPromo, setValidatingPromo] = useState(false);
   const [promoError, setPromoError] = useState("");
   const [discountAmount, setDiscountAmount] = useState(0);
   const [finalAmount, setFinalAmount] = useState(0);
-  
-  console.log(exchangeRate, "this is exchange rate")
+
+  const { data: countries = [], isLoading: loadingCountries } = useCountries();
+  const { data: currenciesData, isLoading: loadingCurrencies } = useCurrencies();
+  const { data: slabsData, isLoading: loadingSlabs } = useSlabs();
+  const promoCodeValidation = usePromoCodeValidation();
+  const rechargeMutation = useRechargeMutation();
+  const { 
+    data: contacts = [], 
+    isLoading: loadingContacts,
+    refetch: refetchContacts 
+  } = useContacts();
+
   const dial = DIAL_CODES[country?.countryCode] || "";
   const operator = guessOperator(country?.countryCode, localNumber.replace(/\D/g, ""));
+
+  // MANUAL POLLING FUNCTION - Same as DataFlowScreenMerchant
+  const startPollingOrderStatus = async (orderId) => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+    }
+
+    let pollCount = 0;
+    const maxPolls = 60;
+
+    pollingRef.current = setInterval(async () => {
+      try {
+        pollCount++;
+        const statusResponse = await getOrderStatus(orderId);
+        const currentStatus = statusResponse.data?.status;
+        
+        console.log(`Poll ${pollCount}: Topup order status:`, currentStatus);
+        
+        setOrderStatus(currentStatus);
+        setOrderDetails(prev => ({
+          ...prev,
+          ...statusResponse.data
+        }));
+
+        if (
+          currentStatus === ORDER_STATUS.SUCCEEDED || 
+          currentStatus === ORDER_STATUS.FAILED || 
+          pollCount >= maxPolls
+        ) {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+          
+          if (pollCount >= maxPolls) {
+            console.log("Max polling attempts reached for topup order");
+          }
+        }
+      } catch (error) {
+        console.error("Error polling topup order status:", error);
+        if (pollCount >= maxPolls) {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+        }
+      }
+    }, 3000);
+  };
 
   const calculateTotalAfnAmount = (baseAfn, productItem = null) => {
     const baseAmount = parseFloat(baseAfn) || 0;
@@ -258,144 +426,52 @@ export default function TopupFlowScreen({ navigation, route }) {
   const totalAfn = calculateTotalAfnAmount(afn);
   const usd = calculateUsdAmount(afn);
 
+  // Set initial country
+  useEffect(() => {
+    if (countries.length > 0 && !country) {
+      const afgCountry = countries.find((c) => c.countryCode === "AF") || countries[0];
+      setCountry(afgCountry);
+    }
+  }, [countries]);
+
+  // Update exchange rate and slab percentage
+  useEffect(() => {
+    if (currenciesData && currenciesData.success && currenciesData.data && currenciesData.data.length > 0) {
+      const afnToUsdRate = parseFloat(currenciesData.data[0].target_amount);
+      const usdToAfnRate = parseFloat(currenciesData.data[0].source_amount);
+      setExchangeRate(1 / usdToAfnRate);
+    } else {
+      setExchangeRate(0.012);
+    }
+  }, [currenciesData]);
+
+  useEffect(() => {
+    if (slabsData && slabsData.success && slabsData.data && slabsData.data.length > 0 && country) {
+      const countrySlabs = slabsData.data.filter(slab => slab.countryId === country.id);
+      const totalPercentage = countrySlabs.reduce((sum, slab) => {
+        return sum + parseFloat(slab.percentage || 0);
+      }, 0);
+      setSlabPercentage(totalPercentage);
+    } else {
+      setSlabPercentage(0);
+    }
+  }, [slabsData, country]);
+
+  // Update final amount
   useEffect(() => {
     const originalUsd = calculateUsdAmount(getActualAfnAmount());
     const newFinalAmount = Math.max(0, originalUsd - discountAmount);
     setFinalAmount(parseFloat(newFinalAmount.toFixed(2)));
   }, [usd, discountAmount, product, customAfn, exchangeRate]);
 
-  const handleApplyPromoCode = async () => {
-    if (!promoCode.trim()) {
-      setPromoError(t('promoCode.enterCode'));
-      return;
-    }
-
-    setValidatingPromo(true);
-    setPromoError("");
-
-    try {
-      const orderAmount = getActualAfnAmount();
-      const response = await validatePromoCode({
-        code: promoCode.trim(),
-        orderAmount: orderAmount
-      });
-
-      if (response.status) {
-        let discount = 0;
-        const baseUsdAmount = calculateUsdAmount(getActualAfnAmount());
-        
-        if (response.discount_type === 'percentage') {
-          discount = (baseUsdAmount * response.discount_value) / 100;
-        } else {
-          discount = response.discount_value;
-        }
-
-        if (response.max_discount && discount > response.max_discount) {
-          discount = response.max_discount;
-        }
-
-        setDiscountAmount(discount);
-        setAppliedPromoCode({
-          code: promoCode.trim(),
-          discount_type: response.discount_type,
-          discount_value: response.discount_value,
-          discount_amount: discount
-        });
-        
-        setPromoModalVisible(false);
-        Alert.alert(t('success'), t('promoCode.appliedSuccessfully'));
-      } else {
-        setPromoError(response.error || t('promoCode.invalidCode'));
-      }
-    } catch (error) {
-      console.error('Error validating promo code:', error);
-      setPromoError(t('promoCode.validationError'));
-    } finally {
-      setValidatingPromo(false);
-    }
-  };
-
-  const handleRemovePromoCode = () => {
-    setAppliedPromoCode(null);
-    setDiscountAmount(0);
-    setPromoError("");
-  };
-
-  const openPromoModal = () => {
-    setPromoModalVisible(true);
-    setPromoError("");
-  };
-
-  const closePromoModal = () => {
-    setPromoModalVisible(false);
-    setPromoError("");
-  };
-
+  // Lottie animation
   useEffect(() => {
-    console.log("Topup1 route params:", route.params);
-    console.log("Current step:", step);
-    
-    const resendOrder = route.params?.resendOrder;
-    console.log("Resend order detected:", resendOrder);
-    
-    if (resendOrder) {
-      console.log("Processing resend order:", resendOrder);
-      
-      if (resendOrder.receiver) {
-        const cleanNumber = resendOrder.receiver.replace(/\D/g, "");
-        console.log("Setting local number to:", cleanNumber);
-        setLocalNumber(cleanNumber);
-      }
-      
-      if (resendOrder.amount) {
-        const amount = parseFloat(resendOrder.amount);
-        if (!isNaN(amount) && amount > 0) {
-          console.log("Setting custom AFN to:", amount);
-          setCustomAfn(amount.toString());
-          setProduct(null);
-        }
-      }
-      
-      setTimeout(() => {
-        console.log("Auto-proceeding to AMOUNT step");
-        setStep(BASE_STEPS.AMOUNT);
-      }, 500);
+    if (lottieRef.current && (orderStatus === ORDER_STATUS.SUCCEEDED || orderStatus === ORDER_STATUS.FAILED)) {
+      lottieRef.current.play();
     }
-  }, [route.params?.resendOrder]);
+  }, [orderStatus]);
 
-  useEffect(() => {
-    const resendOrder = route.params?.resendOrder;
-    if (resendOrder) {
-      console.log("Resend order detected - resetting flow");
-      
-      setStep(BASE_STEPS.COUNTRY);
-      setProduct(null);
-      setCustomAfn("");
-      
-      setTimeout(() => {
-        if (resendOrder.receiver) {
-          const cleanNumber = resendOrder.receiver.replace(/\D/g, "");
-          console.log("Setting local number to:", cleanNumber);
-          setLocalNumber(cleanNumber);
-        }
-        
-        if (resendOrder.amount) {
-          const amount = parseFloat(resendOrder.amount);
-          if (!isNaN(amount) && amount > 0) {
-            console.log("Setting custom AFN to:", amount);
-            setCustomAfn(amount.toString());
-            setProduct(null);
-          }
-        }
-
-        setTimeout(() => {
-          console.log("Auto-proceeding to AMOUNT step after reset");
-          setStep(BASE_STEPS.AMOUNT);
-        }, 300);
-      }, 100);
-    }
-  }, [route.params?.resendOrder]);
-
+  // Clean up polling on unmount
   useEffect(() => {
     return () => {
       if (pollingRef.current) {
@@ -404,12 +480,7 @@ export default function TopupFlowScreen({ navigation, route }) {
     };
   }, []);
 
-  useEffect(() => {
-    if (lottieRef.current && (orderStatus === ORDER_STATUS.SUCCEEDED || orderStatus === ORDER_STATUS.FAILED)) {
-      lottieRef.current.play();
-    }
-  }, [orderStatus]);
-
+  // Bundle activation
   const handleBundleActivated = () => {
     setBundleActivated(true);
     setTimeout(() => {
@@ -417,60 +488,7 @@ export default function TopupFlowScreen({ navigation, route }) {
     }, 2000);
   };
 
-  const startPollingOrderStatus = async (orderId) => {
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current);
-    }
-
-    let pollCount = 0;
-    const maxPolls = 60;
-
-    pollingRef.current = setInterval(async () => {
-      try {
-        pollCount++;
-        const statusResponse = await getOrderStatus(orderId);
-        const currentStatus = statusResponse.data?.status;
-        
-        console.log(`Poll ${pollCount}: Order status:`, currentStatus);
-        
-        setOrderStatus(currentStatus);
-        setOrderDetails(prev => ({
-          ...prev,
-          ...statusResponse.data
-        }));
-
-        if (currentStatus === ORDER_STATUS.SUCCEEDED || 
-            currentStatus === ORDER_STATUS.FAILED || 
-            pollCount >= maxPolls) {
-          clearInterval(pollingRef.current);
-          pollingRef.current = null;
-          
-          if (pollCount >= maxPolls) {
-            setOrderStatus(ORDER_STATUS.FAILED);
-            console.log("Max polling attempts reached");
-          }
-        }
-      } catch (error) {
-        console.error("Error polling order status:", error);
-        if (pollCount >= maxPolls) {
-          clearInterval(pollingRef.current);
-          pollingRef.current = null;
-          setOrderStatus(ORDER_STATUS.FAILED);
-        }
-      }
-    }, 3000);
-  };
-
-  useEffect(() => {
-    const getAllCountries = async () => {
-      const res = await getCountries()
-      setCountries(res?.data)
-      const afgCountry = res.data.find((c) => c.countryCode === "AF")
-      setCountry(afgCountry)
-    }
-    getAllCountries()
-  }, [])
-
+  // Animation effects
   useEffect(() => {
     if (contactsModalVisible) {
       Animated.timing(contactsSlideAnim, {
@@ -479,7 +497,7 @@ export default function TopupFlowScreen({ navigation, route }) {
         easing: Easing.out(Easing.back(1)),
         useNativeDriver: true,
       }).start();
-      loadContacts();
+      refetchContacts();
     } else {
       Animated.timing(contactsSlideAnim, {
         toValue: screenHeight,
@@ -508,20 +526,18 @@ export default function TopupFlowScreen({ navigation, route }) {
     }
   }, [countryOpen]);
 
-  useEffect(() => {
-    if (searchQuery) {
-      const filtered = contacts.filter(contact =>
-        contact.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        contact.phoneNumbers?.some(phone =>
-          phone.number?.includes(searchQuery)
-        )
-      );
-      setFilteredContacts(filtered);
-    } else {
-      setFilteredContacts(contacts);
-    }
+  // Filter contacts
+  const filteredContacts = useMemo(() => {
+    if (!searchQuery) return contacts;
+    return contacts.filter(contact =>
+      contact.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      contact.phoneNumbers?.some(phone =>
+        phone.number?.includes(searchQuery)
+      )
+    );
   }, [searchQuery, contacts]);
 
+  // Continue button animation
   useEffect(() => {
     if (customAfn && customAfn.length > 0) {
       setShowPopularAmounts(false);
@@ -547,6 +563,97 @@ export default function TopupFlowScreen({ navigation, route }) {
     }
   }, [customAfn]);
 
+  // Promo code handling
+  const handleApplyPromoCode = async () => {
+    if (!promoCode.trim()) {
+      setPromoError(t('promoCode.enterCode'));
+      return;
+    }
+
+    setPromoError("");
+
+    try {
+      const orderAmount = getActualAfnAmount();
+      const response = await promoCodeValidation.mutateAsync({
+        code: promoCode.trim(),
+        orderAmount: orderAmount
+      });
+
+      let discount = 0;
+      const baseUsdAmount = calculateUsdAmount(getActualAfnAmount());
+      
+      if (response.discount_type === 'percentage') {
+        discount = (baseUsdAmount * response.discount_value) / 100;
+      } else {
+        discount = response.discount_value;
+      }
+
+      if (response.max_discount && discount > response.max_discount) {
+        discount = response.max_discount;
+      }
+
+      setDiscountAmount(discount);
+      setAppliedPromoCode({
+        code: promoCode.trim(),
+        discount_type: response.discount_type,
+        discount_value: response.discount_value,
+        discount_amount: discount
+      });
+      
+      setPromoModalVisible(false);
+      Alert.alert(t('success'), t('promoCode.appliedSuccessfully'));
+    } catch (error) {
+      setPromoError(error.message || t('promoCode.invalidCode'));
+    }
+  };
+
+  const handleRemovePromoCode = () => {
+    setAppliedPromoCode(null);
+    setDiscountAmount(0);
+    setPromoError("");
+  };
+
+  const openPromoModal = () => {
+    setPromoModalVisible(true);
+    setPromoError("");
+  };
+
+  const closePromoModal = () => {
+    setPromoModalVisible(false);
+    setPromoError("");
+  };
+
+  // Handle resend order
+  useEffect(() => {
+    const resendOrder = route.params?.resendOrder;
+    
+    if (resendOrder) {
+      setStep(BASE_STEPS.COUNTRY);
+      setProduct(null);
+      setCustomAfn("");
+      
+      setTimeout(() => {
+        if (resendOrder.receiver) {
+          const cleanNumber = resendOrder.receiver.replace(/\D/g, "");
+          setLocalNumber(cleanNumber);
+        }
+        
+        if (resendOrder.amount) {
+          const amount = parseFloat(resendOrder.amount);
+          if (!isNaN(amount) && amount > 0) {
+            setCustomAfn(amount.toString());
+            setProduct(null);
+          }
+        }
+
+        setTimeout(() => {
+          setStep(BASE_STEPS.AMOUNT);
+        }, 300);
+      }, 100);
+    }
+  }, [route.params?.resendOrder]);
+
+  // Mobile number validation
   const validateMobileNumber = (number, dialCode = "+93") => {
     const cleanNumber = number.replace(/\D/g, "");
     
@@ -593,94 +700,7 @@ export default function TopupFlowScreen({ navigation, route }) {
     };
   };
 
-  useEffect(() => {
-    const fetchRateAndSlab = async () => {
-      if (!country) return;
-
-      setLoadingData(true);
-      try {
-        const rateData = await getCurrencies();
-        console.log("Rate API Response:", JSON.stringify(rateData, null, 2));
-
-        if (rateData && rateData.success && rateData.data && rateData.data.length > 0) {
-          const afnToUsdRate = parseFloat(rateData.data[0].target_amount);
-          const usdToAfnRate = parseFloat(rateData.data[0].source_amount);
-          
-          console.log("AFN to USD Rate:", afnToUsdRate);
-          console.log("USD to AFN Rate:", usdToAfnRate);
-          
-          setExchangeRate(1 / usdToAfnRate);
-        } else {
-          console.log("Using fallback exchange rate: 0.012");
-          setExchangeRate(0.012);
-        }
-
-        const slabData = await getSlabs();
-        console.log("Slab API Response:", JSON.stringify(slabData, null, 2));
-
-        if (slabData && slabData.success && slabData.data && slabData.data.length > 0) {
-          const countrySlabs = slabData.data.filter(slab => slab.countryId === country.id);
-          console.log("All country slabs:", countrySlabs);
-
-          const totalPercentage = countrySlabs.reduce((sum, slab) => {
-            return sum + parseFloat(slab.percentage || 0);
-          }, 0);
-
-          console.log("Total slab percentage for country:", totalPercentage + "%");
-          setSlabPercentage(totalPercentage);
-        } else {
-          console.log("No slab data, setting to 0");
-          setSlabPercentage(0);
-        }
-      } catch (error) {
-        console.error("Error fetching data:", error);
-        setSlabPercentage(0);
-      } finally {
-        setLoadingData(false);
-      }
-    };
-
-    if (country) {
-      const timer = setTimeout(() => {
-        fetchRateAndSlab();
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [country]);
-
-  const loadContacts = async () => {
-    try {
-      const { status } = await Contacts.requestPermissionsAsync();
-      if (status === 'granted') {
-        const { data } = await Contacts.getContactsAsync({
-          fields: [Contacts.Fields.Name, Contacts.Fields.PhoneNumbers],
-        });
-
-        if (data.length > 0) {
-          setContacts(data);
-          setFilteredContacts(data);
-        }
-      } else {
-        Alert.alert(t('permissionDenied'), t('contactsPermissionDenied'));
-      }
-    } catch (error) {
-      console.error('Error loading contacts:', error);
-      Alert.alert(t('error'), t('failedToLoadContacts'));
-    }
-  };
-
-  const defaultAf = useMemo(
-    () => countries.find((c) => c.countryCode === "AF") || countries[0],
-    []
-  );
-
-  const filteredCountries = countrySearch
-    ? countries.filter(c =>
-      c.countryName.toLowerCase().includes(countrySearch.toLowerCase()) ||
-      c.countryCode.toLowerCase().includes(countrySearch.toLowerCase())
-    )
-    : countries;
-
+  // Navigation
   const canNext =
     (step === BASE_STEPS.COUNTRY && !!country) ||
     (step === BASE_STEPS.NUMBER && localNumber.replace(/\D/g, "").length === 9 && validateMobileNumber(localNumber).isValid) ||
@@ -691,28 +711,19 @@ export default function TopupFlowScreen({ navigation, route }) {
   const goBack = () => (step > 0 ? setStep(step - 1) : navigation.goBack());
 
   const goNext = () => {
-    if (!canNext) {
-      console.log("Cannot proceed - conditions not met:", {
-        step,
-        serviceType,
-        product,
-        afn,
-        canNext
-      });
-      return;
-    }
+    if (!canNext) return;
     setStep(step + 1);
   };
 
   const jumpTo = (i) => setStep(i);
 
+  // Reset local number when country changes
   useEffect(() => {
     setLocalNumber("");
   }, [country?.countryCode]);
 
+  // Handle popular amount selection
   const handleSelectPopularAmount = (selectedAmount) => {
-    console.log("Popular amount selected:", selectedAmount);
-    
     if (selectedAmount.product) {
       setProduct(selectedAmount.product);
     }
@@ -720,86 +731,94 @@ export default function TopupFlowScreen({ navigation, route }) {
     setCustomAfn("");
     
     setTimeout(() => {
-      console.log("Auto-proceeding to payment...");
       setStep(BASE_STEPS.PAY);
     }, 100);
   };
 
+  // Recharge function with manual polling
   const recharge = async () => {
     if (!paymentMethodId) {
       Alert.alert(t('error'), t('pleaseEnterCardDetails'));
       return;
     }
 
-    setLoading(true);
-    
+    const operatorId = getSetaraganMnoId(localNumber);
+
+    if (!operatorId) {
+      Alert.alert("Invalid Number", "The number you have added is not matching with any mobile network in Afghanistan");
+      return;
+    }
+
+    if (afn <= 0) {
+      Alert.alert("Invalid Amount", "Please enter a valid amount greater than 0");
+      return;
+    }
+
+    const originalUsdAmount = calculateUsdAmount(afn);
+
+    const payload = {
+      amount: afn,
+      companyId: "",
+      countryId: country?.id,
+      currency: "AFN",
+      operator: operatorId,
+      productId: product?.id || null,
+      receiver: localNumber.replace(/\D/g, ""),
+      source: "stripe_card",
+      cardCurrency: "USD",
+      cardAmount: finalAmount,
+      confirmNow: true,
+      paymentMethodId: paymentMethodId,
+      customAmount: customAfn || afn,
+      serviceType: serviceType,
+      promo_code: appliedPromoCode?.code || null,
+      finalDiscountAmount: finalAmount,
+      promodiscountamoun: discountAmount,
+    };
+
     try {
-      const operatorId = getSetaraganMnoId(localNumber);
-
-      if (!operatorId) {
-        Alert.alert("Invalid Number", "The number you have added is not matching with any mobile network in Afghanistan");
-        setLoading(false);
-        return;
-      }
-
-      if (afn <= 0) {
-        Alert.alert("Invalid Amount", "Please enter a valid amount greater than 0");
-        setLoading(false);
-        return;
-      }
-
-      const originalUsdAmount = calculateUsdAmount(afn);
-
-      const payload = {
-        amount: afn,
-        companyId: "",
-        countryId: country?.id,
-        currency: "AFN",
-        operator: operatorId,
-        productId: product?.id || null,
-        receiver: localNumber.replace(/\D/g, ""),
-        source: "stripe_card",
-        cardCurrency: "USD",
-        cardAmount: finalAmount, 
-        confirmNow: true,
-        paymentMethodId: paymentMethodId,
-        customAmount: customAfn || afn,
-        serviceType: serviceType,
-        promo_code: appliedPromoCode?.code || null,
-        finalDiscountAmount: finalAmount,
-        promodiscountamoun: discountAmount,
-      };
-
-      console.log("Sending recharge payload with promo code:", payload);
-
-      const response = await makeRecharge(payload);
+      const response = await rechargeMutation.mutateAsync(payload);
       
       if (response.status === "queued" || response.status === "processing" || response.success) {
-        setOrderStatus(ORDER_STATUS.QUEUED);
-        setOrderDetails({
+        // Set order details IMMEDIATELY with orderId - same as bundle activation
+        const newOrderDetails = {
           orderId: response.orderId,
-          txnNumber: response.txnNumber,
+          txnNumber: response.txnNumber || `TXN-${Date.now()}`,
           mobile: `${dial} ${formatLocal(localNumber)}`,
           amountAfn: afn,
-          usdAmount: finalAmount, 
-          originalUsdAmount: originalUsdAmount, 
+          usdAmount: finalAmount,
+          originalUsdAmount: originalUsdAmount,
           discountAmount: discountAmount,
           promoCode: appliedPromoCode?.code,
           date: new Date().toISOString(),
           operator: operator?.name || "Unknown",
           serviceType: serviceType,
-        });
+          message: "Topup request submitted successfully!",
+          status: ORDER_STATUS.QUEUED,
+        };
         
-        await startPollingOrderStatus(response.orderId);
+        setOrderDetails(newOrderDetails);
+        setOrderStatus(ORDER_STATUS.QUEUED);
+        
+        // Start manual polling - same as bundle activation
+        if (response.orderId) {
+          await startPollingOrderStatus(response.orderId);
+        }
+        
+        Alert.alert(
+          "Success",
+          "Topup initiated successfully!",
+          [{ text: 'OK', onPress: () => {} }]
+        );
       } else if (response.status === "requires_action") {
         const { error } = await confirmPayment(response.nextAction.clientSecret);
         if (error) {
           throw new Error(error.message);
         } else {
-          setOrderStatus(ORDER_STATUS.QUEUED);
-          setOrderDetails({
+          // Set order details for requires_action case too
+          const newOrderDetails = {
             orderId: response.orderId,
-            txnNumber: response.txnNumber,
+            txnNumber: response.txnNumber || `TXN-${Date.now()}`,
             mobile: `${dial} ${formatLocal(localNumber)}`,
             amountAfn: afn,
             usdAmount: finalAmount,
@@ -809,16 +828,22 @@ export default function TopupFlowScreen({ navigation, route }) {
             date: new Date().toISOString(),
             operator: operator?.name || "Unknown",
             serviceType: serviceType,
-          });
+            message: "Payment requires additional action.",
+            status: ORDER_STATUS.QUEUED,
+          };
           
-          await startPollingOrderStatus(response.orderId);
+          setOrderDetails(newOrderDetails);
+          setOrderStatus(ORDER_STATUS.QUEUED);
+          
+          // Start manual polling
+          if (response.orderId) {
+            await startPollingOrderStatus(response.orderId);
+          }
         }
       } else {
         throw new Error(response.error || 'Payment failed');
       }
-
     } catch (error) {
-      console.log("Payment error: ", error);
       const message = error.response?.data?.error || error.message || t('paymentFailedGeneric');
       
       setOrderStatus(ORDER_STATUS.FAILED);
@@ -835,10 +860,12 @@ export default function TopupFlowScreen({ navigation, route }) {
         error: message,
         serviceType: serviceType,
       });
+      
+      Alert.alert("Error", message);
     }
-    setLoading(false);
   };
 
+  // Payment summaries
   const getPaymentSummaryForBundle = () => {
     const baseAfn = serviceType === 'bundle' && product ? parseFloat(product.price) : afn;
     const baseAmount = calculateBaseAmount(baseAfn);
@@ -856,8 +883,6 @@ export default function TopupFlowScreen({ navigation, route }) {
       exchangeRate,
       slabPercentage: slabPercent,
       serviceSlabPercentage: serviceSlabPercent,
-      calculateBaseAmount: () => baseAmount,
-      calculateFeeAmount: () => feeAmount,
       baseAmount: baseAmount,
       feeAmount: feeAmount,
       totalAmount: totalUsd,
@@ -870,7 +895,7 @@ export default function TopupFlowScreen({ navigation, route }) {
       onRemovePromoCode: handleRemovePromoCode,
       openPromoModal: openPromoModal,
       closePromoModal: closePromoModal,
-      validatingPromo: validatingPromo,
+      validatingPromo: promoCodeValidation.isLoading,
       promoError: promoError
     };
   };
@@ -907,17 +932,6 @@ export default function TopupFlowScreen({ navigation, route }) {
     const slabPercent = product?.slabDetails?.percentage || 0;
     const serviceSlabPercent = product?.serviceSlabDetails?.percentage || 0;
     
-    console.log("Payment Summary:", {
-      serviceType,
-      hasProduct: !!product,
-      baseAfn,
-      baseAmount,
-      feeAmount,
-      totalUsd,
-      totalAfn,
-      product: product?.productName
-    });
-
     return {
       mobile: `${dial} ${formatLocal(localNumber)}`,
       usd: totalUsd,
@@ -926,8 +940,6 @@ export default function TopupFlowScreen({ navigation, route }) {
       exchangeRate,
       slabPercentage: slabPercent,
       serviceSlabPercentage: serviceSlabPercent,
-      calculateBaseAmount: () => baseAmount,
-      calculateFeeAmount: () => feeAmount,
       baseAmount: baseAmount,
       feeAmount: feeAmount,
       totalAmount: totalUsd,
@@ -940,11 +952,12 @@ export default function TopupFlowScreen({ navigation, route }) {
       onRemovePromoCode: handleRemovePromoCode,
       openPromoModal: openPromoModal,
       closePromoModal: closePromoModal,
-      validatingPromo: validatingPromo,
+      validatingPromo: promoCodeValidation.isLoading,
       promoError: promoError
     };
   };
 
+  // Reset flow
   const resetFlow = () => {
     setOrderStatus(null);
     setOrderDetails(null);
@@ -961,16 +974,18 @@ export default function TopupFlowScreen({ navigation, route }) {
     setPromoError("");
     setPromoModalVisible(false);
     
+    // Clear polling interval
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
       pollingRef.current = null;
     }
-
+    
     if (lottieRef.current) {
       lottieRef.current.reset();
     }
   };
 
+  // Contact selection
   const handleContactSelect = (phoneNumber) => {
     if (!phoneNumber) {
       Alert.alert(t('error'), t('invalidPhoneNumber'));
@@ -989,6 +1004,7 @@ export default function TopupFlowScreen({ navigation, route }) {
     setSearchQuery('');
   };
 
+  // Status helpers
   const getStatusMessage = () => {
     switch (orderStatus) {
       case ORDER_STATUS.QUEUED:
@@ -1089,6 +1105,7 @@ export default function TopupFlowScreen({ navigation, route }) {
     }
   };
 
+  // Modals
   const ContactsModal = () => {
     const { t } = useTranslation();
     
@@ -1137,7 +1154,12 @@ export default function TopupFlowScreen({ navigation, route }) {
               />
             </View>
 
-            {filteredContacts.length > 0 ? (
+            {loadingContacts ? (
+              <View style={modalStyles.emptyContainer}>
+                <ActivityIndicator size="large" color={Colors.primary} />
+                <Text style={modalStyles.emptyText}>{t('loadingContacts')}</Text>
+              </View>
+            ) : filteredContacts.length > 0 ? (
               <FlatList
                 data={filteredContacts}
                 keyExtractor={(item) => item.id}
@@ -1179,6 +1201,13 @@ export default function TopupFlowScreen({ navigation, route }) {
 
   const CountriesModal = () => {
     const { t } = useTranslation();
+    
+    const filteredCountries = countrySearch
+      ? countries.filter(c =>
+        c.countryName.toLowerCase().includes(countrySearch.toLowerCase()) ||
+        c.countryCode.toLowerCase().includes(countrySearch.toLowerCase())
+      )
+      : countries;
     
     return (
       <Modal
@@ -1225,33 +1254,40 @@ export default function TopupFlowScreen({ navigation, route }) {
               />
             </View>
 
-            <FlatList
-              data={filteredCountries}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={modalStyles.modalRow}
-                  onPress={() => {
-                    setCountry(item);
-                    setCountryOpen(false);
-                    setCountrySearch('');
-                  }}
-                >
-                  <Text style={{ fontSize: 24, marginEnd: 12 }}>
-                    {codeToFlag(item.countryCode)}
-                  </Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: Colors.textPrimary, fontSize: 16, fontWeight: '500' }}>
-                      {item.countryName}
+            {loadingCountries ? (
+              <View style={modalStyles.emptyContainer}>
+                <ActivityIndicator size="large" color={Colors.primary} />
+                <Text style={modalStyles.emptyText}>{t('loadingCountries')}</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={filteredCountries}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={modalStyles.modalRow}
+                    onPress={() => {
+                      setCountry(item);
+                      setCountryOpen(false);
+                      setCountrySearch('');
+                    }}
+                  >
+                    <Text style={{ fontSize: 24, marginEnd: 12 }}>
+                      {codeToFlag(item.countryCode)}
                     </Text>
-                    <Text style={{ color: Colors.textSecondary, fontSize: 14 }}>
-                      {DIAL_CODES[item.countryCode] || ""}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              )}
-              ItemSeparatorComponent={() => <View style={modalStyles.contactSeparator} />}
-            />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: Colors.textPrimary, fontSize: 16, fontWeight: '500' }}>
+                        {item.countryName}
+                      </Text>
+                      <Text style={{ color: Colors.textSecondary, fontSize: 14 }}>
+                        {DIAL_CODES[item.countryCode] || ""}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                )}
+                ItemSeparatorComponent={() => <View style={modalStyles.contactSeparator} />}
+              />
+            )}
           </Animated.View>
         </View>
       </Modal>
@@ -1276,14 +1312,12 @@ export default function TopupFlowScreen({ navigation, route }) {
         await new Promise(resolve => setTimeout(resolve, 100));
         
         if (receiptCaptureRef.current) {
-          console.log('Capturing receipt...');
           const uri = await captureRef(receiptCaptureRef.current, {
             format: 'png',
             quality: 1.0,
             result: 'tmpfile',
           });
           
-          console.log('Receipt captured successfully:', uri);
           return uri;
         } else {
           throw new Error('Receipt capture ref not available');
@@ -1303,40 +1337,24 @@ export default function TopupFlowScreen({ navigation, route }) {
           return;
         }
 
-        console.log('Starting receipt capture for sharing...');
         const receiptUri = await captureReceipt();
         
         if (receiptUri) {
-          console.log('Sharing receipt URI:', receiptUri);
-          
           if (await Sharing.isAvailableAsync()) {
-            console.log('Using expo-sharing directly...');
             await Sharing.shareAsync(receiptUri, {
               mimeType: 'image/png',
               dialogTitle: 'Share Receipt',
               UTI: 'public.png'
             });
           } else {
-            let shareUri = receiptUri;
-            if (Platform.OS === 'android') {
-              if (!receiptUri.startsWith('file://') && !receiptUri.startsWith('content://')) {
-                shareUri = `file://${receiptUri}`;
-              }
-            } else {
-              if (!receiptUri.startsWith('file://')) {
-                shareUri = `file://${receiptUri}`;
-              }
-            }
-
             const shareOptions = {
-              url: shareUri,
+              url: receiptUri,
               type: 'image/png',
               title: 'Share Receipt'
             };
 
             await Share.share(shareOptions);
           }
-          
         } else {
           throw new Error('Failed to capture receipt');
         }
@@ -1377,12 +1395,9 @@ Thank you for using our service!
           return;
         }
 
-        console.log('Starting receipt capture for download...');
         const receiptUri = await captureReceipt();
         
         if (receiptUri) {
-          console.log('Downloading receipt:', receiptUri);
-          
           const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
           const filename = `Receipt-${orderDetails?.txnNumber}-${timestamp}.png`;
           
@@ -1571,9 +1586,6 @@ Thank you for using our service!
             <PrimaryButton
               label="Done"
               onPress={() => {
-                if (pollingRef.current) {
-                  clearInterval(pollingRef.current);
-                }
                 navigation.popToTop();
               }}
               style={{ width: "100%", marginTop: 20 }}
@@ -1589,6 +1601,9 @@ Thank you for using our service!
       </View>
     );
   };
+
+  const loadingData = loadingCurrencies || loadingSlabs;
+  const loading = rechargeMutation.isLoading;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background }}>
@@ -1610,6 +1625,7 @@ Thank you for using our service!
               <StepCountry
                 country={country}
                 onOpen={() => setCountryOpen(true)}
+                loading={loadingCountries}
               />
             )}
 
@@ -1712,7 +1728,7 @@ Thank you for using our service!
         onClose={closePromoModal}
         promoCode={promoCode}
         setPromoCode={setPromoCode}
-        validatingPromo={validatingPromo}
+        validatingPromo={promoCodeValidation.isLoading}
         promoError={promoError}
         onApply={handleApplyPromoCode}
       />
@@ -1720,10 +1736,21 @@ Thank you for using our service!
   );
 }
 
+// Wrap the component with QueryClientProvider in your App or parent component
+export default function TopupFlowScreenWrapper({ navigation, route }) {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TopupFlowScreen navigation={navigation} route={route} />
+    </QueryClientProvider>
+  );
+}
+
 const modalStyles = {
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center', 
+    alignItems: 'center',
   },
   modalBackdrop: {
     flex: 1,

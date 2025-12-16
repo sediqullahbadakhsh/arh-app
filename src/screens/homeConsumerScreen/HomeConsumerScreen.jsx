@@ -33,12 +33,13 @@ import { getAppContents } from '../../services/appContentApi';
 import TopupIcon from '../../../assets/icons/topup.png';
 import BundleIcon from '../../../assets/icons/Data bundle.png';
 import GamesIcon from '../../../assets/icons/game.png';
+import SocialIcon from '../../../assets/icons/social.png';
 import * as Print from 'expo-print';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as MediaLibrary from 'expo-media-library';
 import ReceiptModal1 from "../orderScreen/ReceiptModal";
-import FinalPushTest from "../PushNotificationTester";
+
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -183,8 +184,10 @@ const ReceiptModal = ({ visible, onClose, transaction }) => {
         return t('services.mobileTopup');
       case 'bundle':
         return t('services.dataBundle');
-      case 'game_coins':
+      case 'games':
         return t('services.gameCoins');
+         case 'social':
+        return t('services.social');
       default:
         return t('transaction');
     }
@@ -389,84 +392,79 @@ Thank you for your business!
     `;
   };
 
-  const requestMediaPermissions = async () => {
-    try {
-      if (Platform.OS === 'android') {
-        const { status } = await MediaLibrary.requestPermissionsAsync();
-        return status === 'granted';
-      }
-      return true;
-    } catch (error) {
-      console.error('Error requesting media permissions:', error);
-      return false;
-    }
-  };
 
-  const downloadPDF = async () => {
-    if (!transaction) return;
+
+const downloadPDF = async () => {
+  if (!transaction) return;
+  
+  try {
+    setDownloading(true);
+
+
+    // if (Platform.OS === 'android') {
+    //   const { status } = await MediaLibrary.getPermissionsAsync();
+      
+    //   if (status !== 'granted') {
+    //     const { status: newStatus } = await MediaLibrary.requestPermissionsAsync();
+    //     if (newStatus !== 'granted') {
+    //       Alert.alert(
+    //         'Storage Permission Required',
+    //         'To save receipts to your device, please grant storage permission in app settings.',
+    //         [{ text: 'OK' }]
+    //       );
+    //       await shareReceipt();
+    //       setDownloading(false);
+    //       return;
+    //     }
+    //   }
+    // }
+
+    await generateAndSharePDF();
+    
+  } catch (error) {
+    console.error('Error generating PDF:', error);
     
     try {
-      setDownloading(true);
-      
-      // Request permissions only when user tries to download
-      if (Platform.OS === 'android') {
-        const hasPermission = await requestMediaPermissions();
-        if (!hasPermission) {
-          Alert.alert(
-            'Permission Required',
-            'Storage permission is required to save the receipt to your device.',
-            [{ text: 'OK' }]
-          );
-          return;
-        }
-      }
+      await shareReceipt();
+    } catch (fallbackError) {
+      Alert.alert('Error', 'Failed to generate receipt. Please try again.');
+    }
+  } finally {
+    setDownloading(false);
+  }
+};
 
-      const html = generatePDFHtml();
-      const { uri } = await Print.printToFileAsync({ html });
-      
-      const fileName = `Receipt_${transaction.txnNumber}_${new Date().getTime()}.pdf`;
-      const newPath = `${FileSystem.documentDirectory}${fileName}`;
-      
-      await FileSystem.moveAsync({
-        from: uri,
-        to: newPath,
-      });
-      
-      if (Platform.OS === 'ios') {
-        await Sharing.shareAsync(newPath, {
-          mimeType: 'application/pdf',
-          dialogTitle: 'Save Receipt as PDF',
-        });
-      } else {
-        const permission = await MediaLibrary.getPermissionsAsync();
-        
-        if (permission.granted) {
-          const asset = await MediaLibrary.createAssetAsync(newPath);
-          await MediaLibrary.createAlbumAsync('Downloads', asset, false);
-          Alert.alert('Success', 'Receipt saved to Downloads folder');
-        } else {
-          await Sharing.shareAsync(newPath, {
-            mimeType: 'application/pdf',
-            dialogTitle: 'Save Receipt as PDF',
-          });
-        }
-      }
-      
-      // Clean up temporary file
+const generateAndSharePDF = async () => {
+  try {
+    const html = generatePDFHtml();
+    const { uri } = await Print.printToFileAsync({ html });
+    
+    const fileName = `Receipt_${transaction.txnNumber}_${new Date().getTime()}.pdf`;
+    const newPath = `${FileSystem.documentDirectory}${fileName}`;
+    
+    await FileSystem.moveAsync({
+      from: uri,
+      to: newPath,
+    });
+
+    await Sharing.shareAsync(newPath, {
+      mimeType: 'application/pdf',
+      dialogTitle: 'Save or Share Receipt',
+      UTI: 'com.adobe.pdf'
+    });
+
+    setTimeout(async () => {
       try {
         await FileSystem.deleteAsync(newPath);
       } catch (cleanupError) {
         console.log('Cleanup error:', cleanupError);
       }
-      
-    } catch (error) {
-      console.error('Error generating PDF:', error);
-      Alert.alert('Error', 'Failed to generate PDF receipt. Please try again.');
-    } finally {
-      setDownloading(false);
-    }
-  };
-
+    }, 10000);
+    
+  } catch (error) {
+    throw error; 
+  }
+};
   if (!transaction) return null;
 
   return (
@@ -745,13 +743,13 @@ export default function HomeConsumerScreen({ navigation }) {
   };
 
   
-  const getServiceIcon = (source) => {
-    switch (source) {
-      case 'stripe_card':
+  const getServiceIcon = (type) => {
+    switch (type) {
+      case 'recharge':
         return 'phone-portrait-outline';
-      case 'data_bundle':
+      case 'bundle':
         return 'wifi-outline';
-      case 'game_coins':
+      case 'games':
         return 'game-controller-outline';
       default:
         return 'document-text-outline';
@@ -772,7 +770,7 @@ export default function HomeConsumerScreen({ navigation }) {
 
   const goToNotifications = () => navigation.navigate("Notifications");
   const goToAllOrders = () => navigation.navigate("Order");
-  const goToProfile = () => navigation.navigate("ProfileDetails");
+  const goToProfile = () => navigation.navigate("profileDetails");
   const goToMerchant = () => navigation.navigate("MerchantSignup");
 
   const handleTransactionPress = (transaction) => {
@@ -799,6 +797,12 @@ export default function HomeConsumerScreen({ navigation }) {
         label: t('services.gameCoins'),
         icon: <Image source={GamesIcon}  style={{ width: 90, height: 90 }} resizeMode="contain" />,
         onPress: () => navigation.navigate("GameCoins"),
+      },
+        {
+        key: "Social",
+        label: t('services.social'),
+        icon: <Image source={SocialIcon}  style={{ width: 90, height: 90 }} resizeMode="contain" />,
+        onPress: () => navigation.navigate("SocialScreen"),
       },
     ],
     [navigation, t]
@@ -1057,7 +1061,7 @@ const TransactionRow = ({ item }) => (
                 <Text style={HomeStyles.seeAll}>{t('common.seeAll')}</Text>
               </TouchableOpacity>
             </View>
-<FinalPushTest/>
+
             {isLoading ? (
               <ActivityIndicator size="small" color={Colors.primary} style={HomeStyles.loader} />
             ) : isError ? (

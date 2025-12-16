@@ -36,7 +36,17 @@ function StepProducts({
 
   const renderItem = ({ item }) => {
     const active = product?.id === item.id;
-
+    
+    let IMAGE_URL = null;
+    if (item.image) {
+      if (item.image.startsWith('http')) {
+        IMAGE_URL = item.image;
+      } else {
+        const encodedImage = encodeURIComponent(item.image);
+        IMAGE_URL = `http://3.67.144.22/backend/uploads/product_images/${encodedImage}`;
+      }
+    }
+    
     return (
       <TouchableOpacity
         style={[DataStyles.bundleCard, active && DataStyles.bundleCardActive]}
@@ -44,19 +54,29 @@ function StepProducts({
         activeOpacity={0.85}
       >
         <View style={DataStyles.bundleHeader}>
-          {operatorLogo && (
-            <Image source={operatorLogo} style={DataStyles.operatorLogo} />
+          {IMAGE_URL ? (
+            <Image 
+              source={{ uri: IMAGE_URL }} 
+              style={DataStyles.operatorLogo}
+              onError={(e) => {
+                console.log('Image failed to load:', IMAGE_URL);
+                console.log('Error:', e.nativeEvent.error);
+              }}
+            />
+          ) : (
+            <View style={[DataStyles.operatorLogo, { 
+              backgroundColor: Colors.lightGray,
+              justifyContent: 'center',
+              alignItems: 'center'
+            }]}>
+              <Ionicons name="cube-outline" size={24} color={Colors.primary} />
+            </View>
           )}
           <View style={DataStyles.bundleInfo}>
             <Text style={[DataStyles.bundleName, active && { color: Colors.primary }]}>
               {item.productName?.en || item.productName}
             </Text>
-            <Text style={[DataStyles.bundleDesc, active && { color: Colors.primary }]}>
-              {item.description || "High-speed internet bundle"}
-            </Text>
-          </View>
-        </View>
-        <View style={DataStyles.bundleFooter}>
+           <View style={DataStyles.bundleFooter}>
           <Text style={[DataStyles.bundlePrice, active && { color: Colors.primary }]}>
             {item.price} AFN
           </Text>
@@ -64,15 +84,16 @@ function StepProducts({
             <Ionicons name="checkmark-circle" color={Colors.primary} size={20} />
           )}
         </View>
+          </View>
+        </View>
+        
       </TouchableOpacity>
     );
   };
 
   return (
-    <View style={{ marginTop: 12 }}>
-     
-
-      <Text style={DataStyles.smallLabel}>Bundle Category</Text>
+    <View style={{ marginTop: 0 }}>
+   
       <ScrollView 
         horizontal 
         showsHorizontalScrollIndicator={false} 
@@ -126,8 +147,6 @@ function StepProducts({
         </View>
       </ScrollView>
 
- 
-
       <FlatList
         data={products}
         keyExtractor={(item) => item.id?.toString()}
@@ -138,7 +157,7 @@ function StepProducts({
         scrollEnabled={false}
         ListEmptyComponent={
           <View style={DataStyles.emptyProducts}>
-            <Ionicons name="wifi-outline" size={48} color="#999" />
+            <Ionicons name="cube-outline" size={48} color="#999" />
             <Text style={DataStyles.emptyProductsText}>
               {selectedCategory || selectedType 
                 ? "No bundles available for selected filters" 

@@ -17,21 +17,19 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import PrimaryButton from "../../components/PrimaryButton";
 import { useTranslation } from "react-i18next";
-import { getDataProducts, getDataProductsCustomer, getBundleCategories, getBundleTypes } from "../../services/merchantApi";
+import { getDataProducts, getProductsCustomer, getBundleCategories, getBundleTypes } from "../../services/merchantApi";
 import { getSetaraganMnoId } from "../../utils/getCompanyIdForSetaragan";
 import formatLocal from "../../utils/formatLocal";
 import { scale } from "../../utils/normalizeSize";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// Skeleton Loader Component
 const SkeletonLoader = ({ type = 'card', count = 3 }) => {
   if (type === 'card') {
     return (
       <View>
         {Array.from({ length: count }).map((_, index) => (
           <View key={index} style={ProductStyles.skeletonCard}>
-            {/* Card Header Skeleton */}
             <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 16 }}>
               <View style={ProductStyles.skeletonImage} />
               <View style={{ flex: 1 }}>
@@ -41,7 +39,7 @@ const SkeletonLoader = ({ type = 'card', count = 3 }) => {
               </View>
             </View>
             
-            {/* Card Footer Skeleton */}
+   
             <View style={{ 
               flexDirection: "row", 
               justifyContent: "space-between", 
@@ -110,11 +108,11 @@ const ProductStyles = {
   categoriesContainer: {
     flexDirection: "row",
     gap: 12,
-    paddingHorizontal: 4,
+    paddingHorizontal: 2,
   },
   categoryChip: {
-    paddingHorizontal: 24,
-    paddingVertical: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     borderRadius: 30,
     backgroundColor: "#F8F9FA",
     borderWidth: 2,
@@ -545,56 +543,28 @@ function BundleProductSelection({
             <Text style={[ProductStyles.bundleName, active && { color: Colors.primary }]}>
               {item.productName?.en || item.productName}
             </Text>
-            <Text style={[ProductStyles.bundleDesc, active && { color: Colors.primary }]}>
-              {item.description || "High-speed internet data bundle"}
+           <Text style={[ProductStyles.bundlePrice, active && { color: Colors.primary }]}>
+              {item.price} AFN
             </Text>
             
-            {features.length > 0 && (
-              <View style={ProductStyles.bundleFeatures}>
-                {features.map((feature, index) => (
-                  <View key={index} style={ProductStyles.featureTag}>
-                    <Text style={ProductStyles.featureText}>{feature}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
+          
           </View>
         </View>
         
-        <View style={ProductStyles.bundleFooter}>
-          <View>
-            <Text style={[ProductStyles.bundlePrice, active && { color: Colors.primary }]}>
-              {item.price} AFN
-            </Text>
-            <Text style={ProductStyles.bundleDuration}>
-              {item.description?.toLowerCase().includes('day') ? 'Validity period' : '30 Days'}
-            </Text>
-          </View>
-          
-          {active ? (
-            <View style={ProductStyles.selectedBadge}>
-              <Ionicons name="checkmark" size={16} color={Colors.white} />
-              <Text style={ProductStyles.selectedBadgeText}>Selected</Text>
-            </View>
-          ) : (
-            <Ionicons name="chevron-forward" size={20} color="#CCCCCC" />
-          )}
-        </View>
+      
       </TouchableOpacity>
     );
   };
 
   return (
     <View style={{ flex: 1 }}>
-      {/* Categories Skeleton */}
       {loadingCategories ? (
         <>
-          <Text style={ProductStyles.smallLabel}>Category</Text>
+         
           <SkeletonLoader type="category" />
         </>
       ) : bundleCategories.length > 0 && (
         <>
-          <Text style={ProductStyles.smallLabel}>Category</Text>
           <ScrollView 
             horizontal 
             showsHorizontalScrollIndicator={false} 
@@ -624,7 +594,7 @@ function BundleProductSelection({
         </>
       )}
 
-      {/* Types Skeleton */}
+
       {loadingTypes ? (
         <>
           <Text style={ProductStyles.smallLabel}>Type</Text>
@@ -632,7 +602,7 @@ function BundleProductSelection({
         </>
       ) : bundleTypes.length > 0 && (
         <>
-          <Text style={ProductStyles.smallLabel}>Type</Text>
+          <Text style={ProductStyles.smallLabel}>Validity</Text>
           <ScrollView 
             horizontal 
             showsHorizontalScrollIndicator={false} 
@@ -673,7 +643,7 @@ function BundleProductSelection({
         />
       </View>
 
-      {/* Products Skeleton */}
+ 
       {loading ? (
         <SkeletonLoader type="card" count={3} />
       ) : (
@@ -783,7 +753,7 @@ function StepAmount({
           countryId: country.id,
         };
         
-        const res = await getDataProductsCustomer(filter);
+        const res = await getProductsCustomer(filter);
         
         if (res?.data) {
           const rechargeProds = res.data.filter(product => {
@@ -941,7 +911,7 @@ function StepAmount({
 
   return (
     <View style={{ flex: 1 }}>
-      <View style={TopUpStyles.serviceTypeToggle}>
+      {/* <View style={TopUpStyles.serviceTypeToggle}>
         <TouchableOpacity
           style={[
             TopUpStyles.toggleOption,
@@ -970,7 +940,7 @@ function StepAmount({
             {t('bundle')}
           </Text>
         </TouchableOpacity>
-      </View>
+      </View> */}
 
       <ScrollView 
         style={{ flex: 1 }}

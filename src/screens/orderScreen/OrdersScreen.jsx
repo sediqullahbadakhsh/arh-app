@@ -65,26 +65,63 @@ const ModernOrderCard = ({ item, onViewDetails, onRetry, onResend, t }) => {
     }
   };
 
+
   const serviceConfig = {
     recharge: { 
       name: t('services.mobileTopup'), 
       icon: 'phone-portrait-outline',
-      color: Colors.primary
+      color: Colors.primary,
+      showResend: true // Allow resend for recharge
     },
     bundle: { 
       name: t('services.dataBundle'), 
       icon: 'wifi-outline',
-      color: '#8B5CF6'
+      color: '#8B5CF6',
+      showResend: true // Allow resend for bundle
     },
     game: { 
       name: t('services.gameCoins'), 
       icon: 'game-controller-outline',
-      color: '#F59E0B'
+      color: '#F59E0B',
+      showResend: false // Hide resend for game
+    },
+    games: { // Added 'games' type to match your backend
+      name: t('services.gameCoins'), 
+      icon: 'game-controller-outline',
+      color: '#F59E0B',
+      showResend: false // Hide resend for games
+    },
+    social: { // Added 'social' type
+      name: t('services.social'), 
+      icon: 'share-social-outline',
+      color: '#EC4899',
+      showResend: false // Hide resend for social
+    },
+    others: { // Added 'others' type as fallback
+      name: t('services.other'), 
+      icon: 'cube-outline',
+      color: '#6B7280',
+      showResend: false // Hide resend for others
+    },
+    stripe_card: { // Default fallback
+      name: t('services.payment'), 
+      icon: 'card-outline',
+      color: Colors.primary,
+      showResend: false
     }
   };
 
-  const config = statusConfig[item.status] || statusConfig.pending;
-  const service = serviceConfig[item.type] || serviceConfig.stripe_card;
+  // Safely get status config with fallback
+  const config = statusConfig[item?.status] || statusConfig.pending;
+  
+  // Safely get service config with fallback
+  const serviceType = item?.type || 'stripe_card';
+  const service = serviceConfig[serviceType] || serviceConfig.stripe_card;
+
+  // Check if resend button should be shown
+  const shouldShowResend = 
+    item?.status !== 'cancelled' && 
+    service.showResend;
 
   const handlePressIn = () => {
     Animated.spring(cardScale, {
@@ -103,14 +140,23 @@ const ModernOrderCard = ({ item, onViewDetails, onRetry, onResend, t }) => {
   };
 
   const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      return 'Invalid date';
+    }
   };
+
+
+  if (!item) {
+    return null;
+  }
 
   return (
     <Animated.View
@@ -153,24 +199,36 @@ const ModernOrderCard = ({ item, onViewDetails, onRetry, onResend, t }) => {
           <View style={styles.receiverRow}>
             <Ionicons name="call-outline" size={16} color="#6B7280" />
             <Text style={styles.receiverNumber} numberOfLines={1}>
-              {item.receiver}
+              {item.receiver || 'N/A'}
             </Text>
           </View>
-          <Text style={styles.txnId}>TXN: {item.txnNumber}</Text>
+          <Text style={styles.txnId}>TXN: {item.txnNumber || 'N/A'}</Text>
         </View>
 
         <View style={styles.amountSection}>
           <View>
             <Text style={styles.amountLabel}>{t('amount')}</Text>
             <Text style={styles.amountValue}>
-              {Number(item.amount).toFixed(2)} {item.currency}
+              {Number(item.amount || 0).toFixed(2)} {item.currency || 'USD'}
             </Text>
           </View>
           
           <View style={styles.actionButtons}>
-           
+            {item.status === 'failed' && (
+              <TouchableOpacity 
+                style={[styles.actionIcon, styles.retryIcon]}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  onRetry(item.id);
+                }}
+              >
+                <Ionicons name="refresh" size={18} color={Colors.primary} />
+              </TouchableOpacity>
+            )}
             
-            {item.status !== 'cancelled' && (
+            {/* Conditionally show resend button */}
+            {shouldShowResend && (
               <TouchableOpacity 
                 style={[styles.actionIcon, styles.resendIcon]}
                 onPress={(e) => {
@@ -693,7 +751,7 @@ const styles = StyleSheet.create({
   },
   searchContainer: {
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 4,
     backgroundColor: '#FFFFFF',
   },
   searchInner: {
@@ -702,7 +760,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9FAFB',
     borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 4,
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },

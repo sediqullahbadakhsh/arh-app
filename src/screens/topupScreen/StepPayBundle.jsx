@@ -214,17 +214,17 @@ function StepPayBundle({
             <Text style={TopUpStyles.summaryValue}>{summary.afn} AFN</Text>
           </View>
 
-          <View style={TopUpStyles.summaryRow}>
+          {/* <View style={TopUpStyles.summaryRow}>
             <Text style={TopUpStyles.summaryKey}>Base Amount</Text>
             <Text style={TopUpStyles.summaryValue}>${summary.calculateBaseAmount()} USD</Text>
-          </View>
+          </View> */}
 
-          {summary.slabPercentage > 0 && (
+          {/* {summary.slabPercentage > 0 && (
             <View style={TopUpStyles.summaryRow}>
               <Text style={TopUpStyles.summaryKey}>Fee</Text>
               <Text style={TopUpStyles.summaryValue}>${summary.calculateFeeAmount()} USD</Text>
             </View>
-          )}
+          )} */}
 
           <View
             style={[

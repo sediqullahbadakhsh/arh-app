@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSocket } from '../context/SocketContext';
 import { useAuth } from '../auth/AuthProvider';
 
@@ -6,20 +6,61 @@ export const useNotifications = () => {
   const { 
     socket, 
     isConnected, 
-    notifications, 
+    notifications: contextNotifications, 
     unreadCount, 
-    markAsRead, 
-    markAllAsRead, 
-    deleteNotification,
+    markAsRead: socketMarkAsRead, 
+    markAllAsRead: socketMarkAllAsRead, 
+    deleteNotification: socketDeleteNotification,
     getNotifications,
     refreshNotifications: socketRefreshNotifications
   } = useSocket();
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [notifications, setNotifications] = useState([]);
   const { user } = useAuth();
+  
+  const isInitialLoadRef = useRef(false);
 
-  const loadNotifications = async () => {
+  const formatNotification = useCallback((notification) => {
+    if (!notification) return null;
+    
+    return {
+      id: notification.id || `notif-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      title: notification.title?.en || notification.title || 'Notification',
+      description: notification.description?.en || notification.description || '',
+      isRead: notification.isRead || notification.read || false,
+      createdAt: notification.createdAt || notification.created_at || notification.time || new Date().toISOString(),
+      notificationType: notification.notificationType || notification.notiType || { name: 'General' },
+      notiType: notification.notiType || notification.notificationType?.name?.toLowerCase() || 'general',
+      from: notification.from || 'Yes Charge',
+      data: notification.data || {},
+      ...notification
+    };
+  }, []);
+
+  useEffect(() => {
+    if (contextNotifications && contextNotifications.length > 0) {
+      const formatted = contextNotifications
+        .map(formatNotification)
+        .filter(Boolean)
+        .sort((a, b) => {
+          const dateA = new Date(a.createdAt || 0);
+          const dateB = new Date(b.createdAt || 0);
+          return dateB - dateA; 
+        });
+      
+      setNotifications(formatted);
+      
+      if (error && formatted.length > 0) {
+        setError(null);
+      }
+    } else if (contextNotifications && contextNotifications.length === 0) {
+      setNotifications([]);
+    }
+  }, [contextNotifications, formatNotification, error]);
+
+  const loadNotifications = useCallback(async () => {
     if (!user?.id) {
       setError('User not available');
       return;
@@ -29,12 +70,12 @@ export const useNotifications = () => {
     setError(null);
     
     try {
-      console.log('📋 Loading notifications for user:', user.id);
+      console.log('Loading notifications for user:', user.id);
       
-      if (isConnected) {
+      if (isConnected && socket) {
         getNotifications();
       } else {
-        console.log('📱 Offline - loading notifications from local storage');
+        console.log('Offline - loading notifications from local storage');
         await socketRefreshNotifications();
       }
     } catch (err) {
@@ -43,54 +84,89 @@ export const useNotifications = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id, isConnected, socket, getNotifications, socketRefreshNotifications]);
 
-  const handleMarkAsRead = async (notificationId) => {
+  const handleMarkAsRead = useCallback(async (notificationId) => {
     try {
-      const success = await markAsRead(notificationId);
+      console.log('Marking notification as read:', notificationId);
+      
+      setNotifications(prev => 
+        prev.map(notif => 
+          notif.id === notificationId 
+            ? { ...notif, isRead: true } 
+            : notif
+        )
+      );
+      
+      const success = await socketMarkAsRead(notificationId);
+      
       if (!success) {
+        setNotifications(prev => 
+          prev.map(notif => 
+            notif.id === notificationId 
+              ? { ...notif, isRead: false } 
+              : notif
+          )
+        );
         setError('Failed to mark notification as read');
         return false;
       }
+      
       return true;
     } catch (err) {
       setError('Failed to mark notification as read');
       console.error('Error marking notification as read:', err);
       return false;
     }
-  };
+  }, [socketMarkAsRead]);
 
-  const handleMarkAllAsRead = async () => {
+  const handleMarkAllAsRead = useCallback(async () => {
     try {
-      const success = await markAllAsRead();
+      setNotifications(prev => 
+        prev.map(notif => ({ ...notif, isRead: true }))
+      );
+      
+      const success = await socketMarkAllAsRead();
+      
       if (!success) {
+        setNotifications(prev => 
+          prev.map(notif => ({ ...notif, isRead: false }))
+        );
         setError('Failed to mark all notifications as read');
         return false;
       }
+      
       return true;
     } catch (err) {
       setError('Failed to mark all notifications as read');
       console.error('Error marking all notifications as read:', err);
       return false;
     }
-  };
+  }, [socketMarkAllAsRead]);
 
-  const handleDeleteNotification = async (notificationId) => {
+  const handleDeleteNotification = useCallback(async (notificationId) => {
     try {
-      const success = await deleteNotification(notificationId);
+      setNotifications(prev => 
+        prev.filter(notif => notif.id !== notificationId)
+      );
+      
+      const success = await socketDeleteNotification(notificationId);
+      
       if (!success) {
+        loadNotifications();
         setError('Failed to delete notification');
         return false;
       }
+      
       return true;
     } catch (err) {
       setError('Failed to delete notification');
       console.error('Error deleting notification:', err);
       return false;
     }
-  };
+  }, [socketDeleteNotification, loadNotifications]);
 
-  const refreshNotifications = async () => {
+  const refreshNotifications = useCallback(async () => {
     setLoading(true);
     setError(null);
     
@@ -100,66 +176,45 @@ export const useNotifications = () => {
       setError('Failed to refresh notifications');
       console.error('Error refreshing notifications:', err);
     } finally {
-      setLoading(false);
+      setTimeout(() => {
+        setLoading(false);
+      }, 500);
     }
-  };
-
-
-  const formatNotification = (notification) => {
-    return {
-      id: notification.id,
-      title: notification.title?.en || notification.title || 'Notification',
-      description: notification.description?.en || notification.description || '',
-      isRead: notification.isRead || notification.read || false,
-      createdAt: notification.createdAt || notification.created_at || notification.time,
-      notificationType: notification.notificationType,
-      notiType: notification.notiType,
-      ...notification
-    };
-  };
-
-  const formattedNotifications = notifications.map(formatNotification);
-
-
-  const sortedNotifications = formattedNotifications.sort((a, b) => {
-    const dateA = new Date(a.createdAt || 0);
-    const dateB = new Date(b.createdAt || 0);
-    return dateB - dateA;
-  });
+  }, [socketRefreshNotifications]);
 
   useEffect(() => {
-    if (user?.id) {
+    if (user?.id && !isInitialLoadRef.current) {
+      isInitialLoadRef.current = true;
       loadNotifications();
     }
-  }, [isConnected, user?.id]);
-
+  }, [user?.id, loadNotifications]);
 
   useEffect(() => {
     if (isConnected && error) {
       setError(null);
     }
-  }, [isConnected]);
+  }, [isConnected, error]);
+
+  useEffect(() => {
+    if (user?.id) {
+      isInitialLoadRef.current = false;
+    }
+  }, [user?.id]);
 
   return {
-
-    notifications: sortedNotifications,
+    notifications,
     unreadCount,
-    
-
     loading,
     error,
-    
-    
     isConnected,
-    
-
     markAsRead: handleMarkAsRead,
     markAllAsRead: handleMarkAllAsRead,
     deleteNotification: handleDeleteNotification,
     refreshNotifications,
-    
- 
-    hasNotifications: sortedNotifications.length > 0,
+    hasNotifications: notifications.length > 0,
     hasUnreadNotifications: unreadCount > 0,
+    
+
+    formatNotification
   };
 };

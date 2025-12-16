@@ -30,10 +30,50 @@ import { useTranslation } from "react-i18next";
 
 const { width } = Dimensions.get("window");
 
+// Skeleton Loader Component
+const StatementSkeleton = () => {
+  return (
+    <View style={styles.skeletonContainer}>
+      {/* Header skeleton */}
+      <View style={styles.skeletonHeader}>
+        <View style={styles.skeletonFilterButton} />
+        <View style={styles.skeletonExportButton} />
+      </View>
+      
+      {/* Date info skeleton */}
+      <View style={styles.skeletonDateInfo}>
+        <View style={styles.skeletonDateText} />
+        <View style={styles.skeletonSummaryRow}>
+          <View style={styles.skeletonRecordCount} />
+          <View style={styles.skeletonSummaryText} />
+        </View>
+      </View>
+      
+      {/* Transaction list skeletons */}
+      {[...Array(5)].map((_, index) => (
+        <View key={`skeleton-${index}`} style={styles.skeletonTransactionItem}>
+          <View style={styles.skeletonLeft}>
+            <View style={styles.skeletonIcon} />
+            <View style={styles.skeletonInfo}>
+              <View style={styles.skeletonTitle} />
+              <View style={styles.skeletonSubtitle} />
+              <View style={styles.skeletonRemarks} />
+            </View>
+          </View>
+          <View style={styles.skeletonRight}>
+            <View style={styles.skeletonAmount} />
+            <View style={styles.skeletonBalance} />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+};
+
 export default function StatementReportScreen({ navigation, route }) {
   const { t } = useTranslation();
   const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
@@ -55,12 +95,8 @@ export default function StatementReportScreen({ navigation, route }) {
   });
 
   useEffect(() => {
-    fetchStatements();
-  }, [filter.startDate, filter.endDate, filter.page]);
-
-  const fetchStatements = async (isRefresh = false) => {
-    if (!filter.startDate || !filter.endDate) {
-      if (!isRefresh) {
+    const initializeData = async () => {
+      if (!filter.startDate || !filter.endDate) {
         const now = new Date();
         const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
         const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
@@ -70,14 +106,27 @@ export default function StatementReportScreen({ navigation, route }) {
           startDate: startDate.toISOString(),
           endDate: endDate.toISOString(),
         }));
+      } else {
+        await fetchStatements();
       }
-      return;
+    };
+    
+    initializeData();
+  }, []);
+
+  useEffect(() => {
+    if (filter.startDate && filter.endDate) {
+      fetchStatements();
     }
+  }, [filter.startDate, filter.endDate, filter.page]);
+
+  const fetchStatements = async (isRefresh = false) => {
+    if (!filter.startDate || !filter.endDate) return;
 
     try {
       if (isRefresh) {
         setRefreshing(true);
-      } else {
+      } else if (!loading) {
         setLoading(true);
       }
 
@@ -340,19 +389,6 @@ export default function StatementReportScreen({ navigation, route }) {
     });
   };
 
-  const renderSkeletonTransaction = ({ item, index }) => (
-    <View style={styles.txRow}>
-      <View style={styles.txLeft}>
-        <View style={styles.skeletonTxIcon} />
-        <View style={styles.txInfo}>
-          <View style={styles.skeletonTxTitle} />
-          <View style={styles.skeletonTxSub} />
-        </View>
-      </View>
-      <View style={styles.skeletonTxAmount} />
-    </View>
-  );
-
   const renderStatementItem = ({ item }) => (
     <TouchableOpacity 
       style={styles.txRow}
@@ -442,10 +478,10 @@ export default function StatementReportScreen({ navigation, route }) {
         <TouchableOpacity 
           style={[
             styles.exportButton,
-            (data.length === 0 || exportLoading) && styles.exportButtonDisabled
+            (data.length === 0 || exportLoading || loading) && styles.exportButtonDisabled
           ]}
           onPress={handleExportMenu}
-          disabled={data.length === 0 || exportLoading}
+          disabled={data.length === 0 || exportLoading || loading}
         >
           {exportLoading ? (
             <ActivityIndicator size="small" color={Colors.white} />
@@ -463,7 +499,7 @@ export default function StatementReportScreen({ navigation, route }) {
           <Text style={styles.dateInfoText}>
             {t('showingStatementsFrom')} {formatDate(filter.startDate)} {t('to')} {formatDate(filter.endDate)}
           </Text>
-          {meta.total > 0 && (
+          {meta.total > 0 && !loading && (
             <View style={styles.summaryRow}>
               <Text style={styles.recordCount}>{meta.total} {t('recordsFound')}</Text>
               <Text style={styles.summaryText}>
@@ -488,33 +524,30 @@ export default function StatementReportScreen({ navigation, route }) {
 
       {/* Scrollable Transactions Section */}
       <View style={styles.scrollableSection}>
-        <FlatList
-          data={loading ? [...Array(5)] : filteredData}
-          renderItem={loading ? renderSkeletonTransaction : renderStatementItem}
-          keyExtractor={(item, index) => item?.id || `skeleton-${index}`}
-          ListEmptyComponent={!loading && renderEmptyState}
-          contentContainerStyle={[
-            styles.listContainer,
-            filteredData.length === 0 && styles.emptyListContainer
-          ]}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => fetchStatements(true)}
-              colors={[Colors.primary]}
-            />
-          }
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-        />
+        {loading ? (
+          <StatementSkeleton />
+        ) : (
+          <FlatList
+            data={filteredData}
+            renderItem={renderStatementItem}
+            keyExtractor={(item) => item.id}
+            ListEmptyComponent={renderEmptyState}
+            contentContainerStyle={[
+              styles.listContainer,
+              filteredData.length === 0 && styles.emptyListContainer
+            ]}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={() => fetchStatements(true)}
+                colors={[Colors.primary]}
+              />
+            }
+            ItemSeparatorComponent={() => <View style={styles.separator} />}
+          />
+        )}
       </View>
-
-      {loading && !refreshing && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={styles.loadingText}>{t('loadingStatements')}</Text>
-        </View>
-      )}
 
       <Modal
         visible={exportMenuVisible}
@@ -759,43 +792,119 @@ const styles = StyleSheet.create({
     fontSize: scale.hp(2.1),
     fontWeight: '600',
   },
-  loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    justifyContent: 'center',
+  
+  // Skeleton Styles
+  skeletonContainer: {
+    paddingHorizontal: scale.wp(5),
+    paddingTop: scale.hp(2),
+  },
+  skeletonHeader: {
+    flexDirection: 'row',
+    gap: scale.wp(3.1),
+    marginBottom: scale.hp(2.1),
+  },
+  skeletonFilterButton: {
+    flex: 1,
+    height: scale.hp(5.5),
+    backgroundColor: '#E0E0E0',
+    borderRadius: scale.hp(1.55),
+  },
+  skeletonExportButton: {
+    flex: 1,
+    height: scale.hp(5.5),
+    backgroundColor: '#E0E0E0',
+    borderRadius: scale.hp(1.55),
+  },
+  skeletonDateInfo: {
+    backgroundColor: '#F0F0F0',
+    borderRadius: scale.hp(1),
+    padding: scale.hp(1.55),
+    marginBottom: scale.hp(2.1),
+  },
+  skeletonDateText: {
+    height: scale.hp(1.8),
+    width: '70%',
+    backgroundColor: '#D0D0D0',
+    borderRadius: scale.hp(0.5),
+    marginBottom: scale.hp(1),
+  },
+  skeletonSummaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  skeletonRecordCount: {
+    height: scale.hp(1.55),
+    width: '30%',
+    backgroundColor: '#D0D0D0',
+    borderRadius: scale.hp(0.5),
+  },
+  skeletonSummaryText: {
+    height: scale.hp(1.55),
+    width: '50%',
+    backgroundColor: '#D0D0D0',
+    borderRadius: scale.hp(0.5),
+  },
+  skeletonTransactionItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    paddingVertical: scale.hp(1.55),
+    borderBottomWidth: 1,
+    borderBottomColor: '#F8F8F8',
   },
-  loadingText: {
-    marginTop: scale.hp(1.55),
-    fontSize: scale.hp(2.1),
-    color: Colors.textSecondary,
+  skeletonLeft: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    flex: 1,
   },
-  skeletonTxIcon: {
+  skeletonIcon: {
     width: scale.wp(10.4),
     height: scale.wp(10.4),
     borderRadius: scale.wp(5.2),
+    backgroundColor: '#E0E0E0',
     marginRight: scale.wp(3.1),
-    backgroundColor: '#E0E0E0',
   },
-  skeletonTxTitle: {
-    width: scale.wp(46.8),
+  skeletonInfo: {
+    flex: 1,
+  },
+  skeletonTitle: {
     height: scale.hp(2),
+    width: '60%',
+    backgroundColor: '#E0E0E0',
+    borderRadius: scale.hp(0.5),
     marginBottom: scale.hp(0.8),
-    borderRadius: scale.hp(0.5),
-    backgroundColor: '#E0E0E0',
   },
-  skeletonTxSub: {
-    width: scale.wp(36.4),
+  skeletonSubtitle: {
     height: scale.hp(1.55),
-    borderRadius: scale.hp(0.5),
+    width: '80%',
     backgroundColor: '#E0E0E0',
+    borderRadius: scale.hp(0.5),
+    marginBottom: scale.hp(0.8),
   },
-  skeletonTxAmount: {
-    width: scale.wp(20.8),
+  skeletonRemarks: {
+    height: scale.hp(1.55),
+    width: '90%',
+    backgroundColor: '#E0E0E0',
+    borderRadius: scale.hp(0.5),
+  },
+  skeletonRight: {
+    alignItems: 'flex-end',
+    marginLeft: scale.wp(2),
+  },
+  skeletonAmount: {
     height: scale.hp(2),
-    borderRadius: scale.hp(0.5),
+    width: scale.wp(20.8),
     backgroundColor: '#E0E0E0',
+    borderRadius: scale.hp(0.5),
+    marginBottom: scale.hp(0.5),
   },
+  skeletonBalance: {
+    height: scale.hp(1.4),
+    width: scale.wp(15.6),
+    backgroundColor: '#E0E0E0',
+    borderRadius: scale.hp(0.5),
+  },
+  
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',

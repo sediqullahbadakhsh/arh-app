@@ -20,9 +20,11 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Colors } from "../../theme/colors";
 import ServiceButton from "../../components/ServiceButton";
 import { useUser } from "../../context/userContext";
+import SocialIcon from '../../../assets/icons/social.png';
 import { getRecentOrdersOfAgent, getStockInOut } from "../../services/merchantApi";
 import { formatDateTime } from "../../utils/formatDate";
 import { capitalizeFirstLetter } from "../../utils/capitalizeFirstLetter";
@@ -37,6 +39,202 @@ import { scale } from "../../utils/normalizeSize";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
+const WELCOME_MODAL_SEEN_KEY = 'has_seen_welcome_modal';
+
+// Skeleton Loader Components
+const SkeletonRect = ({ width, height, borderRadius = 4, style = {} }) => {
+  const [animation] = useState(new Animated.Value(0));
+
+  useEffect(() => {
+    const pulseAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(animation, {
+          toValue: 1,
+          duration: 1000,
+          easing: Easing.ease,
+          useNativeDriver: true,
+        }),
+        Animated.timing(animation, {
+          toValue: 0,
+          duration: 1000,
+          easing: Easing.ease,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    pulseAnimation.start();
+
+    return () => pulseAnimation.stop();
+  }, [animation]);
+
+  const opacity = animation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.3, 0.7],
+  });
+
+  return (
+    <Animated.View
+      style={[
+        {
+          width,
+          height,
+          borderRadius,
+          backgroundColor: '#E1E9EE',
+          opacity,
+        },
+        style,
+      ]}
+    />
+  );
+};
+
+const SkeletonCircle = ({ size }) => {
+  const [animation] = useState(new Animated.Value(0));
+
+  useEffect(() => {
+    const pulseAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(animation, {
+          toValue: 1,
+          duration: 1000,
+          easing: Easing.ease,
+          useNativeDriver: true,
+        }),
+        Animated.timing(animation, {
+          toValue: 0,
+          duration: 1000,
+          easing: Easing.ease,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    pulseAnimation.start();
+
+    return () => pulseAnimation.stop();
+  }, [animation]);
+
+  const opacity = animation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.3, 0.7],
+  });
+
+  return (
+    <Animated.View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        backgroundColor: '#E1E9EE',
+        opacity,
+      }}
+    />
+  );
+};
+
+const SkeletonHomeScreen = () => {
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="light-content" />
+
+      {/* Header Skeleton */}
+      <View style={styles.header}>
+        <View style={styles.svgContainer}>
+          <HeaderBackgroundSVG width="100%" height="100%" />
+        </View>
+        <View style={styles.headerContent}>
+          <View style={styles.userInfo}>
+            <SkeletonCircle size={scale.wp(11.7)} />
+            <View style={[styles.userTextContainer, { marginLeft: scale.wp(2.9) }]}>
+              <SkeletonRect width={scale.wp(30)} height={scale.hp(1.8)} />
+              <SkeletonRect 
+                width={scale.wp(50)} 
+                height={scale.hp(2.35)} 
+                style={{ marginTop: scale.hp(0.25) }}
+              />
+            </View>
+          </View>
+          <SkeletonCircle size={scale.wp(10.7)} />
+        </View>
+      </View>
+
+      <ScrollView 
+        contentContainerStyle={{ paddingBottom: 40 }}
+        showsVerticalScrollIndicator={false}
+      >
+     
+        <View style={styles.servicesGrid}>
+          {[1, 2, 3, 4, 5].map((item) => (
+            <View key={item} style={styles.serviceSkeletonItem}>
+              <SkeletonCircle size={scale.wp(20)} />
+              <SkeletonRect 
+                width={scale.wp(20)} 
+                height={scale.hp(1.8)} 
+                style={{ marginTop: scale.hp(1) }}
+              />
+            </View>
+          ))}
+        </View>
+
+        {/* Promo Banner Skeleton */}
+        <View style={[styles.promoBanner, { backgroundColor: '#F0F0F0' }]}>
+          <View style={{ padding: scale.hp(2.6), width: '100%' }}>
+            <SkeletonRect width="60%" height={scale.hp(2.85)} />
+            <SkeletonRect 
+              width="80%" 
+              height={scale.hp(1.8)} 
+              style={{ marginTop: scale.hp(0.65) }}
+            />
+            <SkeletonRect 
+              width="40%" 
+              height={scale.hp(2.6)} 
+              style={{ marginTop: scale.hp(1.95), borderRadius: scale.hp(2.6) }}
+            />
+          </View>
+        </View>
+
+        {/* Recent Transactions Skeleton */}
+        <View style={styles.recentContainer}>
+          <View style={styles.recentHeader}>
+            <SkeletonRect width="30%" height={scale.hp(2.35)} />
+            <SkeletonRect width="15%" height={scale.hp(1.8)} />
+          </View>
+
+          {[1, 2, 3, 4].map((item) => (
+            <View key={item} style={styles.txRow}>
+              <View style={styles.txLeft}>
+                <SkeletonCircle size={scale.wp(11.7)} />
+                <View style={[styles.txInfo, { flex: 1, marginLeft: scale.wp(2.9) }]}>
+                  <SkeletonRect width="40%" height={scale.hp(2.1)} />
+                  <SkeletonRect 
+                    width="60%" 
+                    height={scale.hp(1.55)} 
+                    style={{ marginTop: scale.hp(0.25) }}
+                  />
+                  <SkeletonRect 
+                    width="50%" 
+                    height={scale.hp(1.55)} 
+                    style={{ marginTop: scale.hp(0.25) }}
+                  />
+                </View>
+              </View>
+              <View style={styles.txRight}>
+                <SkeletonRect width="30%" height={scale.hp(2.1)} />
+                <SkeletonRect 
+                  width="40%" 
+                  height={scale.hp(1.55)} 
+                  style={{ marginTop: scale.hp(0.5), borderRadius: scale.hp(1.55) }}
+                />
+              </View>
+            </View>
+          ))}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+};
+
 export default function HomeMerchantScreen({ navigation }) {
   const { user, setUser } = useUser();
   const { t, i18n } = useTranslation();
@@ -50,22 +248,25 @@ export default function HomeMerchantScreen({ navigation }) {
   const [selectedTransaction, setSelectedTransaction] = useState(null);
   const [selectedTransactionType, setSelectedTransactionType] = useState(null);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchData = async () => {
-      await getRecentTransactions();
-      await getStockTransactions();
+    const fetchDataAndCheckWelcome = async () => {
+      setIsLoading(true);
+      try {
+        await Promise.all([
+          getRecentTransactions(),
+          getStockTransactions(),
+          checkAndShowWelcomeModal()
+        ]);
+      } catch (error) {
+        console.error("Error loading data:", error);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
-    fetchData();
-
-    // Show welcome modal for new merchants (you can modify this condition)
-    const shouldShowWelcome = true; // Add your logic here - e.g., check if first login
-    if (shouldShowWelcome) {
-      setTimeout(() => {
-        setShowWelcomeModal(true);
-      }, 1000);
-    }
+    fetchDataAndCheckWelcome();
   }, []);
 
   const getRecentTransactions = async () => {
@@ -88,6 +289,31 @@ export default function HomeMerchantScreen({ navigation }) {
       setProfileImage(fullImageUrl);
     }
   }, [user]);
+
+  const checkAndShowWelcomeModal = async () => {
+    try {
+      const hasSeenWelcomeModal = await AsyncStorage.getItem(WELCOME_MODAL_SEEN_KEY);
+      
+      if (!hasSeenWelcomeModal) {
+        // Small delay to ensure smooth loading
+        setTimeout(() => {
+          setShowWelcomeModal(true);
+        }, 1500);
+      }
+    } catch (error) {
+      console.error("Error checking welcome modal status:", error);
+    }
+  };
+
+  const handleWelcomeModalClose = async () => {
+    try {
+      await AsyncStorage.setItem(WELCOME_MODAL_SEEN_KEY, 'true');
+      setShowWelcomeModal(false);
+    } catch (error) {
+      console.error("Error saving welcome modal status:", error);
+      setShowWelcomeModal(false);
+    }
+  };
 
   const services = useMemo(
     () => [
@@ -113,7 +339,13 @@ export default function HomeMerchantScreen({ navigation }) {
         key: "GameCoins",
         label: t('services.gameCoins'),
         icon: <Image source={GamesIcon} style={{ width: 80, height: 80 }} resizeMode="contain" />,
-        onPress: () => navigation.navigate("GameCoins"),
+        onPress: () => navigation.navigate("GameCoinsMerchant"),
+      },
+      {
+        key: "Social",
+        label: t('services.social'),
+        icon: <Image source={SocialIcon}  style={{ width: 90, height: 90 }} resizeMode="contain" />,
+        onPress: () => navigation.navigate("SocialScreenMerchant"),
       },
     ],
     [navigation, t]
@@ -131,7 +363,7 @@ export default function HomeMerchantScreen({ navigation }) {
   };
 
   const goToNotifications = () => navigation.navigate("Notifications");
-  const goToProfile = () => navigation.navigate("MerchantProfile");
+  const goToProfile = () => navigation.navigate("ProfileMerchant");
 
   const getStatusText = (status) => {
     switch (status) {
@@ -152,8 +384,10 @@ export default function HomeMerchantScreen({ navigation }) {
         return t('services.mobileTopup');
       case 'bundle':
         return t('services.dataBundle');
-      case 'game_coins':
+      case 'games':
         return t('services.gameCoins');
+      case 'social':
+        return t('services.social');
       default:
         return t('transaction');
     }
@@ -181,10 +415,18 @@ export default function HomeMerchantScreen({ navigation }) {
                             item.status === 'failed' ? '#FFEBEE' : '#FFF8E1' }
         ]}>
           <Ionicons
-            name={item.type === 'recharge' ? 'phone-portrait-outline' : 'wifi-outline'} 
+            name={
+              item.type === 'recharge' ? 'phone-portrait-outline' : 
+              item.type === 'bundle' ? 'wifi-outline' :
+              item.type === 'games' ? 'game-controller-outline' :
+              item.type === 'social' ? 'people-outline' :
+              'receipt-outline' 
+            } 
             size={20} 
-            color={item.status === 'succeeded' ? '#4CAF50' : 
-                   item.status === 'failed' ? '#F44336' : '#FFC107'} 
+            color={
+              item.status === 'succeeded' ? '#4CAF50' : 
+              item.status === 'failed' ? '#F44336' : '#FFC107'
+            } 
           />
         </View>
         <View style={styles.txInfo}>
@@ -310,14 +552,14 @@ export default function HomeMerchantScreen({ navigation }) {
         transparent={true}
         animationType="slide"
         statusBarTranslucent={true}
-        onRequestClose={() => setShowWelcomeModal(false)}
+        onRequestClose={handleWelcomeModalClose}
       >
         <View style={styles.welcomeModalOverlay}>
           <View style={styles.welcomeModalContent}>
             <View style={styles.welcomeModalHeader}>
               <Text style={styles.welcomeModalTitle}>Welcome to Yes Charge!</Text>
               <TouchableOpacity 
-                onPress={() => setShowWelcomeModal(false)}
+                onPress={handleWelcomeModalClose}
                 style={styles.closeButton}
               >
                 <Ionicons name="close" size={24} color="#666" />
@@ -375,7 +617,13 @@ export default function HomeMerchantScreen({ navigation }) {
                     <Text style={styles.contactButtonText}>WhatsApp</Text>
                   </TouchableOpacity>
                   
-           
+                  <TouchableOpacity 
+                    style={[styles.contactButton, styles.telegramButton]}
+                    onPress={openTelegram}
+                  >
+                    <Ionicons name="paper-plane" size={20} color="#fff" />
+                    <Text style={styles.contactButtonText}>Telegram</Text>
+                  </TouchableOpacity>
                 </View>
                 <Text style={styles.contactNumber}>Mobile: +93 700 000 000</Text>
               </View>
@@ -384,7 +632,7 @@ export default function HomeMerchantScreen({ navigation }) {
             <View style={styles.welcomeModalButtons}>
               <TouchableOpacity 
                 style={[styles.welcomeModalButton, styles.primaryButton]}
-                onPress={() => setShowWelcomeModal(false)}
+                onPress={handleWelcomeModalClose}
               >
                 <Text style={styles.primaryButtonText}>
                   Get Started
@@ -396,6 +644,11 @@ export default function HomeMerchantScreen({ navigation }) {
       </Modal>
     );
   };
+
+  // Show skeleton loader while loading
+  if (isLoading) {
+    return <SkeletonHomeScreen />;
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -530,6 +783,26 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: Colors.white,
+  },
+  
+  // Skeleton Styles
+  serviceSkeletonItem: {
+    alignItems: 'center',
+    width: '33%',
+    marginBottom: scale.hp(2),
+  },
+  
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+  },
+  
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: Colors.primary,
   },
   
   header: {
@@ -708,7 +981,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flex: 1,
   },
-    welcomeModalOverlay: {
+  welcomeModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
@@ -985,9 +1258,6 @@ const styles = StyleSheet.create({
     marginBottom: scale.hp(2.6),
     fontWeight: '500',
   },
-  paymentOptions: {
-    gap: scale.hp(1.95),
-  },
   paymentOption: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1051,11 +1321,6 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: scale.hp(1.95),
     lineHeight: scale.hp(2.35),
-  },
-  contactButtons: {
-    flexDirection: 'row',
-    gap: scale.wp(2.9),
-    marginBottom: scale.hp(1.95),
   },
   contactButton: {
     flex: 1,

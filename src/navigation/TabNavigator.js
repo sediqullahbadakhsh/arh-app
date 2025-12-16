@@ -20,6 +20,7 @@ import TabNavStyles from "./TabNavigatorStyle";
 import { scale as Schp } from "../utils/normalizeSize";
 import ProfileStackNavigatorMerchant from "./ProfileStackNavigatorMerchant";
 import { useTranslation } from "react-i18next";
+import ProfileDetailsScreen from "../screens/profileScreens/profile";
 
 const Tab = createBottomTabNavigator();
 
@@ -65,6 +66,7 @@ export default function TabNavigator() {
       show: can(() => canUse(SCREENS?.HOME)),
       stackReset: true, 
     },
+    
     {
       name: "Order",
       label: t('tabs.orders'),
@@ -81,6 +83,7 @@ export default function TabNavigator() {
       show: true,
       initialParams: {}
     },
+    
     {
       name: "Notifications",
       label: t('tabs.notifications'),

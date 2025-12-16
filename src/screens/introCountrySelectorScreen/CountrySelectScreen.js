@@ -55,7 +55,6 @@ export default function CountrySelectScreen({ navigation }) {
     })();
   }, [navigation]);
 
-
   useEffect(() => {
     if (needsRestart) {
       setLanguageModalVisible(false);
@@ -68,6 +67,10 @@ export default function CountrySelectScreen({ navigation }) {
     
     try {
       await changeLanguage(lang);
+      // Close modal after successful language change
+      setTimeout(() => {
+        setLanguageModalVisible(false);
+      }, 500);
     } catch (error) {
       console.error('Error changing language:', error);
       setLanguageModalVisible(false);
@@ -198,7 +201,6 @@ export default function CountrySelectScreen({ navigation }) {
         {renderFlag()}
         <View style={styles.languageInfo}>
           <Text style={styles.languageName}>{item.label}</Text>
-          {/* <Text style={styles.languageCode}>{(item.code || item.value).toUpperCase()}</Text> */}
         </View>
         {isChangingLanguage && active ? (
           <ActivityIndicator size="small" color={Colors.primary} />
@@ -266,85 +268,84 @@ export default function CountrySelectScreen({ navigation }) {
     </Modal>
   );
 
-  const LanguageModal = () => (
-    <Modal
-      visible={languageModalVisible}
-      transparent={true}
-      animationType="none"
-      statusBarTranslucent={true}
-      onRequestClose={() => {
-        if (!isChangingLanguage) {
-          setLanguageModalVisible(false);
-        }
-      }}
-    >
-      <View style={styles.modalOverlay}>
-        <TouchableOpacity 
-          style={styles.modalBackdrop}
-          activeOpacity={1}
-          onPress={() => {
-            if (!isChangingLanguage) {
-              setLanguageModalVisible(false);
-            }
-          }}
-        />
-        <Animated.View 
-          style={[
-            styles.modalCard,
-            { 
-              transform: [{ translateY: languageModalAnim }],
-              maxHeight: '70%',
-              marginBottom: -insets.bottom
-            }
-          ]}
-        >
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{t('selectLanguage') || "Select Language"}</Text>
-            <TouchableOpacity 
-              onPress={() => {
-                if (!isChangingLanguage) {
-                  setLanguageModalVisible(false);
-                }
-              }}
-              style={styles.closeButton}
-              disabled={isChangingLanguage}
-            >
-              <Ionicons name="close" size={24} color="#666" />
-            </TouchableOpacity>
-          </View>
+  const LanguageModal = () => {
+    const handleClose = useCallback(() => {
+      if (!isChangingLanguage) {
+        setLanguageModalVisible(false);
+      }
+    }, [isChangingLanguage]);
 
-          <View style={styles.searchContainer}>
-            <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
-            <TextInput
-              placeholder={t('searchLanguages') || "Search languages..."}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              style={styles.searchInput}
-              placeholderTextColor="#999"
-              editable={!isChangingLanguage}
-            />
-          </View>
-
-          {isChangingLanguage && (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color={Colors.primary} />
-              <Text style={styles.loadingText}>
-                {t("ChangingLanguage") || "Changing language..."}
-              </Text>
-            </View>
-          )}
-
-          <FlatList
-            data={filteredLanguages}
-            keyExtractor={(item) => item.code || item.value || Math.random().toString()}
-            renderItem={renderLanguageItem}
-            ItemSeparatorComponent={() => <View style={styles.modalSeparator} />}
-            showsVerticalScrollIndicator={false}
+    return (
+      <Modal
+        visible={languageModalVisible}
+        transparent={true}
+        animationType="none"
+        statusBarTranslucent={true}
+        onRequestClose={handleClose}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity 
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={handleClose}
+            disabled={isChangingLanguage}
           />
-        </Animated.View>
-      </View>
-    </Modal>
-  );
+          <Animated.View 
+            style={[
+              styles.modalCard,
+              { 
+                transform: [{ translateY: languageModalAnim }],
+                maxHeight: '70%',
+                // marginBottom: -insets.bottom
+              }
+            ]}
+          >
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{t('selectLanguage') || "Select Language"}</Text>
+              <TouchableOpacity 
+                onPress={handleClose}
+                style={styles.closeButton}
+                disabled={isChangingLanguage}
+              >
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.searchContainer}>
+              <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
+              <TextInput
+                placeholder={t('searchLanguages') || "Search languages..."}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                style={styles.searchInput}
+                placeholderTextColor="#999"
+                editable={!isChangingLanguage}
+              />
+            </View>
+
+            {isChangingLanguage && (
+              <View style={styles.loadingOverlay}>
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color={Colors.primary} />
+                  <Text style={styles.loadingText}>
+                    {t("ChangingLanguage") || "Changing language..."}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            <FlatList
+              data={filteredLanguages}
+              keyExtractor={(item) => item.code || item.value || Math.random().toString()}
+              renderItem={renderLanguageItem}
+              ItemSeparatorComponent={() => <View style={styles.modalSeparator} />}
+              showsVerticalScrollIndicator={false}
+            />
+          </Animated.View>
+        </View>
+      </Modal>
+    );
+  };
 
   if (booting) {
     return (
@@ -403,9 +404,6 @@ export default function CountrySelectScreen({ navigation }) {
                     )}
                     <View style={styles.fieldInfo}>
                       <Text style={styles.fieldPrimary}>{selectedLang.label}</Text>
-                      {/* <Text style={styles.fieldSecondary}>
-                        {(selectedLang.code || selectedLang.value).toUpperCase()}
-                      </Text> */}
                     </View>
                   </>
                 ) : (
@@ -522,10 +520,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
   },
-  fieldFlag: {
-    fontSize: scale.hp(3.5),
-    marginRight: scale.wp(3),
-  },
   fieldInfo: {
     flex: 1,
   },
@@ -534,11 +528,6 @@ const styles = StyleSheet.create({
     fontSize: scale.hp(2),
     fontWeight: '600',
     marginBottom: scale.hp(0.25),
-  },
-  fieldSecondary: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: scale.hp(1.75),
-    fontWeight: '500',
   },
   placeholder: {
     color: 'rgba(255,255,255,0.7)',
@@ -583,7 +572,6 @@ const styles = StyleSheet.create({
   modalCard: {
     position: 'absolute',
     bottom: 0,
-    height: '60%',
     left: 0,
     right: 0,
     backgroundColor: '#fff',
@@ -671,13 +659,13 @@ const styles = StyleSheet.create({
   languageFlag: {
     width: scale.wp(6),
     height: scale.hp(2.25),
-     marginEnd: scale.wp(3), 
+    marginEnd: scale.wp(3), 
     borderRadius: scale.hp(0.375),
   },
   flagPlaceholder: {
     width: scale.wp(6),
     height: scale.hp(2.25),
-     marginEnd: scale.wp(3), 
+    marginEnd: scale.wp(3), 
     backgroundColor: '#F0F0F0',
     borderRadius: scale.hp(0.375),
   },
@@ -690,8 +678,32 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     marginBottom: scale.hp(0.25),
   },
-  languageCode: {
-    fontSize: scale.hp(1.75),
-    color: Colors.textSecondary,
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  loadingContainer: {
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 14,
+    color: Colors.textPrimary,
   },
 });

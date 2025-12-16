@@ -1,4 +1,4 @@
-import React, { useState, useEffect, use } from "react";
+import React, { useState, useEffect } from "react";
 import {
   SafeAreaView,
   View,
@@ -18,25 +18,25 @@ import { useAuth } from "../auth/AuthProvider";
 import { getCurrentMerchantProfile, updateMerchantProfile } from "../services/merchantProfileService";
 import { useTranslation } from "react-i18next";
 import { scale } from "../utils/normalizeSize";
-
+import { useLanguage } from '../context/LanguageContext';
 export default function ProfileScreenMerchant({ navigation }) {
   const { user, logout } = useAuth();
   const [avatar, setAvatar] = useState(null);
   const [merchantData, setMerchantData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
-  const {t} = useTranslation();
+  const { t } = useTranslation();
+
   const fetchMerchantProfile = async () => {
     try {
       setFetching(true);
       const response = await getCurrentMerchantProfile();
-      console.log(response, "this is merchant profile")
+      console.log(response, "this is merchant profile");
       if (response) {
         setMerchantData(response);
         
         if (response.user?.profile_picture) {
-          setAvatar(response.user.profile_picture);
-             const fullImageUrl = response.user.profile_picture.startsWith('http') 
+          const fullImageUrl = response.user.profile_picture.startsWith('http') 
             ? response.user.profile_picture
             : `http://3.67.144.22/uploads/profile_pictures/${response.user.profile_picture}`;
           setAvatar(fullImageUrl);
@@ -44,7 +44,7 @@ export default function ProfileScreenMerchant({ navigation }) {
       }
     } catch (error) {
       console.error("Error fetching merchant profile:", error);
-      Alert.alert("Error", "Failed to load profile data");
+      Alert.alert(t('error'), t('failedLoadProfile'));
     } finally {
       setFetching(false);
     }
@@ -58,7 +58,7 @@ export default function ProfileScreenMerchant({ navigation }) {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert("Permission required", "Please allow access to your photos to change your profile picture.");
+        Alert.alert(t('permissionRequired'), t('allowPhotoAccess'));
         return;
       }
 
@@ -75,7 +75,7 @@ export default function ProfileScreenMerchant({ navigation }) {
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert("Error", "Failed to open image gallery. Please try again.");
+      Alert.alert(t('error'), t('galleryError'));
     }
   };
 
@@ -98,32 +98,33 @@ export default function ProfileScreenMerchant({ navigation }) {
 
       const response = await updateMerchantProfile({ profile_picture: imageUri });
       if (response.status === "success") {
-        Alert.alert("Success", "Profile picture updated successfully");
+        Alert.alert(t('success'), t('pictureUpdated'));
         fetchMerchantProfile();
       } else {
-        Alert.alert("Error", response.message || "Failed to update profile picture");
+        Alert.alert(t('error'), response.message || t('updateFailed'));
       }
     } catch (error) {
       console.error("Update profile image error:", error);
-      Alert.alert("Error", "An error occurred while updating your profile picture");
+      Alert.alert(t('error'), t('updatePictureError'));
     } finally {
       setLoading(false);
     }
   };
-  const goSupport = () => navigation.navigate("SupportScreen", { title: "Support" });
-  const goReverseStockReport = () => navigation.navigate("ReverseStockReportScreen", { title: "Reverse Stock Reports" });
-  const goReverseStock = () => navigation.navigate("ReverseStockScreen", { title: "Reverse Stock" });
+
+  const goSupport = () => navigation.navigate("SupportScreen", { title: t('support') });
+  const goReverseStockReport = () => navigation.navigate("ReverseStockReportScreen", { title: t('reverseStockReports') });
+  const goReverseStock = () => navigation.navigate("ReverseStockScreen", { title: t('reverseStock') });
   const goProfileDetails = () =>
-    navigation.navigate("profileDetailsMerchant", { title: "Profile Details merchant" });
+    navigation.navigate("profileDetailsMerchant", { title: t('profileDetails') });
   const goManageLanguage = () =>
     navigation.navigate("languageScreen", { title: t('manageLanguage') });
   const goSecurity = () =>
-    navigation.navigate("securityScreen", { title: "Security" });
+    navigation.navigate("securityScreen", { title: t('security') });
   const goMerchant = () =>
-    navigation.navigate("MerchantApplication", { title: "Apply For Merchant Account" });
-  const goAboutApp = () => navigation.navigate("aboutAppScreen", { title: "About App" });
-  const goContactUs = () => navigation.navigate("contactUsScreen", { title: "Contact Us" });
-  const goAboutUs = () => navigation.navigate("AboutUsScreen", { title: "About Us" });
+    navigation.navigate("MerchantApplication", { title: t('applyMerchant') });
+  const goAboutApp = () => navigation.navigate("aboutAppScreen", { title: t('aboutApp') });
+  const goContactUs = () => navigation.navigate("contactUsScreen", { title: t('contactUs') });
+  const goAboutUs = () => navigation.navigate("AboutUsScreen", { title: t('aboutUs') });
 
   const handleLogout = async () => {
     try {
@@ -137,13 +138,13 @@ export default function ProfileScreenMerchant({ navigation }) {
   const getUserName = () => {
     if (merchantData?.user?.username) return merchantData.user.username;
     if (user?.username) return user.username;
-    return "Merchant";
+    return t('merchant');
   };
 
   const getDisplayName = (details, nameField) => {
-    if (!details) return "Not provided";
+    if (!details) return t('notProvided');
     const nameObj = details[nameField] || {};
-    return nameObj.en || nameObj.fa || nameObj.dr || "Not provided";
+    return nameObj.en || nameObj.fa || nameObj.dr || t('notProvided');
   };
 
   const SkeletonLoader = () => (
@@ -227,9 +228,6 @@ export default function ProfileScreenMerchant({ navigation }) {
               style={{ marginLeft: 4 }}
             />
           </View>
-
-
-         
         </View>
         
         <View style={styles.decoration1}></View>
@@ -247,22 +245,22 @@ export default function ProfileScreenMerchant({ navigation }) {
                     color={Colors.primary}
                   />
                 }
-                title="Profile"
-                subtitle="View Your Profile and update"
+                title={t('profile')}
+                subtitle={t('viewUpdateProfile')}
                 onPress={goProfileDetails}
               />
-                 <ProfileRow
-                              icon={
-                                <Ionicons
-                                  name="globe-outline"
-                                  size={22}
-                                  color={Colors.primary}
-                                />
-                              }
-                              title={t('language')}
-                              subtitle={t('services.title')}
-                              onPress={goManageLanguage}
-                            />
+              <ProfileRow
+                icon={
+                  <Ionicons
+                    name="globe-outline"
+                    size={22}
+                    color={Colors.primary}
+                  />
+                }
+                title={t('language')}
+                subtitle={t('manageLanguage')}
+                onPress={goManageLanguage}
+              />
               <ProfileRow
                 icon={
                   <Ionicons
@@ -271,63 +269,50 @@ export default function ProfileScreenMerchant({ navigation }) {
                     color={Colors.primary}
                   />
                 }
-                title="Security"
-                subtitle="setup your security"
+                title={t('security')}
+                subtitle={t('setupSecurity')}
                 onPress={goSecurity}
               />
-              
-          <ProfileRow
-  icon={
-    <Ionicons name="swap-horizontal-outline" size={22} color={Colors.primary} />
-  }
-  title="Reverse Stock"
-  subtitle="Manage reverse stock requests"
-  onPress={goReverseStock}
-/>
-<ProfileRow
-  icon={
-    <Ionicons name="document-text-outline" size={22} color={Colors.primary} />
-  }
-  title="Reverse Stock Reports"
-  subtitle="View all reverse stock requests"
-  onPress={goReverseStockReport}
-/>
-{/* <ProfileRow
-  icon={
-    <Ionicons name="headset-outline" size={22} color={Colors.primary} />
-  }
-  title="Support"
-  subtitle="Create and manage support tickets"
-  onPress={goSupport}
-/> */}
-
+              <ProfileRow
+                icon={
+                  <Ionicons name="swap-horizontal-outline" size={22} color={Colors.primary} />
+                }
+                title={t('reverseStocks')}
+                subtitle={t('manageReverseStock')}
+                onPress={goReverseStock}
+              />
+              <ProfileRow
+                icon={
+                  <Ionicons name="document-text-outline" size={22} color={Colors.primary} />
+                }
+                title={t('reverseStockReports')}
+                subtitle={t('viewReverseStock')}
+                onPress={goReverseStockReport}
+              />
               <ProfileRow
                 icon={
                   <Ionicons name="refresh-circle-outline" size={22} color={Colors.primary} />
                 }
-                title="About App"
-                subtitle="Access additional features and informations."
+                title={t('aboutApp')}
+                subtitle={t('appFeaturesInfo')}
                 onPress={goAboutApp}
               />
-              
               <ProfileRow
                 icon={
                   <Ionicons name="headset-outline" size={22} color={Colors.primary} />
                 }
-                title="Contact Us"
-                subtitle="Access additional features and informations."
+                title={t('contactUs')}
+                subtitle={t('contactSupport')}
                 onPress={goContactUs}
               />
-              
               <ProfileRow
                 icon={
                   <Ionicons name="information-circle-outline" size={22} color={Colors.primary} />
                 }
-                title="About Us"
-                subtitle="Access additional features and informations."
+                title={t('aboutUs')}
+                subtitle={t('companyInfo')}
                 onPress={goAboutUs}
               />
-
               <ProfileRow
                 icon={
                   <Ionicons
@@ -336,8 +321,8 @@ export default function ProfileScreenMerchant({ navigation }) {
                     color={Colors.primary}
                   />
                 }
-                title="Logout"
-                subtitle="Logout form eWallet"
+                title={t('logout')}
+                subtitle={t('logoutFromEWallet')}
                 onPress={handleLogout}
               />
             </View>
@@ -349,6 +334,7 @@ export default function ProfileScreenMerchant({ navigation }) {
 }
 
 function ProfileRow({ icon, title, subtitle, onPress }) {
+    const { isRTL } = useLanguage();
   return (
     <TouchableOpacity
       style={styles.row}
@@ -361,7 +347,10 @@ function ProfileRow({ icon, title, subtitle, onPress }) {
           <Text style={styles.rowSubtitle}>{subtitle}</Text>
         </View>
       </View>
-      <Ionicons name="chevron-forward" size={18} color="#BDBDBD" />
+      {isRTL ? (
+        <Ionicons name="chevron-back" size={18} color="#BDBDBD" />
+      ) : (  <Ionicons name="chevron-forward" size={18} color="#BDBDBD" />)}
+    
     </TouchableOpacity>
   );
 }
@@ -501,6 +490,7 @@ const styles = StyleSheet.create({
   },
   rowLeft: {
     flexDirection: "row",
+    
     alignItems: "center",
     flex: 1,
   },
@@ -511,7 +501,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFF5F5",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: scale.wp(3.1),
+    marginEnd: scale.wp(3.1),
   },
   rowTitle: {
     color: Colors.textPrimary,

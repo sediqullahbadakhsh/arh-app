@@ -46,7 +46,6 @@ const debounce = (func, wait) => {
   };
 };
 
-
 const SkeletonLoader = ({ showHeader = true }) => {
   const { width } = Dimensions.get('window');
   const CARD_WIDTH = (width - (scale.wp(5) * 2) - scale.wp(2)) / 2;
@@ -139,10 +138,9 @@ const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - (scale.wp(5) * 2) - scale.wp(2)) / 2;
 const ITEMS_PER_PAGE = 10;
 
-export default function GameCoinsCustomerScreen({ navigation, route }) {
+export default function GameCoinsMerchantScreen({ navigation, route }) {
   const { t } = useTranslation();
   const { customer } = route?.params || {};
-  
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -153,19 +151,17 @@ export default function GameCoinsCustomerScreen({ navigation, route }) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [totalPages, setTotalPages] = useState(1);
   const [refreshing, setRefreshing] = useState(false);
-  
-  // API filters state
+ 
   const [apiFilters, setApiFilters] = useState({
     search: '',
     productCategoryId: null,
   });
 
-  // Refs
   const flatListRef = useRef(null);
   const isMountedRef = useRef(true);
   const isLoadingMoreRef = useRef(false);
 
-  // Categories query
+ 
   const { 
     data: categoriesData,
     isLoading: categoriesLoading,
@@ -176,7 +172,7 @@ export default function GameCoinsCustomerScreen({ navigation, route }) {
     queryFn: getAllGameCategories,
   });
 
-  // Products query with pagination
+  
   const { 
     data: productsData,
     isLoading: productsLoading,
@@ -341,12 +337,12 @@ export default function GameCoinsCustomerScreen({ navigation, route }) {
     isLoadingMoreRef.current = true;
     setLoadingMore(true);
     
-    // Increment page to trigger new query
+    
     const nextPage = page + 1;
     setPage(nextPage);
   }, [hasMore, loadingMore, productsLoading, page, totalPages]);
 
-  // Clear search
+
   const clearSearch = () => {
     setSearchQuery("");
     updateApiFilters({ 
@@ -387,7 +383,7 @@ export default function GameCoinsCustomerScreen({ navigation, route }) {
   };
 
   const handleProductSelect = (product) => {
-    navigation.navigate("GameActivationCustomer", { 
+    navigation.navigate("GameActivationMerchant", { 
       product, 
       customer,
     });
@@ -422,7 +418,7 @@ export default function GameCoinsCustomerScreen({ navigation, route }) {
         IMAGE_URL = `http://3.67.144.22/backend/uploads/product_images/${encodedImage}`;
       }
     }
-    
+    console.log(item, "this is item")
     return (
       <TouchableOpacity
         style={styles.productCard}
@@ -450,7 +446,7 @@ export default function GameCoinsCustomerScreen({ navigation, route }) {
           
           <View style={styles.priceContainer}>
             <Text style={styles.productPrice} numberOfLines={1}>
-               {item.totalAmountInUSD?.toFixed(2) || item.price?.toFixed(2) || "0.00"} USD
+               {item.totalAmountInProductCurrency?.toFixed(2) || item.price?.toFixed(2) || "0.00"} AFN
             </Text>
           </View>
           
@@ -464,7 +460,7 @@ export default function GameCoinsCustomerScreen({ navigation, route }) {
     );
   };
 
-  // Loading More Skeleton Product Card
+
   const renderLoadingMoreProductCard = () => (
     <View style={[styles.loadingMoreCard, { width: CARD_WIDTH }]}>
       <View style={styles.loadingMoreImage} />

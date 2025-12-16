@@ -3,9 +3,7 @@ import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import HomeConsumerScreen from "../screens/homeConsumerScreen/HomeConsumerScreen";
 import HomeMerchantScreen from "../screens/homeMerchantScreen/HomeMerchantScreen";
-
 import NotificationsScreen from "../screens/notificationScreen/NotificationsScreen";
-
 import ProductSelectScreen from "../screens/topup/ProductSelectScreen";
 import { useAuth } from "../auth/AuthProvider";
 import TopupFlowScreen from "../screens/TopupFlowScreen";
@@ -17,6 +15,17 @@ import MerchantApplicationScreen from "../screens/profileScreens/MerchantApllica
 import DataFlowScreenMerchant from "../screens/dataFlowScreen1/DataFlowScreen";
 import AllTransactionsScreen from "../screens/AllTransactionsScreen";
 import MerchantAnalyticsScreen from "../screens/MerchantAnalyticsScreen";
+import GameActivationScreen from "../screens/gameCoinsScreen/GameActivationScreen";
+import ProfileDetailsScreen from "../screens/profileScreens/profile";
+import SocialCustomerScreen from "../screens/socialScreen/SocialScreen";
+import SocialActivationCustomerScreen from "../screens/socialScreen/SocialActivationScreen";
+import GameCoinsMerchantScreen from "../screens/gameCoinsScreenMerchant/GameCoinsScreen";
+import GameActivationMerchantScreen from "../screens/gameCoinsScreenMerchant/GameActivationScreen";
+import SocialMerchantScreen from "../screens/socialScreenMerchant/SocialScreen";
+import SocialActivationMerchantScreen from "../screens/socialScreenMerchant/SocialActivationScreen";
+import ProfileScreenMerchant from "../screens/ProfileScreenMerchant";
+
+
 
 
 const Stack = createNativeStackNavigator();
@@ -45,10 +54,25 @@ export default function HomeStackNavigator() {
               component={MerchantAnalyticsScreen} 
             />
       <Stack.Screen name="GameCoins" component={GameCoinsScreen} /> 
+      <Stack.Screen name="GameActivationCustomer" component={GameActivationScreen} />
+      <Stack.Screen name="GameCoinsMerchant" component={GameCoinsMerchantScreen} /> 
+      <Stack.Screen name="GameActivationMerchant" component={GameActivationMerchantScreen} /> 
+      <Stack.Screen name="SocialScreen" component={SocialCustomerScreen} /> 
+      <Stack.Screen name="SocialActivationScreen" component={SocialActivationCustomerScreen} /> 
+      <Stack.Screen name="SocialScreenMerchant" component={SocialMerchantScreen} /> 
+      <Stack.Screen name="SocialActivationMerchantScreen" component={SocialActivationMerchantScreen} /> 
           <Stack.Screen 
        name="MerchantApplication" 
        component={MerchantApplicationScreen} 
      />
+         <Stack.Screen 
+       name="profileDetails" 
+       component={ProfileDetailsScreen} 
+     />
+      <Stack.Screen
+             name="ProfileMerchant"
+             component={ProfileScreenMerchant}
+           />
       <Stack.Screen name="Topup" component={TopupFlowScreen} />
       <Stack.Screen name="Topup1" component={TopupFlowScreen1} />
       <Stack.Screen name="StockTransfer" component={StockTransferScreen} />

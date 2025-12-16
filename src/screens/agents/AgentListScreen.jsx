@@ -8,6 +8,7 @@ import {
   FlatList,
   SafeAreaView,
   RefreshControl,
+  Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../theme/colors";
@@ -22,10 +23,110 @@ import { useTranslation } from "react-i18next";
 
 const FILTERS = ["All", "Active", "Inactive"];
 
+// Skeleton Loader Component
+const AgentListSkeleton = () => {
+  const [animation] = useState(new Animated.Value(0));
+
+  useEffect(() => {
+    const animate = () => {
+      Animated.sequence([
+        Animated.timing(animation, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(animation, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ]).start(() => animate());
+    };
+    animate();
+
+    return () => animation.stopAnimation();
+  }, []);
+
+  const backgroundColorInterpolate = animation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#E5E7EB', '#F3F4F6']
+  });
+
+  return (
+    <View style={styles.skeletonContainer}>
+      {/* Filter Pills Skeleton */}
+      <View style={styles.skeletonPillsRow}>
+        {[...Array(3)].map((_, index) => (
+          <View key={`pill-${index}`} style={styles.skeletonPill} />
+        ))}
+      </View>
+
+      {/* Search Row Skeleton */}
+      <View style={styles.skeletonSearchRow}>
+        <View style={styles.skeletonSearchBox} />
+        <View style={styles.skeletonAddButton} />
+      </View>
+
+      {/* Results Info Skeleton */}
+      <View style={styles.skeletonResultsInfo}>
+        <View style={styles.skeletonResultsText} />
+      </View>
+
+      {/* Agent Cards Skeleton */}
+      {[...Array(5)].map((_, index) => (
+        <Animated.View 
+          key={`agent-${index}`} 
+          style={[
+            styles.skeletonCard,
+            { backgroundColor: backgroundColorInterpolate }
+          ]}
+        >
+          {/* Card Header */}
+          <View style={styles.skeletonCardHeader}>
+            <View style={styles.skeletonAgentInfo}>
+              <View style={styles.skeletonName} />
+              <View style={styles.skeletonEmail} />
+              <View style={styles.skeletonPhone} />
+            </View>
+            <View style={styles.skeletonStatusPill} />
+          </View>
+
+          {/* Card Body */}
+          <View style={styles.skeletonCardBody}>
+            <View style={styles.skeletonDetailRow}>
+              <View style={styles.skeletonDetailLabel} />
+              <View style={styles.skeletonDetailValue} />
+            </View>
+            <View style={styles.skeletonDetailRow}>
+              <View style={styles.skeletonDetailLabel} />
+              <View style={styles.skeletonDetailValue} />
+            </View>
+            <View style={styles.skeletonDetailRow}>
+              <View style={styles.skeletonDetailLabel} />
+              <View style={styles.skeletonDetailValue} />
+            </View>
+            <View style={styles.skeletonDetailRow}>
+              <View style={styles.skeletonDetailLabel} />
+              <View style={styles.skeletonDetailValue} />
+            </View>
+          </View>
+
+          {/* Card Actions */}
+          <View style={styles.skeletonCardActions}>
+            <View style={styles.skeletonActionButton} />
+            <View style={styles.skeletonActionButton} />
+            <View style={styles.skeletonActionButton} />
+            <View style={styles.skeletonActionButton} />
+          </View>
+        </Animated.View>
+      ))}
+    </View>
+  );
+};
+
 export default function AgentListScreen({ navigation }) {
   const { user } = useUser();
   const { t } = useTranslation();
-  console.log(user, 'this is user of agent');
   
   const [filter, setFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
@@ -220,7 +321,7 @@ export default function AgentListScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white, paddingBottom: 100 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white, paddingBottom: 90 }}>
       <ServiceHeader title={t('manageAgents')} />
 
       <View style={styles.container}>
@@ -245,6 +346,7 @@ export default function AgentListScreen({ navigation }) {
                 key={f}
                 onPress={() => setFilter(f)}
                 style={[styles.filterPill, btnStyle]}
+                disabled={loading}
               >
                 <Text style={[styles.filterPillText, textStyle]}>
                   {t(f.toLowerCase())}
@@ -264,6 +366,7 @@ export default function AgentListScreen({ navigation }) {
               placeholder={t('searchPlaceholder')}
               placeholderTextColor="#9E9E9E"
               autoCapitalize="none"
+              editable={!loading}
             />
             {searchQuery ? (
               <TouchableOpacity onPress={() => setSearchQuery("")}>
@@ -274,55 +377,56 @@ export default function AgentListScreen({ navigation }) {
           <TouchableOpacity
             style={styles.addBtn}
             onPress={() => navigation.navigate("AgentCreate", { refreshAgentList })}
+            disabled={loading}
           >
             <Ionicons name="add" size={20} color="#fff" />
             <Text style={styles.addBtnText}>{t('addAgent')}</Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.resultsInfo}>
-          <Text style={styles.resultsText}>
-            {filteredData.length} {t('agentFound', { count: filteredData.length })}
-            {searchQuery ? ` ${t('for')} "${searchQuery}"` : ''}
-            {filter !== 'All' ? ` (${t(filter.toLowerCase())})` : ''}
-          </Text>
-        </View>
-
         {loading && !refreshing ? (
-          <View style={styles.loadingContainer}>
-            <Text>{t('loadingAgents')}</Text>
-          </View>
+          <AgentListSkeleton />
         ) : (
-          <FlatList
-            data={filteredData}
-            keyExtractor={(item) => item.id}
-            renderItem={renderItem}
-            ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 24 }}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={refreshAgentList}
-                colors={[Colors.primary]}
-              />
-            }
-            ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <Ionicons name="people-outline" size={48} color="#9E9E9E" />
-                <Text style={styles.emptyText}>
-                  {searchQuery 
-                    ? t('noAgentsFoundForSearch', { query: searchQuery })
-                    : t('noAgentsFound')}
-                </Text>
-                <Text style={styles.emptySubtext}>
-                  {searchQuery 
-                    ? t('tryAdjustingSearch')
-                    : t('getStartedByCreatingAgent')}
-                </Text>
-              </View>
-            }
-          />
+          <>
+            <View style={styles.resultsInfo}>
+              <Text style={styles.resultsText}>
+                 {t('agentFound', { count: filteredData.length })}
+                {searchQuery ? ` ${t('for')} "${searchQuery}"` : ''}
+                {filter !== 'All' ? ` (${t(filter.toLowerCase())})` : ''}
+              </Text>
+            </View>
+
+            <FlatList
+              data={filteredData}
+              keyExtractor={(item) => item.id}
+              renderItem={renderItem}
+              ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 24 }}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={refreshAgentList}
+                  colors={[Colors.primary]}
+                />
+              }
+              ListEmptyComponent={
+                <View style={styles.emptyContainer}>
+                  <Ionicons name="people-outline" size={48} color="#9E9E9E" />
+                  <Text style={styles.emptyText}>
+                    {searchQuery 
+                      ? t('noAgentsFoundForSearch', { query: searchQuery })
+                      : t('noAgentsFound')}
+                  </Text>
+                  <Text style={styles.emptySubtext}>
+                    {searchQuery 
+                      ? t('tryAdjustingSearch')
+                      : t('getStartedByCreatingAgent')}
+                  </Text>
+                </View>
+              }
+            />
+          </>
         )}
       </View>
 
@@ -613,11 +717,6 @@ const styles = StyleSheet.create({
   deleteText: {
     color: "#DC2626",
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
   emptyContainer: {
     alignItems: "center",
     justifyContent: "center",
@@ -646,5 +745,121 @@ const styles = StyleSheet.create({
     fontSize: scale.hp(2.1),
     color: Colors.textPrimary,
     fontWeight: "600",
+  },
+  
+  // Skeleton Styles
+  skeletonContainer: {
+    flex: 1,
+  },
+  skeletonPillsRow: {
+    flexDirection: "row",
+    gap: scale.wp(2.4),
+    marginBottom: scale.hp(1.55),
+    justifyContent: "space-between",
+  },
+  skeletonPill: {
+    flex: 1,
+    height: scale.hp(3.5),
+    backgroundColor: "#E5E7EB",
+    borderRadius: scale.hp(0.8),
+  },
+  skeletonSearchRow: {
+    flexDirection: "row",
+    gap: scale.wp(2.4),
+    marginBottom: scale.hp(1.55),
+  },
+  skeletonSearchBox: {
+    flex: 1,
+    height: scale.hp(5.7),
+    backgroundColor: "#E5E7EB",
+    borderRadius: scale.hp(1.3),
+  },
+  skeletonAddButton: {
+    width: scale.wp(25),
+    height: scale.hp(5.7),
+    backgroundColor: "#E5E7EB",
+    borderRadius: scale.hp(1.3),
+  },
+  skeletonResultsInfo: {
+    marginBottom: scale.hp(1.55),
+  },
+  skeletonResultsText: {
+    height: scale.hp(1.55),
+    width: "60%",
+    backgroundColor: "#E5E7EB",
+    borderRadius: scale.hp(0.5),
+  },
+  skeletonCard: {
+    borderWidth: 1,
+    borderColor: "#F3F4F6",
+    borderRadius: scale.hp(1.55),
+    padding: scale.hp(2.1),
+    gap: scale.hp(1.55),
+    marginBottom: scale.hp(1.2),
+  },
+  skeletonCardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  skeletonAgentInfo: {
+    flex: 1,
+  },
+  skeletonName: {
+    height: scale.hp(2.1),
+    width: "50%",
+    backgroundColor: "#D1D5DB",
+    borderRadius: scale.hp(0.5),
+    marginBottom: scale.hp(0.5),
+  },
+  skeletonEmail: {
+    height: scale.hp(1.55),
+    width: "70%",
+    backgroundColor: "#D1D5DB",
+    borderRadius: scale.hp(0.5),
+    marginBottom: scale.hp(0.3),
+  },
+  skeletonPhone: {
+    height: scale.hp(1.55),
+    width: "60%",
+    backgroundColor: "#D1D5DB",
+    borderRadius: scale.hp(0.5),
+  },
+  skeletonStatusPill: {
+    width: scale.wp(15),
+    height: scale.hp(3.1),
+    backgroundColor: "#D1D5DB",
+    borderRadius: scale.hp(1.55),
+  },
+  skeletonCardBody: {
+    gap: scale.hp(0.8),
+  },
+  skeletonDetailRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  skeletonDetailLabel: {
+    height: scale.hp(1.55),
+    width: "30%",
+    backgroundColor: "#D1D5DB",
+    borderRadius: scale.hp(0.5),
+  },
+  skeletonDetailValue: {
+    height: scale.hp(1.55),
+    width: "40%",
+    backgroundColor: "#D1D5DB",
+    borderRadius: scale.hp(0.5),
+  },
+  skeletonCardActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: scale.wp(2),
+  },
+  skeletonActionButton: {
+    flex: 1,
+    height: scale.hp(3.5),
+    backgroundColor: "#D1D5DB",
+    borderRadius: scale.hp(0.8),
   },
 });

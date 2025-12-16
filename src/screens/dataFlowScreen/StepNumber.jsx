@@ -225,7 +225,7 @@ function StepNumber({
 const styles = {
   watermarkContainer: {
     position: 'absolute',
-    top: 300,
+    top: 500,
     left: 0,
     right: 0,
     bottom: 0,

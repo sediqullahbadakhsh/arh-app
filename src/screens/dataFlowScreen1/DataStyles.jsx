@@ -146,7 +146,6 @@ const DataStyles = StyleSheet.create({
   bundleHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: scale.hp(1.55),
   },
   operatorLogo: {
     width: scale.wp(9.75),
