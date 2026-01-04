@@ -640,9 +640,6 @@ export default function SocialActivationCustomerScreen({ navigation, route }) {
             autoCapitalize="none"
             autoCorrect={false}
           />
-          {/* <Text style={styles.inputHelp}>
-            {t("enterYourSocialAccountId") || "Enter your social media account ID or username"}
-          </Text> */}
         </View>
 
 
@@ -714,23 +711,8 @@ export default function SocialActivationCustomerScreen({ navigation, route }) {
                   </Text>
                 )}
                 
-                {isCreatingPaymentMethod && (
-                  <View style={styles.verifyingContainer}>
-                    <ActivityIndicator size="small" color={Colors.primary} />
-                    <Text style={styles.verifyingText}>
-                      {t("verifyingCard") || "Verifying card..."}
-                    </Text>
-                  </View>
-                )}
-                
-                {cardDetailsComplete && (
-                  <View style={styles.verifiedContainer}>
-                    <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-                    <Text style={styles.verifiedText}>
-                      {t("cardVerified") || "Card verified"}
-                    </Text>
-                  </View>
-                )}
+               
+               
               </View>
               <Text style={styles.securePaymentNotice}>
                 {t("securePaymentNotice") || "Your payment is secured with Stripe"}
@@ -739,8 +721,7 @@ export default function SocialActivationCustomerScreen({ navigation, route }) {
           )}
         </View>
 
-        {/* Promo Code Section */}
-        <View style={styles.promoSection}>
+        {/* <View style={styles.promoSection}>
           {appliedPromoCode ? (
             <View style={styles.appliedPromoContainer}>
               <View style={styles.appliedPromoInfo}>
@@ -765,9 +746,8 @@ export default function SocialActivationCustomerScreen({ navigation, route }) {
               <Text style={styles.promoButtonText}>{t('promoCode.havePromoCode') || "Have a promo code?"}</Text>
             </TouchableOpacity>
           )}
-        </View>
+        </View> */}
 
-        {/* Order Summary */}
         <View style={styles.summaryCard}>
           <Text style={styles.summaryTitle}>
             {t("orderSummary") || "Order Summary"}
@@ -1023,7 +1003,7 @@ const styles = StyleSheet.create({
   paymentMethodText: {
     fontSize: scale.hp(1.8),
     color: Colors.textSecondary,
-    marginLeft: scale.wp(2),
+    marginStart: scale.wp(2),
   },
   paymentMethodTextSelected: {
     color: Colors.primary,

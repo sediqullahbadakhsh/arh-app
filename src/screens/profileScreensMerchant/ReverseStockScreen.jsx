@@ -26,11 +26,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import SuccessModal from "../../components/modals/SuccessModal";
 import ErrorModal from "../../components/modals/ErrorModal";
 import { scale } from "../../utils/normalizeSize";
+import { useTranslation } from "react-i18next";
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 const STEPS = { FORM: 0, CONFIRM: 1, DONE: 2 };
 
 export default function ReverseStockScreen({ navigation }) {
+  const { t } = useTranslation();
   const { user } = useUser();
   const [step, setStep] = useState(STEPS.FORM);
   const [loading, setLoading] = useState(false);
@@ -67,11 +69,11 @@ export default function ReverseStockScreen({ navigation }) {
         setAgents(res?.data || []);
       } catch (error) {
         console.error("Error fetching downline agents:", error);
-        Alert.alert("Error", "Failed to load agents");
+        Alert.alert(t('common.error'), t('reverseStock.failedToLoadAgents'));
       }
     };
     fetchDownlineAgents();
-  }, [user?.id]);
+  }, [user?.id, t]);
 
   useEffect(() => {
     if (agentPickerOpen) {
@@ -90,7 +92,6 @@ export default function ReverseStockScreen({ navigation }) {
       }).start();
     }
   }, [agentPickerOpen]);
-
 
   const showCustomSuccessModal = (message) => {
     setSuccessMessage(message);
@@ -113,7 +114,6 @@ export default function ReverseStockScreen({ navigation }) {
     setShowErrorModal(false);
     setErrorMessage("");
   };
-
 
   const amount = useMemo(
     () => Math.max(0, parseNumber(amountText)),
@@ -146,12 +146,15 @@ export default function ReverseStockScreen({ navigation }) {
 
       const response = await createReverseStockByMerchant(formData);
       
-      showCustomSuccessModal(`Reverse stock request of ${fmtAFN(amount)} from ${agent?.user?.username} was submitted successfully!`);
+      showCustomSuccessModal(t('reverseStock.requestSubmittedSuccess', { 
+        amount: fmtAFN(amount), 
+        username: agent?.user?.username 
+      }));
       setStep(STEPS.DONE);
       
     } catch (error) {
       console.log("Reverse stock error: ", error);
-      const message = error.response?.data?.error || error.message || "Failed to submit reverse stock request";
+      const message = error.response?.data?.error || error.message || t('reverseStock.requestFailed');
       showCustomErrorModal(message);
     } finally {
       setLoading(false);
@@ -179,107 +182,111 @@ export default function ReverseStockScreen({ navigation }) {
       )
     : agents;
 
-  const AgentPickerModal = () => (
-    <Modal
-      visible={agentPickerOpen}
-      transparent={true}
-      animationType="none"
-      statusBarTranslucent={true}
-      onRequestClose={() => setAgentPickerOpen(false)}
-    >
-      <View style={styles.modalOverlay}>
-        <TouchableOpacity 
-          style={styles.modalBackdrop}
-          activeOpacity={1}
-          onPress={() => setAgentPickerOpen(false)}
-        />
-        <Animated.View 
-          style={[
-            styles.modalCard,
-            agentPickerTransform,
-            { 
-              height: '70%',
-              marginBottom: -insets.bottom
-            }
-          ]}
-        >
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Select Agent</Text>
-            <TouchableOpacity 
-              onPress={() => setAgentPickerOpen(false)}
-              style={styles.closeButton}
-            >
-              <Ionicons name="close" size={24} color="#666" />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.searchContainer}>
-            <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
-            <TextInput
-              placeholder="Search agents..."
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              style={styles.searchInput}
-              placeholderTextColor="#999"
-            />
-            {searchQuery ? (
-              <TouchableOpacity onPress={() => setSearchQuery("")}>
-                <Ionicons name="close-circle" size={20} color="#999" />
-              </TouchableOpacity>
-            ) : null}
-          </View>
-
-          <FlatList
-            data={filteredAgents}
-            keyExtractor={(item) => item.id.toString()}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.agentItem}
-                onPress={() => {
-                  setAgent(item);
-                  setAgentPickerOpen(false);
-                  setSearchQuery("");
-                }}
-                activeOpacity={0.7}
+  const AgentPickerModal = () => {
+    const { t } = useTranslation();
+    
+    return (
+      <Modal
+        visible={agentPickerOpen}
+        transparent={true}
+        animationType="none"
+        statusBarTranslucent={true}
+        onRequestClose={() => setAgentPickerOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity 
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setAgentPickerOpen(false)}
+          />
+          <Animated.View 
+            style={[
+              styles.modalCard,
+              agentPickerTransform,
+              { 
+                height: '70%',
+                marginBottom: -insets.bottom
+              }
+            ]}
+          >
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{t('reverseStock.selectAgent')}</Text>
+              <TouchableOpacity 
+                onPress={() => setAgentPickerOpen(false)}
+                style={styles.closeButton}
               >
-                <View style={styles.agentAvatar}>
-                  <Ionicons name="person-circle-outline" size={24} color={Colors.primary} />
-                </View>
-                <View style={styles.agentInfo}>
-                  <Text style={styles.agentName}>{item.user?.username}</Text>
-                  <Text style={styles.agentPhone}>{item.user?.mobileNumber}</Text>
-                  <Text style={styles.agentCommission}>
-                    Commission: {item.commissionRateDetails?.percentage || item.commission_rate || 0}%
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.searchContainer}>
+              <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
+              <TextInput
+                placeholder={t('reverseStock.searchAgents')}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                style={styles.searchInput}
+                placeholderTextColor="#999"
+              />
+              {searchQuery ? (
+                <TouchableOpacity onPress={() => setSearchQuery("")}>
+                  <Ionicons name="close-circle" size={20} color="#999" />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+
+            <FlatList
+              data={filteredAgents}
+              keyExtractor={(item) => item.id.toString()}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.agentItem}
+                  onPress={() => {
+                    setAgent(item);
+                    setAgentPickerOpen(false);
+                    setSearchQuery("");
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.agentAvatar}>
+                    <Ionicons name="person-circle-outline" size={24} color={Colors.primary} />
+                  </View>
+                  <View style={styles.agentInfo}>
+                    <Text style={styles.agentName}>{item.user?.username}</Text>
+                    <Text style={styles.agentPhone}>{item.user?.mobileNumber}</Text>
+                    <Text style={styles.agentCommission}>
+                      {t('reverseStock.commission')}: {item.commissionRateDetails?.percentage || item.commission_rate || 0}%
+                    </Text>
+                  </View>
+                  {item.id === agent?.id && (
+                    <Ionicons name="checkmark-circle" size={24} color={Colors.primary} />
+                  )}
+                </TouchableOpacity>
+              )}
+              ItemSeparatorComponent={() => <View style={styles.agentSeparator} />}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.modalContent}
+              ListEmptyComponent={
+                <View style={styles.emptyState}>
+                  <Ionicons name="people-outline" size={48} color="#9E9E9E" />
+                  <Text style={styles.emptyText}>
+                    {searchQuery ? t('reverseStock.noAgentsFound') : t('reverseStock.noAgentsAvailable')}
+                  </Text>
+                  <Text style={styles.emptySubtext}>
+                    {searchQuery ? t('reverseStock.adjustSearch') : t('reverseStock.noDownlineAgents')}
                   </Text>
                 </View>
-                {item.id === agent?.id && (
-                  <Ionicons name="checkmark-circle" size={24} color={Colors.primary} />
-                )}
-              </TouchableOpacity>
-            )}
-            ItemSeparatorComponent={() => <View style={styles.agentSeparator} />}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.modalContent}
-            ListEmptyComponent={
-              <View style={styles.emptyState}>
-                <Ionicons name="people-outline" size={48} color="#9E9E9E" />
-                <Text style={styles.emptyText}>
-                  {searchQuery ? "No agents found" : "No agents available"}
-                </Text>
-                <Text style={styles.emptySubtext}>
-                  {searchQuery ? "Try adjusting your search" : "No downline agents found"}
-                </Text>
-              </View>
-            }
-          />
-        </Animated.View>
-      </View>
-    </Modal>
-  );
+              }
+            />
+          </Animated.View>
+        </View>
+      </Modal>
+    );
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white, paddingBottom: 100 }}>
-      <ServiceHeader title="Reverse Stock" onBack={goBack} />
+      <ServiceHeader title={t('reverseStocks')} onBack={goBack} />
 
       {step === STEPS.DONE ? (
         <ScrollView
@@ -288,25 +295,25 @@ export default function ReverseStockScreen({ navigation }) {
           <View style={styles.successCircle}>
             <Ionicons name="checkmark" size={56} color="#4CAF50" />
           </View>
-          <Text style={styles.title}>Reverse Stock Request Submitted!</Text>
+          <Text style={styles.title}>{t('reverseStock.requestSubmittedTitle')}</Text>
 
           <View style={styles.successDetails}>
-            <DetailRow label="Agent:" value={`${agent?.user?.username} (${agent?.user?.mobileNumber})`} />
-            <DetailRow label="Date:" value={new Date().toLocaleString()} />
-            <DetailRow label="Request ID:" value={txId} />
-            <DetailRow label="Amount:" value={fmtAFN(amount)} />
+            <DetailRow label={`${t('agent')}:`} value={`${agent?.user?.username} (${agent?.user?.mobileNumber})`} />
+            <DetailRow label={`${t('date')}:`} value={new Date().toLocaleString()} />
+            <DetailRow label={`${t('reverseStock.requestId')}:`} value={txId} />
+            <DetailRow label={`${t('amount')}:`} value={fmtAFN(amount)} />
             {commentText && (
-              <DetailRow label="Comment:" value={commentText} />
+              <DetailRow label={`${t('reverseStock.comment')}:`} value={commentText} />
             )}
           </View>
 
           <View style={styles.totalBox}>
-            <Text style={styles.totalLabel}>Amount to be Reversed</Text>
+            <Text style={styles.totalLabel}>{t('reverseStock.amountToBeReversed')}</Text>
             <Text style={styles.totalValue}>{fmtAFN(amount)}</Text>
           </View>
 
           <PrimaryButton
-            label="Done"
+            label={t('common.done')}
             onPress={handleSuccessClose}
             style={{ width: "100%" }}
           />
@@ -325,7 +332,7 @@ export default function ReverseStockScreen({ navigation }) {
               <>
                 <View style={{ marginBottom: 20 }}>
                   <View style={styles.editHeader}>
-                    <Text style={styles.label}>Select Agent</Text>
+                    <Text style={styles.label}>{t('reverseStock.selectAgent')}</Text>
                   </View>
                   <TouchableOpacity
                     style={[
@@ -353,13 +360,13 @@ export default function ReverseStockScreen({ navigation }) {
                             <Text style={styles.dropdownText}>{agent.user?.username}</Text>
                             <Text style={styles.dropdownSubtext}>{agent.user?.mobileNumber}</Text>
                             <Text style={styles.dropdownCommission}>
-                              Commission: {agent.commissionRateDetails?.percentage || agent.commission_rate || 0}%
+                              {t('reverseStock.commission')}: {agent.commissionRateDetails?.percentage || agent.commission_rate || 0}%
                             </Text>
                           </View>
                         </>
                       ) : (
                         <Text style={[styles.dropdownText, { color: '#9E9E9E' }]}>
-                          Choose agent
+                          {t('reverseStock.chooseAgent')}
                         </Text>
                       )}
                     </View>
@@ -369,7 +376,7 @@ export default function ReverseStockScreen({ navigation }) {
 
                 {/* Amount Input */}
                 <View style={{ marginBottom: 20 }}>
-                  <Text style={styles.label}>Reverse Amount</Text>
+                  <Text style={styles.label}>{t('reverseStock.reverseAmount')}</Text>
                   <View style={[
                     styles.inputContainer,
                     {
@@ -406,7 +413,7 @@ export default function ReverseStockScreen({ navigation }) {
 
                 {/* Comment Input */}
                 <View style={{ marginBottom: 20 }}>
-                  <Text style={styles.label}>Comment (Optional)</Text>
+                  <Text style={styles.label}>{t('reverseStock.commentOptional')}</Text>
                   <TextInput
                     style={[styles.textArea, { 
                       borderColor: Colors.primary, 
@@ -414,7 +421,7 @@ export default function ReverseStockScreen({ navigation }) {
                     }]}
                     value={commentText}
                     onChangeText={setCommentText}
-                    placeholder="Add any comments about this reverse stock request..."
+                    placeholder={t('reverseStock.commentPlaceholder')}
                     multiline
                     numberOfLines={4}
                     textAlignVertical="top"
@@ -423,7 +430,7 @@ export default function ReverseStockScreen({ navigation }) {
                 </View>
 
                 <PrimaryButton
-                  label="Continue"
+                  label={t('common.continue')}
                   onPress={() => setStep(STEPS.CONFIRM)}
                   style={{ marginTop: 24, opacity: canContinue ? 1 : 0.5 }}
                   disabled={!canContinue}
@@ -433,32 +440,32 @@ export default function ReverseStockScreen({ navigation }) {
 
             {step === STEPS.CONFIRM && (
               <>
-                <Text style={styles.sectionTitle}>Confirm Reverse Stock Request</Text>
+                <Text style={styles.sectionTitle}>{t('reverseStock.confirmRequest')}</Text>
                 <Text style={styles.confirmSubtitle}>
-                  Please review the reverse stock details before confirming
+                  {t('reverseStock.reviewDetails')}
                 </Text>
 
                 <View style={styles.confirmCard}>
-                  <DetailRow label="Agent" value={`${agent?.user?.username}`} />
-                  <DetailRow label="Phone" value={agent?.user?.mobileNumber} />
-                  <DetailRow label="Reverse Amount" value={fmtAFN(amount)} />
+                  <DetailRow label={t('agent')} value={`${agent?.user?.username}`} />
+                  <DetailRow label={t('mobileNumber')} value={agent?.user?.mobileNumber} />
+                  <DetailRow label={t('reverseStock.reverseAmount')} value={fmtAFN(amount)} />
                   {commentText && (
-                    <DetailRow label="Comment" value={commentText} />
+                    <DetailRow label={t('reverseStock.comment')} value={commentText} />
                   )}
                   <View style={styles.totalRow}>
-                    <Text style={styles.totalLabel}>Total Amount to Reverse</Text>
+                    <Text style={styles.totalLabel}>{t('reverseStock.totalAmountToReverse')}</Text>
                     <Text style={styles.totalValue}>{fmtAFN(amount)}</Text>
                   </View>
                 </View>
 
                 <PrimaryButton
-                  label="Submit Request"
+                  label={t('reverseStock.submitRequest')}
                   onPress={submitReverseStock}
                   style={{ marginTop: 32 }}
                   loading={loading}
                 />
                 <PrimaryButton
-                  label="Back"
+                  label={t('common.back')}
                   onPress={goBack}
                   style={{ marginTop: 12, backgroundColor: "#6B7280" }}
                 />
@@ -472,9 +479,9 @@ export default function ReverseStockScreen({ navigation }) {
       <SuccessModal
         visible={showSuccessModal}
         onClose={handleSuccessClose}
-        title="Request Submitted!"
+        title={t('reverseStock.requestSubmitted')}
         message={successMessage}
-        buttonText="Continue"
+        buttonText={t('common.continue')}
         autoHideDuration={3000}
       />
 
@@ -482,9 +489,9 @@ export default function ReverseStockScreen({ navigation }) {
       <ErrorModal
         visible={showErrorModal}
         onClose={handleErrorClose}
-        title="Request Failed"
+        title={t('reverseStock.requestFailed')}
         message={errorMessage}
-        buttonText="Try Again"
+        buttonText={t('common.tryAgain')}
         showRetryButton={true}
       />
 
@@ -583,7 +590,7 @@ const styles = StyleSheet.create({
     height: scale.hp(5.7),
   },
   searchIcon: {
-    marginRight: scale.wp(2.1),
+    marginEnd: scale.wp(2.1),
   },
   searchInput: {
     flex: 1,
@@ -649,7 +656,7 @@ const styles = StyleSheet.create({
   },
   currencyTag: {
     fontWeight: '700',
-    marginRight: scale.wp(3.1),
+    marginEnd: scale.wp(3.1),
     color: Colors.textPrimary,
     fontSize: scale.hp(2.1),
   },
@@ -783,7 +790,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0F9FF',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: scale.wp(3.1),
+    marginEnd: scale.wp(3.1),
   },
   agentAvatarSmall: {
     width: scale.wp(9.4),
@@ -792,7 +799,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0F9FF',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: scale.wp(3.1),
+    marginEnd: scale.wp(3.1),
   },
   agentInfo: {
     flex: 1,

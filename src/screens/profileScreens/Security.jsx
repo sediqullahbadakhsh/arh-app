@@ -190,10 +190,9 @@ const SecurityScreen = ({ navigation }) => {
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
-            <ServiceHeader title="Security" onBack={goBack} />
+            <ServiceHeader title={t("security")} onBack={goBack} />
             
             <View style={styles.contentContainer}>
-                {/* Biometric Authentication Option */}
                 <Pressable 
                     style={styles.optionRow}
                     onPress={handleBiometricToggle}
@@ -316,7 +315,7 @@ const styles = {
     borderRadius: scale.hp(1.55),
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: scale.wp(4.2),
+    marginEnd: scale.wp(4.2),
   },
   iconEnabled: {
     backgroundColor: '#CD0202',
@@ -345,6 +344,7 @@ const styles = {
   },
   toggleContainer: {
     width: scale.wp(13.5),
+    direction: "ltr",
     height: scale.hp(3.6),
     borderRadius: scale.hp(2.1),
     padding: scale.hp(0.25),

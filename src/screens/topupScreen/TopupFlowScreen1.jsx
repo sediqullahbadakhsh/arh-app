@@ -122,7 +122,7 @@ const useSlabs = () => {
   });
 };
 
-// REMOVED React Query polling and replaced with manual polling
+
 const usePromoCodeValidation = () => {
   return useMutation({
     mutationFn: async ({ code, orderAmount }) => {
@@ -291,7 +291,7 @@ function TopupFlowScreen({ navigation, route }) {
   const [countriesSlideAnim] = useState(new Animated.Value(screenHeight));
   const insets = useSafeAreaInsets();
   const continueButtonAnim = useRef(new Animated.Value(0)).current;
-  const pollingRef = useRef(null); // Manual polling reference
+  const pollingRef = useRef(null); 
   const lottieRef = useRef(null);
   const [promoModalVisible, setPromoModalVisible] = useState(false);
   const [promoCode, setPromoCode] = useState("");
@@ -314,7 +314,7 @@ function TopupFlowScreen({ navigation, route }) {
   const dial = DIAL_CODES[country?.countryCode] || "";
   const operator = guessOperator(country?.countryCode, localNumber.replace(/\D/g, ""));
 
-  // MANUAL POLLING FUNCTION - Same as DataFlowScreenMerchant
+
   const startPollingOrderStatus = async (orderId) => {
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
@@ -800,22 +800,17 @@ function TopupFlowScreen({ navigation, route }) {
         setOrderDetails(newOrderDetails);
         setOrderStatus(ORDER_STATUS.QUEUED);
         
-        // Start manual polling - same as bundle activation
+      
         if (response.orderId) {
           await startPollingOrderStatus(response.orderId);
         }
         
-        Alert.alert(
-          "Success",
-          "Topup initiated successfully!",
-          [{ text: 'OK', onPress: () => {} }]
-        );
+       
       } else if (response.status === "requires_action") {
         const { error } = await confirmPayment(response.nextAction.clientSecret);
         if (error) {
           throw new Error(error.message);
         } else {
-          // Set order details for requires_action case too
           const newOrderDetails = {
             orderId: response.orderId,
             txnNumber: response.txnNumber || `TXN-${Date.now()}`,
@@ -835,7 +830,7 @@ function TopupFlowScreen({ navigation, route }) {
           setOrderDetails(newOrderDetails);
           setOrderStatus(ORDER_STATUS.QUEUED);
           
-          // Start manual polling
+       
           if (response.orderId) {
             await startPollingOrderStatus(response.orderId);
           }
@@ -865,7 +860,7 @@ function TopupFlowScreen({ navigation, route }) {
     }
   };
 
-  // Payment summaries
+
   const getPaymentSummaryForBundle = () => {
     const baseAfn = serviceType === 'bundle' && product ? parseFloat(product.price) : afn;
     const baseAmount = calculateBaseAmount(baseAfn);
@@ -1004,7 +999,7 @@ function TopupFlowScreen({ navigation, route }) {
     setSearchQuery('');
   };
 
-  // Status helpers
+
   const getStatusMessage = () => {
     switch (orderStatus) {
       case ORDER_STATUS.QUEUED:
@@ -1019,7 +1014,7 @@ function TopupFlowScreen({ navigation, route }) {
       case ORDER_STATUS.SUCCEEDED:
         return serviceType === 'bundle'
           ? "Bundle activated successfully! Our team has processed your request."
-          : "Topup completed successfully! ";
+          : t("topupCompletedSuccessfully");
       case ORDER_STATUS.FAILED:
         return serviceType === 'bundle'
           ? "Bundle activation failed. Please contact support if this continues."
@@ -1079,11 +1074,11 @@ function TopupFlowScreen({ navigation, route }) {
         return serviceType === 'bundle' ? "Request Submitted" : "Topup Queued";
       case ORDER_STATUS.PROCESSING:
       case ORDER_STATUS.PENDING:
-        return serviceType === 'bundle' ? "Processing Request" : "Processing Topup";
+        return serviceType === 'bundle' ? "Processing Request" : t("processingTopup");
       case ORDER_STATUS.SUCCEEDED:
-        return serviceType === 'bundle' ? "Bundle Activated!" : "Topup Successful!";
+        return serviceType === 'bundle' ? "Bundle Activated!" : t("topupSuccessful");
       case ORDER_STATUS.FAILED:
-        return serviceType === 'bundle' ? "Activation Failed" : "Topup Failed";
+        return serviceType === 'bundle' ? "Activation Failed" : t("topupFailed");
       default:
         return "Processing";
     }
@@ -1296,15 +1291,10 @@ function TopupFlowScreen({ navigation, route }) {
 
   const OrderStatusScreen = () => {
     const receiptCaptureRef = useRef(null);
-    const [hasMediaPermission, setHasMediaPermission] = useState(false);
+    const [hasMediaPermission, setHasMediaPermission] = useState(null);
     const [isCapturing, setIsCapturing] = useState(false);
 
-    useEffect(() => {
-      (async () => {
-        const { status } = await MediaLibrary.requestPermissionsAsync();
-        setHasMediaPermission(status === 'granted');
-      })();
-    }, []);
+   
 
     const captureReceipt = async () => {
       try {
@@ -1519,7 +1509,7 @@ Thank you for using our service!
 
           <View style={TopUpStyles.detailsCard}>
             <View style={TopUpStyles.detailRow}>
-              <Text style={TopUpStyles.detailLabel}>Receiver Number</Text>
+              <Text style={TopUpStyles.detailLabel}>{t("receiverNumber")}</Text>
               <Text style={TopUpStyles.detailValue}>{orderDetails?.mobile}</Text>
             </View>
            
@@ -1533,18 +1523,18 @@ Thank you for using our service!
             )}
            
             <View style={TopUpStyles.detailRow}>
-              <Text style={TopUpStyles.detailLabel}>Transaction ID</Text>
+              <Text style={TopUpStyles.detailLabel}>{t("transactionIdLabel")}</Text>
               <Text style={TopUpStyles.detailValue}>{orderDetails?.txnNumber}</Text>
             </View>
             <View style={TopUpStyles.detailRow}>
-              <Text style={TopUpStyles.detailLabel}>Date</Text>
+              <Text style={TopUpStyles.detailLabel}>{t("date")}</Text>
               <Text style={TopUpStyles.detailValue}>
                 {new Date(orderDetails?.date).toLocaleString()}
               </Text>
             </View>
 
             <View style={TopUpStyles.amountSection}>
-              <Text style={TopUpStyles.amountLabel}>Total Amount</Text>
+              <Text style={TopUpStyles.amountLabel}>{t("totalAmount")}</Text>
               <View>
                 <Text style={TopUpStyles.amountValue}>{orderDetails?.amountAfn} AFN</Text>
                 <Text style={[TopUpStyles.detailValue, { fontSize: 14, textAlign: 'center' }]}>
@@ -1584,7 +1574,7 @@ Thank you for using our service!
 
           {(orderStatus === ORDER_STATUS.SUCCEEDED || orderStatus === ORDER_STATUS.FAILED) && (
             <PrimaryButton
-              label="Done"
+              label={t("done")}
               onPress={() => {
                 navigation.popToTop();
               }}
@@ -1594,7 +1584,7 @@ Thank you for using our service!
 
           <TouchableOpacity onPress={resetFlow} style={TopUpStyles.moreButton}>
             <Text style={TopUpStyles.moreButtonText}>
-              {orderStatus === ORDER_STATUS.FAILED ? "Try Again" : "Topup More"}
+              {orderStatus === ORDER_STATUS.FAILED ? t("tryAgain") : t("topupMore")}
             </Text>
           </TouchableOpacity>
         </ScrollView>

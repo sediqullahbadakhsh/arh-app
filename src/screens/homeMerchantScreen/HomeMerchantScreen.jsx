@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import {
   View,
   Text,
@@ -36,12 +36,32 @@ import StockTransferIcon from '../../../assets/icons/stock.png';
 import { useTranslation } from "react-i18next";
 import ReceiptModal1 from "../../components/ReceiptModal";
 import { scale } from "../../utils/normalizeSize";
+import { useFocusEffect } from "@react-navigation/native";
+import NetInfo from "@react-native-community/netinfo";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 const WELCOME_MODAL_SEEN_KEY = 'has_seen_welcome_modal';
 
-// Skeleton Loader Components
+// Add a global event listener for real-time updates
+let refreshListeners = [];
+
+export const triggerHomeRefresh = () => {
+  refreshListeners.forEach(listener => listener());
+};
+
+// Add this component at the top level
+const NetworkStatusIndicator = ({ isConnected }) => {
+  if (isConnected) return null;
+  
+  return (
+    <View style={networkStyles.container}>
+      <Ionicons name="wifi-off" size={16} color="#fff" />
+      <Text style={networkStyles.text}>No Internet Connection</Text>
+    </View>
+  );
+};
+
 const SkeletonRect = ({ width, height, borderRadius = 4, style = {} }) => {
   const [animation] = useState(new Animated.Value(0));
 
@@ -137,8 +157,6 @@ const SkeletonHomeScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" />
-
-      {/* Header Skeleton */}
       <View style={styles.header}>
         <View style={styles.svgContainer}>
           <HeaderBackgroundSVG width="100%" height="100%" />
@@ -163,7 +181,6 @@ const SkeletonHomeScreen = () => {
         contentContainerStyle={{ paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       >
-     
         <View style={styles.servicesGrid}>
           {[1, 2, 3, 4, 5].map((item) => (
             <View key={item} style={styles.serviceSkeletonItem}>
@@ -177,7 +194,6 @@ const SkeletonHomeScreen = () => {
           ))}
         </View>
 
-        {/* Promo Banner Skeleton */}
         <View style={[styles.promoBanner, { backgroundColor: '#F0F0F0' }]}>
           <View style={{ padding: scale.hp(2.6), width: '100%' }}>
             <SkeletonRect width="60%" height={scale.hp(2.85)} />
@@ -194,7 +210,6 @@ const SkeletonHomeScreen = () => {
           </View>
         </View>
 
-        {/* Recent Transactions Skeleton */}
         <View style={styles.recentContainer}>
           <View style={styles.recentHeader}>
             <SkeletonRect width="30%" height={scale.hp(2.35)} />
@@ -249,37 +264,140 @@ export default function HomeMerchantScreen({ navigation }) {
   const [selectedTransactionType, setSelectedTransactionType] = useState(null);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isConnected, setIsConnected] = useState(true);
+  const lastRefreshTimeRef = useRef(null);
 
+  // Add refresh listener on mount
   useEffect(() => {
-    const fetchDataAndCheckWelcome = async () => {
-      setIsLoading(true);
-      try {
-        await Promise.all([
-          getRecentTransactions(),
-          getStockTransactions(),
-          checkAndShowWelcomeModal()
-        ]);
-      } catch (error) {
-        console.error("Error loading data:", error);
-      } finally {
-        setIsLoading(false);
-      }
+    const refreshCallback = () => {
+      console.log('Triggering home refresh...');
+      fetchData();
     };
 
-    fetchDataAndCheckWelcome();
+    refreshListeners.push(refreshCallback);
+
+    return () => {
+      // Remove listener on unmount
+      const index = refreshListeners.indexOf(refreshCallback);
+      if (index > -1) {
+        refreshListeners.splice(index, 1);
+      }
+    };
   }, []);
 
+  // Monitor network connectivity
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      setIsConnected(state.isConnected);
+      
+      // Auto-refresh when connection is restored
+      if (state.isConnected && !isConnected) {
+        fetchData();
+      }
+    });
+
+    return () => unsubscribe();
+  }, [isConnected]);
+
+  // Fetch data when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      // Refresh if data is stale (older than 30 seconds)
+      const now = Date.now();
+      if (!lastRefreshTimeRef.current || (now - lastRefreshTimeRef.current > 30000)) {
+        console.log('Screen focused, refreshing data...');
+        fetchData();
+      }
+      
+      // Poll for updates every 60 seconds while screen is focused
+      const pollInterval = setInterval(() => {
+        console.log('Auto-polling for updates...');
+        fetchData();
+      }, 60000);
+      
+      return () => {
+        clearInterval(pollInterval);
+      };
+    }, [])
+  );
+
+  const fetchData = async (showLoading = false) => {
+    if (!isConnected) {
+      Alert.alert(
+        'No Internet Connection',
+        'Please check your internet connection and try again.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    if (showLoading) {
+      setIsLoading(true);
+    }
+
+    try {
+      await Promise.all([
+        getRecentTransactions(),
+        getStockTransactions(),
+      ]);
+      lastRefreshTimeRef.current = Date.now();
+    } catch (error) {
+      console.error("Error loading data:", error);
+      if (showLoading) {
+        Alert.alert(
+          'Error',
+          'Failed to load data. Please try again.',
+          [{ text: 'OK' }]
+        );
+      }
+    } finally {
+      if (showLoading) {
+        setIsLoading(false);
+      }
+    }
+  };
+
   const getRecentTransactions = async () => {
-    const res = await getRecentOrdersOfAgent();
-    console.log(res, "recent Transactions");
-    setRecentTransactions(res?.data || []);
+    try {
+      const res = await getRecentOrdersOfAgent();
+      console.log("Recent Transactions updated:", res?.data?.length || 0, "items");
+      setRecentTransactions(res?.data || []);
+    } catch (error) {
+      console.error("Error fetching recent transactions:", error);
+      throw error;
+    }
   };
 
   const getStockTransactions = async () => {
-    const res = await getStockInOut();
-    console.log(res, "stock transactions");
-    setStockTransactions(res?.data || []);
+    try {
+      const res = await getStockInOut();
+      console.log("Stock transactions updated:", res?.data?.length || 0, "items");
+      setStockTransactions(res?.data || []);
+    } catch (error) {
+      console.error("Error fetching stock transactions:", error);
+      throw error;
+    }
   };
+
+  useEffect(() => {
+    const checkWelcomeModal = async () => {
+      try {
+        const hasSeenWelcomeModal = await AsyncStorage.getItem(WELCOME_MODAL_SEEN_KEY);
+        
+        if (!hasSeenWelcomeModal) {
+          setTimeout(() => {
+            setShowWelcomeModal(true);
+          }, 1500);
+        }
+      } catch (error) {
+        console.error("Error checking welcome modal status:", error);
+      }
+    };
+
+    // Initial data load
+    fetchData(true);
+    checkWelcomeModal();
+  }, []);
 
   useEffect(() => {
     if (user?.profileImg) {
@@ -289,21 +407,6 @@ export default function HomeMerchantScreen({ navigation }) {
       setProfileImage(fullImageUrl);
     }
   }, [user]);
-
-  const checkAndShowWelcomeModal = async () => {
-    try {
-      const hasSeenWelcomeModal = await AsyncStorage.getItem(WELCOME_MODAL_SEEN_KEY);
-      
-      if (!hasSeenWelcomeModal) {
-        // Small delay to ensure smooth loading
-        setTimeout(() => {
-          setShowWelcomeModal(true);
-        }, 1500);
-      }
-    } catch (error) {
-      console.error("Error checking welcome modal status:", error);
-    }
-  };
 
   const handleWelcomeModalClose = async () => {
     try {
@@ -341,11 +444,18 @@ export default function HomeMerchantScreen({ navigation }) {
         icon: <Image source={GamesIcon} style={{ width: 80, height: 80 }} resizeMode="contain" />,
         onPress: () => navigation.navigate("GameCoinsMerchant"),
       },
+    
       {
         key: "Social",
         label: t('services.social'),
-        icon: <Image source={SocialIcon}  style={{ width: 90, height: 90 }} resizeMode="contain" />,
+        icon: <Image source={SocialIcon} style={{ width: 90, height: 90 }} resizeMode="contain" />,
         onPress: () => navigation.navigate("SocialScreenMerchant"),
+      },
+        {
+        key: "StockRequest",
+        label: t('services.stockRequest'),
+        icon: <Image source={StockTransferIcon} style={{ width: 80, height: 80 }} resizeMode="contain" />,
+        onPress: () => navigation.navigate("StockRequest"),
       },
     ],
     [navigation, t]
@@ -353,13 +463,8 @@ export default function HomeMerchantScreen({ navigation }) {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    try {
-      await Promise.all([getRecentTransactions(), getStockTransactions()]);
-    } catch (error) {
-      console.error("Error refreshing data:", error);
-    } finally {
-      setRefreshing(false);
-    }
+    await fetchData();
+    setRefreshing(false);
   };
 
   const goToNotifications = () => navigation.navigate("Notifications");
@@ -368,11 +473,16 @@ export default function HomeMerchantScreen({ navigation }) {
   const getStatusText = (status) => {
     switch (status) {
       case 'completed':
+      case 'succeeded':
         return t('status.completed');
       case 'failed':
         return t('status.failed');
       case 'pending':
         return t('status.pending');
+      case 'queued':
+        return t('status.queued');
+      case 'processing':
+        return t('status.processing');
       default:
         return capitalizeFirstLetter(status || 'pending');
     }
@@ -412,7 +522,8 @@ export default function HomeMerchantScreen({ navigation }) {
         <View style={[
           styles.txIconWrap,
           { backgroundColor: item.status === 'succeeded' ? '#E8F5E9' : 
-                            item.status === 'failed' ? '#FFEBEE' : '#FFF8E1' }
+                            item.status === 'failed' ? '#FFEBEE' : 
+                            item.status === 'processing' || item.status === 'queued' ? '#E3F2FD' : '#FFF8E1' }
         ]}>
           <Ionicons
             name={
@@ -425,7 +536,8 @@ export default function HomeMerchantScreen({ navigation }) {
             size={20} 
             color={
               item.status === 'succeeded' ? '#4CAF50' : 
-              item.status === 'failed' ? '#F44336' : '#FFC107'
+              item.status === 'failed' ? '#F44336' : 
+              item.status === 'processing' || item.status === 'queued' ? '#2196F3' : '#FFC107'
             } 
           />
         </View>
@@ -441,19 +553,22 @@ export default function HomeMerchantScreen({ navigation }) {
         <Text style={[
           styles.txAmount,
           { color: item.status === 'succeeded' ? '#4CAF50' : 
-                 item.status === 'failed' ? '#F44336' : '#FFC107' }
+                 item.status === 'failed' ? '#F44336' : 
+                 item.status === 'processing' || item.status === 'queued' ? '#2196F3' : '#FFC107' }
         ]}>
           {Number(item?.amount || 0).toFixed(2)} {item?.currency || 'USD'}
         </Text>
         <View style={[
           styles.statusBadge,
           { backgroundColor: item.status === 'succeeded' ? '#E8F5E9' : 
-                            item.status === 'failed' ? '#FFEBEE' : '#FFF8E1' }
+                            item.status === 'failed' ? '#FFEBEE' : 
+                            item.status === 'processing' || item.status === 'queued' ? '#E3F2FD' : '#FFF8E1' }
         ]}>
           <Text style={[
             styles.statusText,
             { color: item.status === 'succeeded' ? '#4CAF50' : 
-                   item.status === 'failed' ? '#F44336' : '#FFC107' }
+                   item.status === 'failed' ? '#F44336' : 
+                   item.status === 'processing' || item.status === 'queued' ? '#2196F3' : '#FFC107' }
           ]}>
             {getStatusText(item?.status)}
           </Text>
@@ -524,7 +639,7 @@ export default function HomeMerchantScreen({ navigation }) {
     
     return [...orders, ...stocks]
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-      .slice(0, 10); 
+      .slice(0, 10);
   }, [recentTransaction, stockTransactions]);
 
   const hasTransactions = allTransactions.length > 0;
@@ -645,7 +760,6 @@ export default function HomeMerchantScreen({ navigation }) {
     );
   };
 
-  // Show skeleton loader while loading
   if (isLoading) {
     return <SkeletonHomeScreen />;
   }
@@ -653,6 +767,9 @@ export default function HomeMerchantScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" />
+      
+      {/* Network Status Indicator */}
+      <NetworkStatusIndicator isConnected={isConnected} />
 
       <View style={styles.header}>
         <View style={styles.svgContainer}>
@@ -701,8 +818,10 @@ export default function HomeMerchantScreen({ navigation }) {
             refreshing={refreshing} 
             onRefresh={onRefresh}
             tintColor={Colors.primary}
+            colors={[Colors.primary]}
           />
         }
+        showsVerticalScrollIndicator={false}
       >
         <View style={styles.servicesGrid}>
           {services.map((s) => (
@@ -747,9 +866,17 @@ export default function HomeMerchantScreen({ navigation }) {
         <View style={styles.recentContainer}>
           <View style={styles.recentHeader}>
             <Text style={styles.recentTitle}>{t('transactions.recent')}</Text>
-            <TouchableOpacity onPress={() => navigation.navigate("AllTransactions")}>
-              <Text style={styles.seeAll}>{t('common.seeAll')}</Text>
-            </TouchableOpacity>
+            <View style={styles.recentHeaderRight}>
+              <TouchableOpacity 
+                onPress={fetchData}
+                style={styles.refreshButton}
+              >
+                <Ionicons name="refresh" size={18} color={Colors.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => navigation.navigate("AllTransactions")}>
+                <Text style={styles.seeAll}>{t('common.seeAll')}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {!hasTransactions ? (
@@ -778,6 +905,23 @@ export default function HomeMerchantScreen({ navigation }) {
     </SafeAreaView>
   );
 }
+
+// Add network status styles
+const networkStyles = StyleSheet.create({
+  container: {
+    backgroundColor: '#FF6B6B',
+    padding: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  text: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '500',
+    marginLeft: 6,
+  },
+});
 
 const styles = StyleSheet.create({
   safeArea: {
@@ -838,7 +982,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: scale.wp(2.9),
+    marginEnd: scale.wp(2.9),
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.3)',
   },
@@ -957,6 +1101,16 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: scale.hp(2.1),
+  },
+  recentHeaderRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  refreshButton: {
+    padding: 6,
+    backgroundColor: '#F0F0F0',
+    borderRadius: 20,
   },
   recentTitle: {
     color: Colors.textPrimary,
@@ -1137,7 +1291,7 @@ const styles = StyleSheet.create({
     borderRadius: scale.wp(5.85),
     justifyContent: "center",
     alignItems: "center",
-    marginRight: scale.wp(2.9),
+    marginEnd: scale.wp(2.9),
   },
   txInIcon: {
     backgroundColor: "rgba(11, 163, 96, 0.1)",
@@ -1190,192 +1344,5 @@ const styles = StyleSheet.create({
     color: '#9E9E9E',
     fontSize: scale.hp(1.8),
     marginTop: scale.hp(1.05),
-  },
-
-  // Welcome Modal Styles
-  welcomeModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'flex-end',
-  },
-  welcomeModalBackdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  welcomeModalContainer: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: scale.hp(3.9),
-    borderTopRightRadius: scale.hp(3.9),
-    maxHeight: '90%',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: -scale.hp(1.3),
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: scale.hp(3.9),
-    elevation: 20,
-  },
-  welcomeHeader: {
-    padding: scale.hp(3.1),
-    borderTopLeftRadius: scale.hp(3.9),
-    borderTopRightRadius: scale.hp(3.9),
-    alignItems: 'center',
-  },
-  welcomeIconContainer: {
-    width: scale.wp(19.5),
-    height: scale.wp(19.5),
-    borderRadius: scale.wp(9.75),
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: scale.hp(1.3),
-  },
-  welcomeTitle: {
-    fontSize: scale.hp(3.1),
-    fontWeight: 'bold',
-    color: '#fff',
-    textAlign: 'center',
-    marginBottom: scale.hp(0.65),
-  },
-  welcomeSubtitle: {
-    fontSize: scale.hp(2.1),
-    color: 'rgba(255,255,255,0.9)',
-    fontWeight: '600',
-  },
-  welcomeContent: {
-    maxHeight: scale.hp(58.5),
-    padding: scale.hp(2.6),
-  },
-  welcomeMessage: {
-    fontSize: scale.hp(2.1),
-    color: Colors.textPrimary,
-    textAlign: 'center',
-    lineHeight: scale.hp(2.85),
-    marginBottom: scale.hp(2.6),
-    fontWeight: '500',
-  },
-  paymentOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8F9FA',
-    padding: scale.hp(2.1),
-    borderRadius: scale.hp(1.95),
-    borderWidth: 1,
-    borderColor: '#E9ECEF',
-  },
-  paymentIcon: {
-    width: scale.wp(14.6),
-    height: scale.wp(14.6),
-    borderRadius: scale.wp(7.3),
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: scale.wp(3.9),
-  },
-  paymentInfo: {
-    flex: 1,
-  },
-  paymentTitle: {
-    fontSize: scale.hp(2.1),
-    fontWeight: 'bold',
-    color: Colors.textPrimary,
-    marginBottom: scale.hp(0.65),
-  },
-  paymentDescription: {
-    fontSize: scale.hp(1.8),
-    color: '#666',
-    lineHeight: scale.hp(2.35),
-    marginBottom: scale.hp(0.65),
-  },
-  badge: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#FFE8E6',
-    paddingHorizontal: scale.wp(2.9),
-    paddingVertical: scale.hp(0.5),
-    borderRadius: scale.hp(1.3),
-  },
-  badgeText: {
-    fontSize: scale.hp(1.55),
-    color: '#C40C02',
-    fontWeight: '600',
-  },
-  otherPayments: {
-    backgroundColor: '#F8F9FA',
-    padding: scale.hp(2.6),
-    borderRadius: scale.hp(1.95),
-    borderWidth: 1,
-    borderColor: '#E9ECEF',
-    marginTop: scale.hp(1.3),
-  },
-  otherPaymentsTitle: {
-    fontSize: scale.hp(2.1),
-    fontWeight: 'bold',
-    color: Colors.textPrimary,
-    marginBottom: scale.hp(0.65),
-  },
-  otherPaymentsDescription: {
-    fontSize: scale.hp(1.8),
-    color: '#666',
-    marginBottom: scale.hp(1.95),
-    lineHeight: scale.hp(2.35),
-  },
-  contactButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: scale.hp(1.3),
-    paddingHorizontal: scale.wp(3.9),
-    borderRadius: scale.hp(1.3),
-    gap: scale.wp(1.95),
-  },
-  whatsappButton: {
-    backgroundColor: '#25D366',
-  },
-  telegramButton: {
-    backgroundColor: '#0088CC',
-  },
-  contactButtonText: {
-    color: '#fff',
-    fontSize: scale.hp(1.8),
-    fontWeight: '600',
-  },
-  contactNumber: {
-    fontSize: scale.hp(1.8),
-    color: Colors.textPrimary,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  welcomeFooter: {
-    padding: scale.hp(2.6),
-    borderTopWidth: 1,
-    borderTopColor: '#E9ECEF',
-    gap: scale.hp(1.3),
-  },
-  getStartedButton: {
-    backgroundColor: Colors.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: scale.hp(1.8),
-    borderRadius: scale.hp(1.3),
-    gap: scale.wp(1.95),
-  },
-  getStartedButtonText: {
-    color: '#fff',
-    fontSize: scale.hp(2.1),
-    fontWeight: 'bold',
-  },
-  laterButton: {
-    paddingVertical: scale.hp(1.3),
-    alignItems: 'center',
-  },
-  laterButtonText: {
-    color: '#666',
-    fontSize: scale.hp(1.8),
-    fontWeight: '500',
   },
 });

@@ -1023,7 +1023,6 @@ const triggerPushTokenRegistration = useCallback(async (force = false) => {
       handleNotificationsUpdate(notificationsList);
     };
     
-    // Add listeners
     socketManager.on('connect', handleConnect);
     socketManager.on('disconnect', handleDisconnect);
     socketManager.on('system_notification', handleSystemNotification);
@@ -1036,15 +1035,12 @@ const triggerPushTokenRegistration = useCallback(async (force = false) => {
       
       cleanupNotificationListeners();
       
-      // Remove listeners
       socketManager.off('connect', handleConnect);
       socketManager.off('disconnect', handleDisconnect);
       socketManager.off('system_notification', handleSystemNotification);
       socketManager.off('all_notifications', handleAllNotifications);
       
       disconnectSocket();
-      
-      // Clear any pending auth listener
       if (authListenerRef.current) {
         clearTimeout(authListenerRef.current);
         authListenerRef.current = null;
@@ -1063,7 +1059,6 @@ const triggerPushTokenRegistration = useCallback(async (force = false) => {
     disconnectSocket
   ]);
 
-  // ========== CONTEXT VALUE ==========
   const value = {
     socket: socketManager.getSocket(),
     isConnected: socketManager.getIsConnected(),
@@ -1105,7 +1100,6 @@ const triggerPushTokenRegistration = useCallback(async (force = false) => {
       }
     }, [user?.id]),
     
-    // Push registration functions
     triggerPushRegistrationNow: async (force = false) => {
       return await triggerPushTokenRegistration(force);
     },
@@ -1116,7 +1110,6 @@ const triggerPushTokenRegistration = useCallback(async (force = false) => {
     return 'unknown';
   },
   
-  // Get token info
   getTokenInfo: () => {
     const currentState = currentStateRef.current;
     const token = currentState.expoPushToken;
@@ -1135,7 +1128,6 @@ const triggerPushTokenRegistration = useCallback(async (force = false) => {
       isFCMToken: isFCM
     };
   },
-    // Get push token status
     getPushTokenStatus: () => {
       const currentState = currentStateRef.current;
       const currentUser = currentState.user;
@@ -1159,7 +1151,6 @@ const triggerPushTokenRegistration = useCallback(async (force = false) => {
       };
     },
     
-    // Send test push notification
     sendTestPushNotification: async () => {
       return await testDirectPushAPI();
     },
@@ -1253,7 +1244,6 @@ const triggerPushTokenRegistration = useCallback(async (force = false) => {
         hasAttemptedPushRegistrationRef.current = false;
         setupCompleteRef.current = false;
         
-        // Setup notifications again
         await setupNotifications();
         
         return true;
@@ -1263,7 +1253,6 @@ const triggerPushTokenRegistration = useCallback(async (force = false) => {
       }
     },
     
-    // Get fresh push token
     getFreshPushToken: async () => {
       try {
         const token = await getPushToken();
@@ -1279,12 +1268,10 @@ const triggerPushTokenRegistration = useCallback(async (force = false) => {
       }
     },
     
-    // Firebase specific functions
     verifyFirebaseConfiguration: async () => {
       return await verifyFCMConfiguration();
     },
     
-    // Check if Firebase is properly configured
     checkFirebaseSetup: () => {
       const hasGoogleServices = !!Constants.expoConfig?.android?.googleServicesFile;
       const isStandalone = !isExpoGo;

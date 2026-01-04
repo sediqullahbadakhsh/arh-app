@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { 
   Text, 
   TouchableOpacity, 
@@ -9,7 +9,9 @@ import {
   Platform,
   KeyboardAvoidingView,
   ScrollView,
-  Keyboard
+  Keyboard,
+  LayoutAnimation,
+  UIManager
 } from "react-native";
 import { CardField, useStripe } from "@stripe/stripe-react-native";
 import TopUpStyles from "./TopupStyle";
@@ -17,6 +19,13 @@ import { Colors } from "../../theme/colors";
 import { useTranslation } from "react-i18next";
 import { scale } from "../../utils/normalizeSize";
 import { Ionicons } from "@expo/vector-icons";
+
+
+if (Platform.OS === 'android') {
+  if (UIManager.setLayoutAnimationEnabledExperimental) {
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+  }
+}
 
 function StepPay({
   summary,
@@ -29,7 +38,8 @@ function StepPay({
   const [cardDetails, setCardDetails] = useState(null);
   const [isCreatingPaymentMethod, setIsCreatingPaymentMethod] = useState(false);
   const [paymentMethodId, setPaymentMethodId] = useState(null);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [keyboardEndHeight, setKeyboardEndHeight] = useState(0);
   const scrollViewRef = useRef(null);
   const cardFieldRef = useRef(null);
 
@@ -67,18 +77,24 @@ function StepPay({
     const keyboardDidShowListener = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
       (e) => {
-        setKeyboardHeight(e.endCoordinates.height);
-        // Scroll to make card field visible when keyboard appears
-        setTimeout(() => {
-          scrollToCardField();
-        }, 100);
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setKeyboardVisible(true);
+        setKeyboardEndHeight(e.endCoordinates.height);
+        
+        if (selectedPaymentMethod === 'card') {
+          setTimeout(() => {
+            scrollToCardField();
+          }, 250);
+        }
       }
     );
 
     const keyboardDidHideListener = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
       () => {
-        setKeyboardHeight(0);
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setKeyboardVisible(false);
+        setKeyboardEndHeight(0);
       }
     );
 
@@ -86,24 +102,24 @@ function StepPay({
       keyboardDidShowListener.remove();
       keyboardDidHideListener.remove();
     };
-  }, []);
+  }, [selectedPaymentMethod]);
 
-  const scrollToCardField = () => {
+  const scrollToCardField = useCallback(() => {
     if (scrollViewRef.current && selectedPaymentMethod === 'card') {
-      // Scroll to make card field visible
       scrollViewRef.current.scrollTo({ y: 200, animated: true });
     }
-  };
+  }, [selectedPaymentMethod]);
 
-  const handleCardFieldFocus = () => {
+  const handleCardFieldFocus = useCallback(() => {
     setTimeout(() => {
       scrollToCardField();
     }, 300);
-  };
+  }, [scrollToCardField]);
 
   const getSummaryValue = (key, defaultValue = 0) => {
     return summary && summary[key] !== undefined ? summary[key] : defaultValue;
   };
+
 
   useEffect(() => {
     const createStripePaymentMethod = async () => {
@@ -150,30 +166,35 @@ function StepPay({
     }
   }, [cardDetails, selectedPaymentMethod]);
 
-  const handlePaymentMethodSelect = (methodId) => {
+  const handlePaymentMethodSelect = useCallback((methodId) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setSelectedPaymentMethod(methodId);
     setPaymentMethodId(null);
     setCardDetails(null);
     
+
+    Keyboard.dismiss();
+    
     if (methodId !== 'card') {
       onCardDetailsChange(false, null);
     }
-  };
+  }, [onCardDetailsChange]);
 
-  const handleCardFieldChange = (cardDetails) => {
+  const handleCardFieldChange = useCallback((cardDetails) => {
     setCardDetails(cardDetails);
     if (!cardDetails.complete && paymentMethodId) {
       setPaymentMethodId(null);
       onCardDetailsChange(false, null);
     }
-  };
+  }, [paymentMethodId, onCardDetailsChange]);
 
-  const clearCardDetails = () => {
+  const clearCardDetails = useCallback(() => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setCardDetails(null);
     setPaymentMethodId(null);
     onCardDetailsChange(false, null);
     Keyboard.dismiss();
-  };
+  }, [onCardDetailsChange]);
 
   const getBaseAmount = () => {
     if (summary?.calculateBaseAmount && typeof summary.calculateBaseAmount === 'function') {
@@ -197,6 +218,14 @@ function StepPay({
     return getSummaryValue('totalAfn', getSummaryValue('afn', 0));
   };
 
+
+  const getContentPadding = () => {
+    if (keyboardVisible && selectedPaymentMethod === 'card') {
+      return { paddingBottom: keyboardEndHeight + 100 };
+    }
+    return { paddingBottom: 40 };
+  };
+
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: '#fff' }}
@@ -206,16 +235,21 @@ function StepPay({
       <ScrollView
         ref={scrollViewRef}
         style={{ flex: 1 }}
-        contentContainerStyle={{ 
-          paddingBottom: keyboardHeight > 0 ? keyboardHeight + 20 : 40,
-          paddingHorizontal: 16
-        }}
+        contentContainerStyle={[
+          { 
+            paddingHorizontal: 16,
+            paddingTop: 12,
+          },
+          getContentPadding()
+        ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         automaticallyAdjustContentInsets={false}
         scrollEventThrottle={16}
+        onScrollEndDrag={Keyboard.dismiss}
+        contentInsetAdjustmentBehavior="never"
       >
-        <View style={{ marginTop: 12 }}>
+        <View>
           <Text style={TopUpStyles.sectionTitle}>
             {t('paymentMethod')}
           </Text>
@@ -249,7 +283,8 @@ function StepPay({
               </TouchableOpacity>
             ))}
           </View>
-          <View style={styles.promoSection}>
+          
+          {/* <View style={styles.promoSection}>
             {appliedPromoCode ? (
               <View style={styles.appliedPromoContainer}>
                 <View style={styles.appliedPromoInfo}>
@@ -261,17 +296,30 @@ function StepPay({
                     -${appliedPromoCode.discount_amount?.toFixed(2) || discountAmount.toFixed(2)}
                   </Text>
                 </View>
-                <TouchableOpacity onPress={onRemovePromoCode} style={styles.removePromoButton}>
+                <TouchableOpacity 
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    onRemovePromoCode();
+                  }} 
+                  style={styles.removePromoButton}
+                >
                   <Text style={styles.removePromoText}>{t('promoCode.remove')}</Text>
                 </TouchableOpacity>
               </View>
             ) : (
-              <TouchableOpacity style={styles.promoButton} onPress={openPromoModal}>
+              <TouchableOpacity 
+                style={styles.promoButton} 
+                onPress={() => {
+                  Keyboard.dismiss();
+                  openPromoModal();
+                }}
+              >
                 <Ionicons name="pricetag-outline" size={20} color={Colors.primary} />
                 <Text style={styles.promoButtonText}>{t('promoCode.havePromoCode')}</Text>
               </TouchableOpacity>
             )}
-          </View>
+          </View> */}
+
           {selectedPaymentMethod === 'card' && (
             <View style={styles.cardDetailsContainer}>
               <View style={styles.fieldContainer}>
@@ -324,6 +372,7 @@ function StepPay({
               </Text>
             </View>
           )}
+
           {selectedPaymentMethod === 'paypal' && (
             <View style={styles.altPaymentContainer}>
               <Image 
@@ -334,7 +383,10 @@ function StepPay({
               <Text style={styles.altPaymentText}>
                 {t('paypalRedirect')}
               </Text>
-              <TouchableOpacity style={[styles.paymentButton, { backgroundColor: '#CD0202' }]}>
+              <TouchableOpacity 
+                style={[styles.paymentButton, { backgroundColor: '#CD0202' }]}
+                onPress={() => Keyboard.dismiss()}
+              >
                 <Image 
                   source={require('../../../assets/images/paypal.png')} 
                   style={styles.buttonIcon} 
@@ -344,6 +396,7 @@ function StepPay({
               </TouchableOpacity>
             </View>
           )}
+
           {selectedPaymentMethod === 'googlepay' && (
             <View style={styles.altPaymentContainer}>
               <Image 
@@ -354,7 +407,10 @@ function StepPay({
               <Text style={styles.altPaymentText}>
                 {t('googlePayRedirect')}
               </Text>
-              <TouchableOpacity style={[styles.paymentButton, { backgroundColor: '#CD0202' }]}>
+              <TouchableOpacity 
+                style={[styles.paymentButton, { backgroundColor: '#CD0202' }]}
+                onPress={() => Keyboard.dismiss()}
+              >
                 <Image 
                   source={require('../../../assets/images/google-pay.png')} 
                   style={styles.buttonIcon} 
@@ -364,7 +420,8 @@ function StepPay({
               </TouchableOpacity>
             </View>
           )}
-          <View style={TopUpStyles.summaryCard}>
+
+          <View style={[TopUpStyles.summaryCard, { marginTop: 20 }]}>
             <View style={TopUpStyles.summaryRow}>
               <Text style={TopUpStyles.summaryKey}>{t('mobileNumber')}</Text>
               <Text style={TopUpStyles.summaryValue}>{getSummaryValue('mobile', 'N/A')}</Text>
@@ -417,7 +474,13 @@ function StepPay({
               </Text>
             </View>
             
-            <TouchableOpacity onPress={onEditAmount} style={{ marginTop: 8 }}>
+            <TouchableOpacity 
+              onPress={() => {
+                Keyboard.dismiss();
+                onEditAmount();
+              }} 
+              style={{ marginTop: 8 }}
+            >
               <Text style={[TopUpStyles.editLink, { alignSelf: "flex-end" }]}>
                 {t('changeAmount')}
               </Text>
@@ -460,7 +523,7 @@ const styles = StyleSheet.create({
   paymentIcon: {
     width: scale.wp(6),
     height: scale.wp(6),
-    marginRight: scale.wp(2),
+    marginEnd: scale.wp(2),
     tintColor: Colors.textSecondary,
   },
   paymentIconSelected: {
@@ -494,7 +557,7 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontSize: scale.hp(1.75),
     fontWeight: '600',
-    marginLeft: scale.wp(2),
+    marginStart: scale.wp(2),
   },
   appliedPromoContainer: {
     flexDirection: 'row',

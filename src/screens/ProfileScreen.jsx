@@ -17,7 +17,7 @@ import * as ImagePicker from "expo-image-picker";
 import { useAuth } from "../auth/AuthProvider";
 import { getCustomerProfile, updateCustomerProfile } from "../services/authApi";
 import { useTranslation } from "react-i18next";
-import { isRTL } from "../utils/rtl";
+import { useLanguage } from '../context/LanguageContext';
 import ValidationModal from "../components/ValidationModal";
 import { useModal } from "../hooks/useModal";
 import { scale } from "../utils/normalizeSize";
@@ -346,6 +346,7 @@ export default function ProfileScreen({ navigation }) {
 }
 
 function ProfileRow({ icon, title, subtitle, onPress }) {
+  const { isRTL } = useLanguage();
   return (
     <TouchableOpacity
       style={styles.row}
@@ -358,7 +359,10 @@ function ProfileRow({ icon, title, subtitle, onPress }) {
           <Text style={styles.rowSubtitle}>{subtitle}</Text>
         </View>
       </View>
-      <Ionicons name={isRTL ? "chevron-forward" : "chevron-forward"}  size={18} color="#BDBDBD" />
+      {isRTL ? (
+             <Ionicons name="chevron-back" size={18} color="#BDBDBD" />
+           ) : (  <Ionicons name="chevron-forward" size={18} color="#BDBDBD" />)}
+         
     </TouchableOpacity>
   );
 }
@@ -485,7 +489,6 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: "row",
-    direction: 'ltr',
     gap: scale.wp(2.6),
     paddingVertical: scale.hp(1.55),
     paddingHorizontal: scale.wp(4.2),
@@ -509,7 +512,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFF5F5",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: scale.wp(3.1),
+    marginEnd: scale.wp(3.1),
   },
   rowTitle: {
     color: Colors.textPrimary,

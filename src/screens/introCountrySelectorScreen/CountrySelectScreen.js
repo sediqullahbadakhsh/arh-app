@@ -231,7 +231,7 @@ export default function CountrySelectScreen({ navigation }) {
             { 
               transform: [{ translateY: countryModalAnim }],
               maxHeight: '80%',
-              marginBottom: -insets.bottom
+              // marginBottom: -insets.bottom
             }
           ]}
         >
@@ -577,7 +577,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderTopLeftRadius: MODAL_RADIUS,
     borderTopRightRadius: MODAL_RADIUS,
-    padding: scale.hp(2.5),
+    paddingHorizontal: scale.hp(2.5),
+    paddingTop: scale.hp(2.5),
+    paddingBottom: scale.hp(14),
     elevation: 5,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
@@ -622,7 +624,7 @@ const styles = StyleSheet.create({
   modalRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: scale.hp(1.75),
+    paddingVertical: scale.hp(2),
     paddingHorizontal: scale.wp(2),
     backgroundColor: '#fff',
   },

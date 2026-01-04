@@ -254,6 +254,8 @@ function CountryModal({ visible, countries, selectedCountry, onSelect, onClose }
 }
 
 function CountryModalItem({ item, isSelected, onSelect }) {
+  const { t } = useTranslation();
+  
   return (
     <TouchableOpacity
       style={styles.modalRow}
@@ -274,6 +276,15 @@ function CountryModalItem({ item, isSelected, onSelect }) {
       )}
     </TouchableOpacity>
   );
+}
+
+function codeToFlag(countryCode) {
+  if (!countryCode) return "🏳️";
+  const codePoints = countryCode
+    .toUpperCase()
+    .split('')
+    .map(char => 127397 + char.charCodeAt());
+  return String.fromCodePoint(...codePoints);
 }
 
 function formatLocal(s) {

@@ -29,17 +29,14 @@ import { getSetaraganMnoId } from "../utils/getCompanyIdForSetaragan";
 import { getMnoLogo } from "../utils/getMnoLogo";
 import * as Contacts from 'expo-contacts';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
 import formatLocal from "../utils/formatLocal";
 import TopUpStyles from "./topupScreen/TopupStyle";
 import { useAuth } from "../auth/AuthProvider";
 import { useTranslation } from "react-i18next";
-import { isRTL } from "../utils/rtl";
 
 const { height: screenHeight } = Dimensions.get('window');
 const BASE_STEPS = { COUNTRY: 0, NUMBER: 1, PAY: 2 };
 
-// Status types
 const ORDER_STATUS = {
   QUEUED: 'queued',
   PROCESSING: 'processing',
@@ -49,6 +46,7 @@ const ORDER_STATUS = {
 };
 
 export default function MerchantTopupFlowScreen({ navigation }) {
+  const { t } = useTranslation();
   const { user } = useAuth?.() || { user: null };
   const lastStep = BASE_STEPS.PAY;
   const [countries, setCountries] = useState([]);
@@ -77,7 +75,6 @@ export default function MerchantTopupFlowScreen({ navigation }) {
   const operatorId = getSetaraganMnoId(localNumber);
   const operatorLogo = getMnoLogo(operatorId);
 
-
   useEffect(() => {
     return () => {
       if (pollingRef.current) {
@@ -85,7 +82,6 @@ export default function MerchantTopupFlowScreen({ navigation }) {
       }
     };
   }, []);
-
 
   useEffect(() => {
     if (lottieRef.current && (orderStatus === ORDER_STATUS.SUCCEEDED || orderStatus === ORDER_STATUS.FAILED)) {
@@ -104,14 +100,13 @@ export default function MerchantTopupFlowScreen({ navigation }) {
     getAllCountries();
   }, []);
 
-
   const startPollingOrderStatus = async (orderId) => {
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
     }
 
     let pollCount = 0;
-    const maxPolls = 60; 
+    const maxPolls = 60;
 
     pollingRef.current = setInterval(async () => {
       try {
@@ -126,7 +121,6 @@ export default function MerchantTopupFlowScreen({ navigation }) {
           ...prev,
           ...statusResponse.data
         }));
-
 
         if (currentStatus === ORDER_STATUS.SUCCEEDED || 
             currentStatus === ORDER_STATUS.FAILED || 
@@ -147,7 +141,7 @@ export default function MerchantTopupFlowScreen({ navigation }) {
           setOrderStatus(ORDER_STATUS.FAILED);
         }
       }
-    }, 3000); 
+    }, 3000);
   };
 
   useEffect(() => {
@@ -214,11 +208,11 @@ export default function MerchantTopupFlowScreen({ navigation }) {
           setFilteredContacts(data);
         }
       } else {
-        Alert.alert('Permission denied', 'Cannot access contacts without permission');
+        Alert.alert(t('permissionDenied'), t('contactsPermissionDenied'));
       }
     } catch (error) {
       console.error('Error loading contacts:', error);
-      Alert.alert('Error', 'Failed to load contacts');
+      Alert.alert(t('error'), t('failedToLoadContacts'));
     }
   };
 
@@ -254,7 +248,7 @@ export default function MerchantTopupFlowScreen({ navigation }) {
 
   const handleContactSelect = (phoneNumber) => {
     if (!phoneNumber) {
-      Alert.alert('Error', 'Invalid phone number selected');
+      Alert.alert(t('error'), t('invalidPhoneNumber'));
       return;
     }
 
@@ -276,7 +270,7 @@ export default function MerchantTopupFlowScreen({ navigation }) {
       const operatorId = getSetaraganMnoId(localNumber);
 
       if (!operatorId) {
-        Alert.alert("Invalid Number", "The number you have added is not matching with any mobile network in Afghanistan");
+        Alert.alert(t('invalidNumber'), t('invalidMobileNetwork'));
         setLoading(false);
         return;
       }
@@ -284,14 +278,14 @@ export default function MerchantTopupFlowScreen({ navigation }) {
       // Validate amount
       const amountValue = parseFloat(amountAfn);
       if (isNaN(amountValue) || amountValue <= 0) {
-        Alert.alert("Invalid Amount", "Please enter a valid amount greater than 0");
+        Alert.alert(t('invalidNumber'), t('enterValidAmountGreaterThanZero'));
         setLoading(false);
         return;
       }
 
       // Check minimum amount for Setaragan
       if (amountValue < 10) {
-        Alert.alert("Minimum Amount", "The minimum topup amount for Setaragan is 50 AFN");
+        Alert.alert(t('invalidNumber'), t('topup.minimumAmount'));
         setLoading(false);
         return;
       }
@@ -303,8 +297,8 @@ export default function MerchantTopupFlowScreen({ navigation }) {
         customAmount: amountValue,
         currency: "AFN",
         countryId: country?.id,
-        companyId: "", 
-        productId: 1, 
+        companyId: "",
+        productId: 1,
       };
 
       console.log("Sending recharge payload:", payload);
@@ -319,14 +313,14 @@ export default function MerchantTopupFlowScreen({ navigation }) {
           mobile: `${dial} ${formatLocal(localNumber)}`,
           amountAfn: amountAfn,
           date: new Date().toISOString(),
-          operator: operator?.name || "Unknown",
+          operator: operator?.name || t('common.unknown'),
         });
         
         // Start polling for status updates
         await startPollingOrderStatus(res.orderId);
         goNext();
       } else {
-        throw new Error(res.error || "Failed to process recharge");
+        throw new Error(res.error || t('failedToRecharge'));
       }
       
     } catch (error) {
@@ -335,9 +329,9 @@ export default function MerchantTopupFlowScreen({ navigation }) {
         error.response?.data?.error ||
         error.response?.data?.details ||
         error.message ||
-        "Failed to Recharge";
+        t('failedToRecharge');
     
-      Alert.alert("Failed To Recharge", message);
+      Alert.alert(t('rechargeFailed'), message);
     }
     setLoading(false);
   };
@@ -345,16 +339,16 @@ export default function MerchantTopupFlowScreen({ navigation }) {
   const getStatusMessage = () => {
     switch (orderStatus) {
       case ORDER_STATUS.QUEUED:
-        return "Your topup has been queued and will be processed shortly.";
+        return t('topupQueued');
       case ORDER_STATUS.PROCESSING:
       case ORDER_STATUS.PENDING:
-        return "Your topup is being processed. Please wait...";
+        return t('topupProcessing');
       case ORDER_STATUS.SUCCEEDED:
-        return "Topup completed successfully! The amount has been credited to the recipient's account.";
+        return t('topupCompletedSuccessfully');
       case ORDER_STATUS.FAILED:
-        return "Topup failed. The amount has been refunded to your wallet. Please try again.";
+        return t('topupFailed');
       default:
-        return "Processing your request...";
+        return t('processingYourRequest');
     }
   };
 
@@ -405,16 +399,16 @@ export default function MerchantTopupFlowScreen({ navigation }) {
   const getStatusTitle = () => {
     switch (orderStatus) {
       case ORDER_STATUS.QUEUED:
-        return "Topup Queued";
+        return t('status.queued');
       case ORDER_STATUS.PROCESSING:
       case ORDER_STATUS.PENDING:
-        return "Processing Topup";
+        return t('processing');
       case ORDER_STATUS.SUCCEEDED:
-        return "Topup Successful!";
+        return t('topupSuccessful');
       case ORDER_STATUS.FAILED:
-        return "Topup Failed";
+        return t('topupFailed');
       default:
-        return "Processing";
+        return t('processing');
     }
   };
 
@@ -434,189 +428,204 @@ export default function MerchantTopupFlowScreen({ navigation }) {
     }
   };
 
-  const resetFlow = () => {
-    setOrderStatus(null);
-    setOrderDetails(null);
-    setStep(0);
-    setLocalNumber("");
-    setAmountAfn("");
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current);
-      pollingRef.current = null;
-    }
+ const resetFlow = () => {
+  setOrderStatus(null);
+  setOrderDetails(null);
+  setStep(0);
+  setLocalNumber("");
+  setAmountAfn("");
+  
+  if (pollingRef.current) {
+    clearInterval(pollingRef.current);
+    pollingRef.current = null;
+  }
 
-    if (lottieRef.current) {
-      lottieRef.current.reset();
+  if (lottieRef.current) {
+    lottieRef.current.reset();
+  }
+
+  setTimeout(() => {
+    if (typeof triggerHomeRefresh === 'function') {
+      triggerHomeRefresh();
     }
+    navigation.navigate('Home', { refresh: true });
+  }, 500);
+};
+
+  const ContactsModal = () => {
+    const { t } = useTranslation();
+    
+    return (
+      <Modal
+        visible={contactsModalVisible}
+        transparent={true}
+        animationType="none"
+        statusBarTranslucent={true}
+        onRequestClose={() => setContactsModalVisible(false)}
+      >
+        <View style={TopUpStyles.modalOverlay}>
+          <TouchableOpacity 
+            style={TopUpStyles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setContactsModalVisible(false)}
+          />
+          <Animated.View 
+            style={[
+              TopUpStyles.modalCard,
+              { 
+                transform: [{ translateY: contactsSlideAnim }],
+                height: '80%',
+                marginBottom: -insets.bottom
+              }
+            ]}
+          >
+            <View style={TopUpStyles.modalHeader}>
+              <Text style={TopUpStyles.modalTitle}>{t('selectContact')}</Text>
+              <TouchableOpacity 
+                onPress={() => setContactsModalVisible(false)}
+                style={TopUpStyles.closeButton}
+              >
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={TopUpStyles.searchContainer}>
+              <Ionicons name="search" size={20} color="#999" style={TopUpStyles.searchIcon} />
+              <TextInput
+                placeholder={t('searchContacts')}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                style={TopUpStyles.searchInput}
+                placeholderTextColor="#999"
+              />
+            </View>
+
+            {filteredContacts.length > 0 ? (
+              <FlatList
+                data={filteredContacts}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={TopUpStyles.contactItem}
+                    onPress={() => {
+                      if (item.phoneNumbers && item.phoneNumbers.length > 0) {
+                        handleContactSelect(item.phoneNumbers[0].number);
+                      }
+                    }}
+                  >
+                    <View style={TopUpStyles.contactAvatar}>
+                      <Text style={{ color: 'white', fontWeight: 'bold' }}>
+                        {item.name ? item.name.charAt(0).toUpperCase() : '?'}
+                      </Text>
+                    </View>
+                    <View style={TopUpStyles.contactInfo}>
+                      <Text style={TopUpStyles.contactName}>{item.name}</Text>
+                      {item.phoneNumbers && item.phoneNumbers.length > 0 && (
+                        <Text style={TopUpStyles.contactPhone}>{item.phoneNumbers[0].number}</Text>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                )}
+                ItemSeparatorComponent={() => <View style={TopUpStyles.contactSeparator} />}
+              />
+            ) : (
+              <View style={TopUpStyles.emptyContainer}>
+                <Ionicons name="people-outline" size={48} color="#999" />
+                <Text style={TopUpStyles.emptyText}>{t('noContactsFound')}</Text>
+              </View>
+            )}
+          </Animated.View>
+        </View>
+      </Modal>
+    );
   };
 
-  const ContactsModal = () => (
-    <Modal
-      visible={contactsModalVisible}
-      transparent={true}
-      animationType="none"
-      statusBarTranslucent={true}
-      onRequestClose={() => setContactsModalVisible(false)}
-    >
-      <View style={TopUpStyles.modalOverlay}>
-        <TouchableOpacity 
-          style={TopUpStyles.modalBackdrop}
-          activeOpacity={1}
-          onPress={() => setContactsModalVisible(false)}
-        />
-        <Animated.View 
-          style={[
-            TopUpStyles.modalCard,
-            { 
-              transform: [{ translateY: contactsSlideAnim }],
-              height: '80%',
-              marginBottom: -insets.bottom
-            }
-          ]}
-        >
-          <View style={TopUpStyles.modalHeader}>
-            <Text style={TopUpStyles.modalTitle}>Select Contact</Text>
-            <TouchableOpacity 
-              onPress={() => setContactsModalVisible(false)}
-              style={TopUpStyles.closeButton}
-            >
-              <Ionicons name="close" size={24} color="#666" />
-            </TouchableOpacity>
-          </View>
+  const CountriesModal = () => {
+    const { t } = useTranslation();
+    
+    return (
+      <Modal
+        visible={countryOpen}
+        transparent={true}
+        animationType="none"
+        statusBarTranslucent={true}
+        onRequestClose={() => setCountryOpen(false)}
+      >
+        <View style={TopUpStyles.modalOverlay}>
+          <TouchableOpacity 
+            style={TopUpStyles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setCountryOpen(false)}
+          />
+          <Animated.View 
+            style={[
+              TopUpStyles.modalCard,
+              { 
+                transform: [{ translateY: countriesSlideAnim }],
+                height: '80%',
+                marginBottom: -insets.bottom
+              }
+            ]}
+          >
+            <View style={TopUpStyles.modalHeader}>
+              <Text style={TopUpStyles.modalTitle}>{t('selectCountry')}</Text>
+              <TouchableOpacity 
+                onPress={() => setCountryOpen(false)}
+                style={TopUpStyles.closeButton}
+              >
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
 
-          <View style={TopUpStyles.searchContainer}>
-            <Ionicons name="search" size={20} color="#999" style={TopUpStyles.searchIcon} />
-            <TextInput
-              placeholder="Search contacts..."
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              style={TopUpStyles.searchInput}
-              placeholderTextColor="#999"
-            />
-          </View>
+            <View style={TopUpStyles.searchContainer}>
+              <Ionicons name="search" size={20} color="#999" style={TopUpStyles.searchIcon} />
+              <TextInput
+                placeholder={t('searchCountries')}
+                value={countrySearch}
+                onChangeText={setCountrySearch}
+                style={TopUpStyles.searchInput}
+                placeholderTextColor="#999"
+              />
+            </View>
 
-          {filteredContacts.length > 0 ? (
             <FlatList
-              data={filteredContacts}
+              data={filteredCountries}
               keyExtractor={(item) => item.id}
               renderItem={({ item }) => (
                 <TouchableOpacity
-                  style={TopUpStyles.contactItem}
+                  style={TopUpStyles.modalRow}
                   onPress={() => {
-                    if (item.phoneNumbers && item.phoneNumbers.length > 0) {
-                      handleContactSelect(item.phoneNumbers[0].number);
-                    }
+                    setCountry(item);
+                    setCountryOpen(false);
+                    setCountrySearch('');
                   }}
                 >
-                  <View style={TopUpStyles.contactAvatar}>
-                    <Text style={{ color: 'white', fontWeight: 'bold' }}>
-                      {item.name ? item.name.charAt(0).toUpperCase() : '?'}
+                  <Text style={{ fontSize: 24, marginEnd: 12 }}>
+                    {codeToFlag(item.countryCode)}
+                  </Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: Colors.textPrimary, fontSize: 16, fontWeight: '500' }}>
+                      {item.countryName}
                     </Text>
-                  </View>
-                  <View style={TopUpStyles.contactInfo}>
-                    <Text style={TopUpStyles.contactName}>{item.name}</Text>
-                    {item.phoneNumbers && item.phoneNumbers.length > 0 && (
-                      <Text style={TopUpStyles.contactPhone}>{item.phoneNumbers[0].number}</Text>
-                    )}
+                    <Text style={{ color: Colors.textSecondary, fontSize: 14 }}>
+                      {DIAL_CODES[item.countryCode] || ""}
+                    </Text>
                   </View>
                 </TouchableOpacity>
               )}
               ItemSeparatorComponent={() => <View style={TopUpStyles.contactSeparator} />}
             />
-          ) : (
-            <View style={TopUpStyles.emptyContainer}>
-              <Ionicons name="people-outline" size={48} color="#999" />
-              <Text style={TopUpStyles.emptyText}>No contacts found</Text>
-            </View>
-          )}
-        </Animated.View>
-      </View>
-    </Modal>
-  );
-
-  const CountriesModal = () => (
-    <Modal
-      visible={countryOpen}
-      transparent={true}
-      animationType="none"
-      statusBarTranslucent={true}
-      onRequestClose={() => setCountryOpen(false)}
-    >
-      <View style={TopUpStyles.modalOverlay}>
-        <TouchableOpacity 
-          style={TopUpStyles.modalBackdrop}
-          activeOpacity={1}
-          onPress={() => setCountryOpen(false)}
-        />
-        <Animated.View 
-          style={[
-            TopUpStyles.modalCard,
-            { 
-              transform: [{ translateY: countriesSlideAnim }],
-              height: '80%',
-              marginBottom: -insets.bottom
-            }
-          ]}
-        >
-          <View style={TopUpStyles.modalHeader}>
-            <Text style={TopUpStyles.modalTitle}>Select Country</Text>
-            <TouchableOpacity 
-              onPress={() => setCountryOpen(false)}
-              style={TopUpStyles.closeButton}
-            >
-              <Ionicons name="close" size={24} color="#666" />
-            </TouchableOpacity>
-          </View>
-
-          <View style={TopUpStyles.searchContainer}>
-            <Ionicons name="search" size={20} color="#999" style={TopUpStyles.searchIcon} />
-            <TextInput
-              placeholder="Search countries..."
-              value={countrySearch}
-              onChangeText={setCountrySearch}
-              style={TopUpStyles.searchInput}
-              placeholderTextColor="#999"
-            />
-          </View>
-
-          <FlatList
-            data={filteredCountries}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={TopUpStyles.modalRow}
-                onPress={() => {
-                  setCountry(item);
-                  setCountryOpen(false);
-                  setCountrySearch('');
-                }}
-              >
-                <Text style={{ fontSize: 24, marginRight: 12 }}>
-                  {codeToFlag(item.countryCode)}
-                </Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: Colors.textPrimary, fontSize: 16, fontWeight: '500' }}>
-                    {item.countryName}
-                  </Text>
-                  <Text style={{ color: Colors.textSecondary, fontSize: 14 }}>
-                    {DIAL_CODES[item.countryCode] || ""}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            )}
-            ItemSeparatorComponent={() => <View style={TopUpStyles.contactSeparator} />}
-          />
-        </Animated.View>
-      </View>
-    </Modal>
-  );
+          </Animated.View>
+        </View>
+      </Modal>
+    );
+  };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white, paddingBottom: 100, }}>
-      <ServiceHeader title="Mobile Top-up" onBack={goBack} />
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white, paddingBottom: 100 }}>
+      <ServiceHeader title={t('mobileTopup')} onBack={goBack} />
 
       {orderStatus ? (
-
         <View style={{ flex: 1 }}>
           <ScrollView
             contentContainerStyle={{ 
@@ -635,30 +644,22 @@ export default function MerchantTopupFlowScreen({ navigation }) {
 
             <View style={TopUpStyles.detailsCard}>
               <View style={TopUpStyles.detailRow}>
-                <Text style={TopUpStyles.detailLabel}>Receiver Number</Text>
+                <Text style={TopUpStyles.detailLabel}>{t('receiverNumber')}</Text>
                 <Text style={TopUpStyles.detailValue}>{orderDetails?.mobile}</Text>
               </View>
-              {/* <View style={TopUpStyles.detailRow}>
-                <Text style={TopUpStyles.detailLabel}>Operator</Text>
-                <Text style={TopUpStyles.detailValue}>{orderDetails?.operator}</Text>
-              </View> */}
               <View style={TopUpStyles.detailRow}>
-                <Text style={TopUpStyles.detailLabel}>Transaction ID</Text>
+                <Text style={TopUpStyles.detailLabel}>{t('transactionId')}</Text>
                 <Text style={TopUpStyles.detailValue}>{orderDetails?.txnNumber}</Text>
               </View>
-              {/* <View style={TopUpStyles.detailRow}>
-                <Text style={TopUpStyles.detailLabel}>Order ID</Text>
-                <Text style={TopUpStyles.detailValue}>{orderDetails?.orderId}</Text>
-              </View> */}
               <View style={TopUpStyles.detailRow}>
-                <Text style={TopUpStyles.detailLabel}>Date</Text>
+                <Text style={TopUpStyles.detailLabel}>{t('date')}</Text>
                 <Text style={TopUpStyles.detailValue}>
                   {new Date(orderDetails?.date).toLocaleString()}
                 </Text>
               </View>
 
               <View style={TopUpStyles.amountSection}>
-                <Text style={TopUpStyles.amountLabel}>Total Amount</Text>
+                <Text style={TopUpStyles.amountLabel}>{t('totalAmount')}</Text>
                 <Text style={TopUpStyles.amountValue}>{orderDetails?.amountAfn} AFN</Text>
               </View>
             </View>
@@ -684,34 +685,40 @@ export default function MerchantTopupFlowScreen({ navigation }) {
                   />
                 </View>
                 <Text style={TopUpStyles.progressText}>
-                  {orderStatus === ORDER_STATUS.QUEUED ? 'Queued' : 
-                  orderStatus === ORDER_STATUS.PROCESSING ? 'Processing' : 'Finalizing...'}
+                  {orderStatus === ORDER_STATUS.QUEUED ? t('queued') : 
+                  orderStatus === ORDER_STATUS.PROCESSING ? t('processing') : t('finalizing')}
                 </Text>
               </View>
             )}
 
-            {(orderStatus === ORDER_STATUS.SUCCEEDED || orderStatus === ORDER_STATUS.FAILED) && (
-              <PrimaryButton
-                label="Done"
-                onPress={() => {
-                  if (pollingRef.current) {
-                    clearInterval(pollingRef.current);
-                  }
-                  navigation.popToTop();
-                }}
-                style={{ width: "100%", marginTop: 20 }}
-              />
-            )}
+       {(orderStatus === ORDER_STATUS.SUCCEEDED || orderStatus === ORDER_STATUS.FAILED) && (
+  <PrimaryButton
+    label={t('done')}
+    onPress={() => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+      }
+      
+ 
+      if (typeof triggerHomeRefresh === 'function') {
+        triggerHomeRefresh();
+      }
+      
+      navigation.popToTop();
+      navigation.navigate('Home', { refresh: true });
+    }}
+    style={{ width: "100%", marginTop: 20 }}
+  />
+)}
 
             <TouchableOpacity onPress={resetFlow} style={TopUpStyles.moreButton}>
               <Text style={TopUpStyles.moreButtonText}>
-                {orderStatus === ORDER_STATUS.FAILED ? "Try Again" : "Topup More"}
+                {orderStatus === ORDER_STATUS.FAILED ? t('tryAgain') : t('topupMore')}
               </Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
       ) : (
-        // Regular Flow (unchanged)
         <KeyboardAvoidingView
           style={{ flex: 1 }}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -742,7 +749,7 @@ export default function MerchantTopupFlowScreen({ navigation }) {
                   openContacts={() => setContactsModalVisible(true)}
                 />
 
-                <Text style={TopUpStyles.sectionTitle}>Amount</Text>
+                <Text style={TopUpStyles.sectionTitle}>{t('enterAmount')}</Text>
                 <AmountInput
                   value={amountAfn}
                   onChangeText={setAmountAfn}
@@ -755,14 +762,14 @@ export default function MerchantTopupFlowScreen({ navigation }) {
                 summary={{
                   mobile: `${dial} ${formatLocal(localNumber)}`,
                   amount: amountAfn,
-                  operator: operator?.name || "Unknown"
+                  operator: operator?.name || t('common.unknown')
                 }}
                 onEditNumber={() => jumpTo(BASE_STEPS.NUMBER)}
               />
             )}
 
             <PrimaryButton
-              label={step === lastStep ? "Send Top-up" : "Continue"}
+              label={step === lastStep ? t('sendTopup') : t('continue')}
               onPress={step === lastStep ? recharge : goNext}
               style={{ marginTop: 24, opacity: canNext ? 1 : 0.5 }}
               loading={loading}
@@ -770,7 +777,7 @@ export default function MerchantTopupFlowScreen({ navigation }) {
             />
             {step > 0 && (
               <PrimaryButton
-                label="Back"
+                label={t('back')}
                 onPress={goBack}
                 style={{ marginTop: 12, backgroundColor: "#4A4A4A" }}
               />
@@ -788,11 +795,12 @@ export default function MerchantTopupFlowScreen({ navigation }) {
 /* ---------- Step Components ---------- */
 
 function StepCountry({ country, onOpen }) {
+  const { t } = useTranslation();
   const [isFocused, setIsFocused] = useState(false);
 
   return (
     <View style={{ marginTop: 16 }}>
-      <Text style={TopUpStyles.sectionTitle}>Select country you want to send</Text>
+      <Text style={TopUpStyles.sectionTitle}>{t('selectCountryYouWantToSend')}</Text>
       <TouchableOpacity
         style={[
           TopUpStyles.dropField,
@@ -812,7 +820,7 @@ function StepCountry({ country, onOpen }) {
         onPressOut={() => setIsFocused(false)}
       >
         <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
-          <Text style={{ fontSize: 24, marginRight: 12 }}>
+          <Text style={{ fontSize: 24, marginEnd: 12 }}>
             {codeToFlag(country?.countryCode)}
           </Text>
           <View>
@@ -831,7 +839,6 @@ function StepCountry({ country, onOpen }) {
 }
 
 const OPERATOR_LOGOS = {
-
   'AWCC': require('../../assets/mnos/awcc.png'),
   'Roshan': require('../../assets/mnos/roshan.png'),
   'MTN': require('../../assets/mnos/mtn.png'),
@@ -839,6 +846,7 @@ const OPERATOR_LOGOS = {
   'Etisalat': require('../../assets/mnos/etisalat.png'),
   'default': require('../../assets/mnos/awcc.png'),
 };
+
 const getOperatorLogo = (operatorName) => {
   if (!operatorName) return OPERATOR_LOGOS.default;
   
@@ -854,14 +862,14 @@ const getOperatorLogo = (operatorName) => {
 };
 
 const VALID_PREFIXES = ['71', '72', '73', '74', '76', '77', '78', '79'];
+
 const validateMobileNumber = (number) => {
   const cleanNumber = number.replace(/\D/g, "");
-  
 
   if (cleanNumber.length > 0 && !cleanNumber.startsWith('7')) {
     return {
       isValid: false,
-      message: "mobileNumberStartWith7"
+      message: "phoneNumberStartWith7"
     };
   }
 
@@ -871,14 +879,13 @@ const validateMobileNumber = (number) => {
       message: "invalidPrefix75"
     };
   }
-  
 
   if (cleanNumber.length >= 2) {
     const prefix = cleanNumber.substring(0, 2);
     if (!VALID_PREFIXES.includes(prefix)) {
       return {
         isValid: false,
-        message: `invalidPrefix ${prefix}`
+        message: "invalidPrefix"
       };
     }
   }
@@ -888,6 +895,7 @@ const validateMobileNumber = (number) => {
     message: ""
   };
 };
+
 function StepNumber({
   dial,
   country,
@@ -904,20 +912,15 @@ function StepNumber({
   const formatted = formatLocal(value);
 
   const handleNumberChange = (input) => {
-
     const numericInput = input.replace(/\D/g, "");
-    
-
     const limitedInput = numericInput.slice(0, 9);
     
-  
     const validation = validateMobileNumber(limitedInput);
     
     if (!validation.isValid && limitedInput.length > 0) {
       const errorMessage = t(validation.message);
       setValidationError(errorMessage);
       
- 
       if (limitedInput.startsWith('75') || !limitedInput.startsWith('7')) {
         return;
       }
@@ -925,7 +928,6 @@ function StepNumber({
       setValidationError("");
     }
     
-
     onChange(limitedInput);
   };
 
@@ -1041,6 +1043,7 @@ function StepNumber({
 }
 
 function AmountInput({ value, onChangeText }) {
+  const { t } = useTranslation();
   const [isFocused, setIsFocused] = useState(false);
 
   return (
@@ -1083,26 +1086,28 @@ function StepPay({
   summary,
   onEditNumber,
 }) {
+  const { t } = useTranslation();
+  
   return (
     <View style={{ marginTop: 12 }}>
       <View style={TopUpStyles.editHeader}>
-        <Text style={TopUpStyles.sectionTitle}>Confirm Top-up</Text>
+        <Text style={TopUpStyles.sectionTitle}>{t('confirmTopup')}</Text>
         <TouchableOpacity onPress={onEditNumber}>
-          <Text style={TopUpStyles.editLink}>Change number</Text>
+          <Text style={TopUpStyles.editLink}>{t('changeNumber')}</Text>
         </TouchableOpacity>
       </View>
 
       <View style={TopUpStyles.summaryCard}>
         <View style={TopUpStyles.summaryRow}>
-          <Text style={TopUpStyles.summaryKey}>Mobile Number</Text>
+          <Text style={TopUpStyles.summaryKey}>{t('receiverNumber')}</Text>
           <Text style={TopUpStyles.summaryValue}>{summary.mobile}</Text>
         </View>
         <View style={TopUpStyles.summaryRow}>
-          <Text style={TopUpStyles.summaryKey}>Operator</Text>
+          <Text style={TopUpStyles.summaryKey}>{t('common.operator')}</Text>
           <Text style={TopUpStyles.summaryValue}>{summary.operator}</Text>
         </View>
         <View style={TopUpStyles.summaryRow}>
-          <Text style={TopUpStyles.summaryKey}>Amount</Text>
+          <Text style={TopUpStyles.summaryKey}>{t('amount')}</Text>
           <Text style={TopUpStyles.summaryValue}>{summary.amount} AFN</Text>
         </View>
         <View
@@ -1117,7 +1122,7 @@ function StepPay({
           ]}
         >
           <Text style={[TopUpStyles.summaryKey, { fontWeight: "700" }]}>
-            Total Amount
+            {t('totalAmount')}
           </Text>
           <Text
             style={[
@@ -1133,12 +1138,3 @@ function StepPay({
   );
 }
 
-
-
-function hexFade(hex, op) {
-  const n = hex.replace("#", "");
-  const r = parseInt(n.slice(0, 2), 16);
-  const g = parseInt(n.slice(2, 4), 16);
-  const b = parseInt(n.slice(4, 6), 16);
-  return `rgba(${r},${g},${b},${op})`;
-}

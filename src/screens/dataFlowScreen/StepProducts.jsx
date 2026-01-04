@@ -316,7 +316,8 @@ function StepProducts({
               <View style={styles.summaryTextContainer}>
                 <Text style={styles.summaryLabel}>{t('mobileNumber')}</Text>
                 <Text style={styles.summaryValue}>
-                  {summary.dial} {formatLocal(summary.localNumber)}
+                  {/* {summary.dial}  */}
+                  {formatLocal(summary.localNumber)}
                 </Text>
               </View>
               <TouchableOpacity onPress={onEditNumber}>
@@ -717,7 +718,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: scale.wp(3),
+    marginEnd: scale.wp(3),
   },
   summaryTextContainer: {
     flex: 1,

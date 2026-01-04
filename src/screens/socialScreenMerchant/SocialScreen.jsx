@@ -26,7 +26,7 @@ import {
 import { scale } from "../../utils/normalizeSize";
 import { useQuery } from "@tanstack/react-query"; 
 
-// Skeleton Components
+
 const SkeletonRect = ({ width, height, borderRadius = 4, style = {} }) => {
   const [animation] = useState(new Animated.Value(0));
 

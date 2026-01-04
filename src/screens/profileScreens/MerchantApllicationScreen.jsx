@@ -301,12 +301,7 @@ export default function MerchantApplicationScreen({ navigation }) {
           return false;
         }
         return true;
-      case 2:
-        if (!photoUri) {
-          showModal(t('validationError'), t('takeProfilePhoto'));
-          return false;
-        }
-        return true;
+     
       default:
         return true;
     }
@@ -315,7 +310,6 @@ export default function MerchantApplicationScreen({ navigation }) {
   const submitApplication = async () => {
     if (!validateStep(2)) return;
 
-    // Check if user has an existing application that's not rejected
     if (existingApplication && existingApplication.status !== "rejected") {
       showModal(
         t('existingApplication'), 
@@ -902,7 +896,7 @@ export default function MerchantApplicationScreen({ navigation }) {
   );
 }
 
-// Application Status Card Component
+
 const ApplicationStatusCard = ({ application }) => {
   const { t } = useTranslation();
   const statusConfig = STATUS_CONFIG[application.status] || STATUS_CONFIG.pending;
@@ -1068,7 +1062,7 @@ const styles = StyleSheet.create({
     borderRadius: scale.wp(5.2),
     justifyContent: "center",
     alignItems: "center",
-    marginRight: scale.wp(3.1),
+    marginEnd: scale.wp(3.1),
   },
   statusTextContainer: {
     flex: 1,
@@ -1231,6 +1225,7 @@ const styles = StyleSheet.create({
   imagePickerContainer: {
     backgroundColor: '#fff',
     borderTopLeftRadius: scale.hp(3.2),
+    paddingBottom: scale.hp(10),
     borderTopRightRadius: scale.hp(3.2),
     padding: scale.hp(2.1),
     elevation: 5,
@@ -1264,7 +1259,7 @@ const styles = StyleSheet.create({
     borderRadius: scale.wp(5.7),
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: scale.wp(4.2),
+    marginEnd: scale.wp(4.2),
   },
   optionText: {
     fontSize: scale.hp(2.1),

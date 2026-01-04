@@ -104,5 +104,23 @@ export const updateCustomerProfileAdmin = async (customerId, formData) => {
   }
 };
 
+export const loginOtpResend = (identifier) =>
+  api.post("/login/otp/generate", { identifier }).then((r) => r.data);
+
+export const signupCustomerResendOtp = ({ email }) =>
+  api.post("/customer/request-otp", { email }).then((r) => r.data);
+
 export const profile = () =>
   api.get("/profile").then((r) => r.data);
+
+export const requestMerchantPasswordReset = (email) =>
+  api.post("/forgot-password", { email }).then((r) => r.data);
+
+export const generateAgentForgotPasswordOtp = (email) =>
+  api.post("/forgot-password/generate-otp", { email }).then((r) => r.data);
+
+export const verifyAgentForgotPasswordOtp = ({ email, otp }) =>
+  api.post("/forgot-password/verify-otp", { email, otp }).then((r) => r.data);
+
+export const resetAgentPasswordViaForgot = ({ email, otp, newPassword, confirmPassword }) =>
+  api.post("/forgot-password/reset", { email, otp, newPassword, confirmPassword }).then((r) => r.data);

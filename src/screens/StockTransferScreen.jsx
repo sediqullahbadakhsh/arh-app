@@ -25,40 +25,32 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import SuccessModal from "../components/modals/SuccessModal";
 import ErrorModal from "../components/modals/ErrorModal";
 import { scale } from "../utils/normalizeSize";
+import { useTranslation } from "react-i18next";
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 const STEPS = { FORM: 0, CONFIRM: 1, DONE: 2 };
 
 export default function StockTransferScreen({ navigation }) {
+  const { t } = useTranslation();
   const [step, setStep] = useState(STEPS.FORM);
   const [loading, setLoading] = useState(false);
-  
-
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
-
   const { user, setUser } = useUser();
   const insets = useSafeAreaInsets();
-
   const modalSlideAnim = useRef(new Animated.Value(screenHeight)).current;
   const modalScaleAnim = useRef(new Animated.Value(0.8)).current;
   const modalOpacityAnim = useRef(new Animated.Value(0)).current;
   const successIconScale = useRef(new Animated.Value(0)).current;
   const successIconRotate = useRef(new Animated.Value(0)).current;
   const contentStaggerAnim = useRef(new Animated.Value(0)).current;
-
-
   const [agentPickerAnim] = useState(new Animated.Value(screenHeight));
-
-
   const [agent, setAgent] = useState(null);
   const [agents, setAgents] = useState([]);
   const [amountText, setAmountText] = useState("");
   const [isAmountFocused, setIsAmountFocused] = useState(false);
-  
-
   const [agentPickerOpen, setAgentPickerOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -88,7 +80,6 @@ export default function StockTransferScreen({ navigation }) {
     }
   }, [agentPickerOpen]);
 
-  // Modal handlers
   const showCustomSuccessModal = (message) => {
     setSuccessMessage(message);
     setShowSuccessModal(true);
@@ -110,12 +101,10 @@ export default function StockTransferScreen({ navigation }) {
     setErrorMessage("");
   };
 
-  // Use agent's commission rate directly
   const agentCommissionRate = useMemo(() => {
     return agent?.commissionRateDetails?.percentage || agent?.commission_rate || 0;
   }, [agent]);
 
-  // parsed & computed - use agentCommissionRate instead of manual input
   const amount = useMemo(
     () => Math.max(0, parseNumber(amountText)),
     [amountText]
@@ -143,15 +132,14 @@ export default function StockTransferScreen({ navigation }) {
 
       const res = await transferStockToDownlineAgent(payload);
       
-      // Show success modal instead of progress
-      showCustomSuccessModal(`Stock transfer of ${fmtAFN(amount)} to ${agent?.user?.username} was successful!`);
-      setStep(STEPS.FORM); // Reset form
+      showCustomSuccessModal(t('transactions.stockSent'));
+      setStep(STEPS.FORM); 
       setAgent(null);
       setAmountText("");
       
     } catch (error) {
       console.log("Transfer stock error: ", error);
-      const message = error.response?.data?.error || error.message || "Failed to Transfer Stock";
+      const message = error.response?.data?.error || error.message || t('common.error');
       showCustomErrorModal(message);
     } finally {
       setLoading(false);
@@ -204,7 +192,7 @@ export default function StockTransferScreen({ navigation }) {
           ]}
         >
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Select Agent</Text>
+            <Text style={styles.modalTitle}>{t('stockTransfer.selectAgent')}</Text>
             <TouchableOpacity 
               onPress={() => setAgentPickerOpen(false)}
               style={styles.closeButton}
@@ -216,7 +204,7 @@ export default function StockTransferScreen({ navigation }) {
           <View style={styles.searchContainer}>
             <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
             <TextInput
-              placeholder="Search agents..."
+              placeholder={t('stockTransfer.searchAgents')}
               value={searchQuery}
               onChangeText={setSearchQuery}
               style={styles.searchInput}
@@ -249,7 +237,7 @@ export default function StockTransferScreen({ navigation }) {
                   <Text style={styles.agentName}>{item.user?.username}</Text>
                   <Text style={styles.agentPhone}>{item.user?.mobileNumber}</Text>
                   <Text style={styles.agentCommission}>
-                    Commission: {item.commissionRateDetails?.percentage || item.commission_rate || 0}%
+                    {t('stockTransfer.commission')}: {item.commissionRateDetails?.percentage || item.commission_rate || 0}%
                   </Text>
                 </View>
                 {item.id === agent?.id && (
@@ -264,10 +252,10 @@ export default function StockTransferScreen({ navigation }) {
               <View style={styles.emptyState}>
                 <Ionicons name="people-outline" size={48} color="#9E9E9E" />
                 <Text style={styles.emptyText}>
-                  {searchQuery ? "No agents found" : "No agents available"}
+                  {searchQuery ? t('stockTransfer.noAgentsFound') : t('stockTransfer.noAgentsAvailable')}
                 </Text>
                 <Text style={styles.emptySubtext}>
-                  {searchQuery ? "Try adjusting your search" : "No downline agents found"}
+                  {searchQuery ? t('stockTransfer.adjustSearch') : t('stockTransfer.noDownlineAgents')}
                 </Text>
               </View>
             }
@@ -279,7 +267,7 @@ export default function StockTransferScreen({ navigation }) {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white, paddingBottom: 100 }}>
-      <ServiceHeader title="Stock Transfer" onBack={goBack} />
+      <ServiceHeader title={t('services.stockTransfer')} onBack={goBack} />
 
       {step === STEPS.DONE ? (
         <ScrollView
@@ -288,21 +276,21 @@ export default function StockTransferScreen({ navigation }) {
           <View style={styles.successCircle}>
             <Ionicons name="checkmark" size={56} color="#4CAF50" />
           </View>
-          <Text style={styles.title}>Stock Transfer Successful!</Text>
+          <Text style={styles.title}>{t('stockTransfer.transferSuccessful')}</Text>
 
           <View style={styles.successDetails}>
-            <DetailRow label="Agent:" value={`${agent?.user?.username} (${agent?.user?.mobileNumber})`} />
-            <DetailRow label="Date:" value={new Date().toLocaleString()} />
-            <DetailRow label="Transaction ID:" value={txId} />
+            <DetailRow label={`${t('stockTransfer.agent')}:`} value={`${agent?.user?.username} (${agent?.user?.mobileNumber})`} />
+            <DetailRow label={`${t('receipt.dateTime')}:`} value={new Date().toLocaleString()} />
+            <DetailRow label={`${t('receipt.transactionId')}:`} value={txId} />
           </View>
 
           <View style={styles.totalBox}>
-            <Text style={styles.totalLabel}>Total Amount Transferred</Text>
+            <Text style={styles.totalLabel}>{t('stockTransfer.totalAmountTransferred')}</Text>
             <Text style={styles.totalValue}>{fmtAFN(total)}</Text>
           </View>
 
           <PrimaryButton
-            label="Done"
+            label={t('common.done')}
             onPress={() => navigation.popToTop()}
             style={{ width: "100%" }}
           />
@@ -319,10 +307,9 @@ export default function StockTransferScreen({ navigation }) {
           >
             {step === STEPS.FORM && (
               <>
-                {/* Agent Selection */}
                 <View style={{ marginBottom: 20 }}>
                   <View style={styles.editHeader}>
-                    <Text style={styles.label}>Select Agent</Text>
+                    <Text style={styles.label}>{t('stockTransfer.selectAgent')}</Text>
                   </View>
                   <TouchableOpacity
                     style={[
@@ -350,13 +337,13 @@ export default function StockTransferScreen({ navigation }) {
                             <Text style={styles.dropdownText}>{agent.user?.username}</Text>
                             <Text style={styles.dropdownSubtext}>{agent.user?.mobileNumber}</Text>
                             <Text style={styles.dropdownCommission}>
-                              Commission: {agentCommissionRate}%
+                              {t('stockTransfer.commission')}: {agentCommissionRate}%
                             </Text>
                           </View>
                         </>
                       ) : (
                         <Text style={[styles.dropdownText, { color: '#9E9E9E' }]}>
-                          Choose agent
+                          {t('stockTransfer.chooseAgent')}
                         </Text>
                       )}
                     </View>
@@ -364,9 +351,8 @@ export default function StockTransferScreen({ navigation }) {
                   </TouchableOpacity>
                 </View>
 
-                {/* Amount Input */}
                 <View style={{ marginBottom: 20 }}>
-                  <Text style={styles.label}>Transfer Amount</Text>
+                  <Text style={styles.label}>{t('stockTransfer.transferAmount')}</Text>
                   <View style={[
                     styles.inputContainer,
                     {
@@ -401,9 +387,8 @@ export default function StockTransferScreen({ navigation }) {
                   </View>
                 </View>
 
-                {/* Commission Rate - Display Only */}
                 <View style={{ marginBottom: 20 }}>
-                  <Text style={styles.label}>Commission Rate</Text>
+                  <Text style={styles.label}>{t('stockTransfer.commissionRate')}</Text>
                   <View style={[styles.inputContainer, styles.inputDisabled]}>
                     <Text style={styles.currencyTag}>%</Text>
                     <Text style={[styles.input, { color: Colors.textPrimary, paddingVertical: 15 }]}>
@@ -412,9 +397,8 @@ export default function StockTransferScreen({ navigation }) {
                   </View>
                 </View>
 
-                {/* Commission Amount - Display Only */}
                 <View style={{ marginBottom: 20 }}>
-                  <Text style={styles.label}>Commission Amount</Text>
+                  <Text style={styles.label}>{t('stockTransfer.commissionAmount')}</Text>
                   <View style={[styles.inputContainer, styles.inputDisabled]}>
                     <Text style={styles.currencyTag}>AFN</Text>
                     <Text style={[styles.input, { color: Colors.textPrimary, paddingVertical: 15 }]}>
@@ -423,9 +407,8 @@ export default function StockTransferScreen({ navigation }) {
                   </View>
                 </View>
 
-                {/* Total Amount - Display Only */}
                 <View style={{ marginBottom: 20 }}>
-                  <Text style={styles.label}>Total Amount</Text>
+                  <Text style={styles.label}>{t('stockTransfer.totalAmount')}</Text>
                   <View style={[styles.inputContainer, styles.inputDisabled]}>
                     <Text style={styles.currencyTag}>AFN</Text>
                     <Text style={[styles.input, { color: Colors.textPrimary, paddingVertical: 15 }]}>
@@ -435,7 +418,7 @@ export default function StockTransferScreen({ navigation }) {
                 </View>
 
                 <PrimaryButton
-                  label="Continue"
+                  label={t('common.continue')}
                   onPress={() => setStep(STEPS.CONFIRM)}
                   style={{ marginTop: 24, opacity: canContinue ? 1 : 0.5 }}
                   disabled={!canContinue}
@@ -445,31 +428,31 @@ export default function StockTransferScreen({ navigation }) {
 
             {step === STEPS.CONFIRM && (
               <>
-                <Text style={styles.sectionTitle}>Confirm Transfer</Text>
+                <Text style={styles.sectionTitle}>{t('stockTransfer.confirmTransfer')}</Text>
                 <Text style={styles.confirmSubtitle}>
-                  Please review the transfer details before confirming
+                  {t('stockTransfer.reviewDetails')}
                 </Text>
 
                 <View style={styles.confirmCard}>
-                  <DetailRow label="Agent" value={`${agent?.user?.username}`} />
-                  <DetailRow label="Phone" value={agent?.user?.mobileNumber} />
-                  <DetailRow label="Transfer Amount" value={fmtAFN(amount)} />
-                  <DetailRow label="Commission Rate" value={`${agentCommissionRate}%`} />
-                  <DetailRow label="Commission Amount" value={fmtAFN(commission)} />
+                  <DetailRow label={t('stockTransfer.agent')} value={`${agent?.user?.username}`} />
+                  <DetailRow label={t('mobileNumber')} value={agent?.user?.mobileNumber} />
+                  <DetailRow label={t('stockTransfer.transferAmount')} value={fmtAFN(amount)} />
+                  <DetailRow label={t('stockTransfer.commissionRate')} value={`${agentCommissionRate}%`} />
+                  <DetailRow label={t('stockTransfer.commissionAmount')} value={fmtAFN(commission)} />
                   <View style={styles.totalRow}>
-                    <Text style={styles.totalLabel}>Total Amount</Text>
+                    <Text style={styles.totalLabel}>{t('stockTransfer.totalAmount')}</Text>
                     <Text style={styles.totalValue}>{fmtAFN(total)}</Text>
                   </View>
                 </View>
 
                 <PrimaryButton
-                  label="Confirm Transfer"
+                  label={t('stockTransfer.confirmTransferButton')}
                   onPress={transferStock}
                   style={{ marginTop: 32 }}
                   loading={loading}
                 />
                 <PrimaryButton
-                  label="Back"
+                  label={t('common.back')}
                   onPress={goBack}
                   style={{ marginTop: 12, backgroundColor: "#6B7280" }}
                 />
@@ -479,23 +462,21 @@ export default function StockTransferScreen({ navigation }) {
         </KeyboardAvoidingView>
       )}
 
-      {/* Success Modal */}
       <SuccessModal
         visible={showSuccessModal}
         onClose={handleSuccessClose}
-        title="Transfer Successful!"
+        title={t('receipt.stockSent')}
         message={successMessage}
-        buttonText="Continue"
+        buttonText={t('common.continue')}
         autoHideDuration={3000}
       />
 
-      {/* Error Modal */}
       <ErrorModal
         visible={showErrorModal}
         onClose={handleErrorClose}
-        title="Transfer Failed"
+        title={t('common.error')}
         message={errorMessage}
-        buttonText="Try Again"
+        buttonText={t('common.tryAgain')}
         showRetryButton={true}
       />
 
@@ -558,157 +539,155 @@ const styles = {
     left: 0,
     right: 0,
     backgroundColor: '#fff',
-    borderTopLeftRadius: scale.hp(3.2),
-    borderTopRightRadius: scale.hp(3.2),
-    padding: scale.hp(2.1),
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
     elevation: 5,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: -scale.hp(0.26) },
+    shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.25,
-    shadowRadius: scale.hp(0.5),
+    shadowRadius: 3.84,
   },
   modalHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: scale.hp(2.1),
-    paddingBottom: scale.hp(1.55),
+    marginBottom: 20,
+    paddingBottom: 15,
     borderBottomWidth: 1,
     borderBottomColor: "#F0F0F0",
   },
   modalTitle: {
-    fontSize: scale.hp(2.35),
+    fontSize: 20,
     fontWeight: "700",
     color: Colors.textPrimary,
   },
   closeButton: {
-    padding: scale.hp(0.5),
+    padding: 4,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F5F5F5',
-    borderRadius: scale.hp(1.3),
-    paddingHorizontal: scale.wp(3.1),
-    marginBottom: scale.hp(2.1),
-    height: scale.hp(5.7),
+    borderRadius: 12,
+    paddingHorizontal: 15,
+    marginBottom: 20,
+    height: 48,
   },
   searchIcon: {
-    marginRight: scale.wp(2.1),
+    marginRight: 10,
   },
   searchInput: {
     flex: 1,
-    fontSize: scale.hp(2.1),
+    fontSize: 16,
     color: Colors.textPrimary,
   },
   modalContent: {
-    paddingBottom: scale.hp(2.6),
+    paddingBottom: 20,
   },
   sectionTitle: {
-    fontSize: scale.hp(2.6),
+    fontSize: 22,
     fontWeight: '700',
     color: Colors.textPrimary,
-    marginBottom: scale.hp(1.05),
-    marginTop: scale.hp(2.1),
+    marginBottom: 10,
+    marginTop: 20,
   },
   label: {
-    fontSize: scale.hp(1.8),
+    fontSize: 16,
     fontWeight: '600',
     color: Colors.textPrimary,
-    marginBottom: scale.hp(1.05),
+    marginBottom: 10,
   },
   editHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: scale.hp(1.05),
+    marginBottom: 10,
   },
   dropdown: {
-    height: scale.hp(9.8),
-    borderRadius: scale.hp(2.1),
+    height: 80,
+    borderRadius: 16,
     borderWidth: 1,
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: scale.wp(4.2),
+    paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
   dropdownText: {
-    fontSize: scale.hp(2.1),
+    fontSize: 18,
     fontWeight: '500',
     color: Colors.textPrimary,
   },
   dropdownSubtext: {
-    fontSize: scale.hp(1.8),
+    fontSize: 14,
     color: Colors.textSecondary,
-    marginTop: scale.hp(0.26),
+    marginTop: 2,
   },
   dropdownCommission: {
-    fontSize: scale.hp(1.55),
+    fontSize: 13,
     color: Colors.primary,
-    marginTop: scale.hp(0.26),
+    marginTop: 2,
     fontWeight: '500',
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderRadius: scale.hp(2.1),
+    borderRadius: 16,
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: scale.wp(4.2),
-    height: scale.hp(8.5),
+    paddingHorizontal: 20,
+    height: 60,
   },
   currencyTag: {
     fontWeight: '700',
-    marginRight: scale.wp(3.1),
+    marginRight: 15,
     color: Colors.textPrimary,
-    fontSize: scale.hp(2.1),
+    fontSize: 18,
   },
   input: {
     flex: 1,
-    fontSize: scale.hp(2.1),
+    fontSize: 18,
     color: Colors.textPrimary,
   },
   inputDisabled: {
     backgroundColor: '#F8F9FA',
   },
   clearBtn: {
-    padding: scale.hp(0.8),
+    padding: 6,
   },
   confirmCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: scale.hp(2.6),
-    padding: scale.hp(2.6),
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: scale.hp(0.5) },
+    borderRadius: 16,
+    padding: 20,
+    marginTop: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: scale.hp(1.55),
-    elevation: 4,
-    marginTop: scale.hp(2.1),
+    shadowRadius: 8,
+    elevation: 3,
   },
   confirmSubtitle: {
-    fontSize: scale.hp(2.1),
+    fontSize: 16,
     color: Colors.textSecondary,
-    marginBottom: scale.hp(2.6),
-    lineHeight: scale.hp(2.9),
+    marginBottom: 25,
+    lineHeight: 22,
   },
   detailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: scale.hp(1.55),
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
   detailLabel: {
-    fontSize: scale.hp(1.8),
+    fontSize: 14,
     color: Colors.textSecondary,
     fontWeight: '500',
   },
   detailValue: {
-    fontSize: scale.hp(1.8),
+    fontSize: 14,
     color: Colors.textPrimary,
     fontWeight: '600',
   },
@@ -716,123 +695,133 @@ const styles = {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: scale.hp(2.1),
-    marginTop: scale.hp(1.05),
+    paddingVertical: 16,
+    marginTop: 8,
     borderTopWidth: 2,
     borderTopColor: '#F1F5F9',
+  },
+  totalLabel: {
+    fontSize: 16,
+    color: Colors.textPrimary,
+    fontWeight: '600',
+  },
+  totalValue: {
+    fontSize: 20,
+    color: Colors.primary,
+    fontWeight: '700',
   },
   boldText: {
     fontWeight: '700',
   },
   successCircle: {
-    width: scale.wp(24.8),
-    height: scale.wp(24.8),
-    borderRadius: scale.wp(12.4),
+    width: 120,
+    height: 120,
+    borderRadius: 60,
     backgroundColor: "rgba(76,175,80,0.1)",
-    borderWidth: scale.hp(0.26),
+    borderWidth: 2,
     borderColor: "rgba(76,175,80,0.35)",
     justifyContent: "center",
     alignItems: "center",
-    marginVertical: scale.hp(1.55),
+    marginVertical: 30,
   },
   title: {
-    fontSize: scale.hp(3.1),
+    fontSize: 28,
     fontWeight: "700",
     color: Colors.textPrimary,
-    marginBottom: scale.hp(3.1),
+    marginBottom: 24,
   },
   successDetails: {
     width: '100%',
     backgroundColor: '#F8FAFC',
-    borderRadius: scale.hp(2.1),
-    padding: scale.hp(2.6),
-    marginBottom: scale.hp(3.1),
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
   },
   totalBox: {
     width: '100%',
     backgroundColor: '#F0F9FF',
-    borderRadius: scale.hp(2.6),
-    paddingVertical: scale.hp(3.1),
+    borderRadius: 20,
+    paddingVertical: 24,
     alignItems: 'center',
-    marginVertical: scale.hp(2.6),
+    marginVertical: 20,
     borderWidth: 1,
     borderColor: '#E0F2FE',
   },
   totalLabel: {
     color: Colors.textSecondary,
-    fontSize: scale.hp(1.8),
+    fontSize: 16,
     fontWeight: '600',
-    marginBottom: scale.hp(1.05),
+    marginBottom: 8,
   },
   totalValue: {
     color: Colors.primary,
-    fontSize: scale.hp(3.65),
+    fontSize: 32,
     fontWeight: '800',
   },
   agentItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: scale.hp(1.55),
-    paddingHorizontal: scale.wp(2.1),
-    borderRadius: scale.hp(1.05),
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
   },
   agentAvatar: {
-    width: scale.wp(10.4),
-    height: scale.wp(10.4),
-    borderRadius: scale.wp(5.2),
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: '#F0F9FF',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: scale.wp(3.1),
+    marginRight: 15,
   },
   agentAvatarSmall: {
-    width: scale.wp(9.4),
-    height: scale.wp(9.4),
-    borderRadius: scale.wp(4.7),
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
     backgroundColor: '#F0F9FF',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: scale.wp(3.1),
+    marginRight: 15,
   },
   agentInfo: {
     flex: 1,
   },
   agentName: {
-    fontSize: scale.hp(2.1),
+    fontSize: 16,
     fontWeight: '600',
     color: Colors.textPrimary,
   },
   agentPhone: {
-    fontSize: scale.hp(1.8),
+    fontSize: 14,
     color: Colors.textSecondary,
-    marginTop: scale.hp(0.26),
+    marginTop: 2,
   },
   agentCommission: {
-    fontSize: scale.hp(1.55),
+    fontSize: 13,
     color: Colors.primary,
-    marginTop: scale.hp(0.26),
+    marginTop: 2,
     fontWeight: '500',
   },
   agentSeparator: {
-    height: scale.hp(0.13),
+    height: 1,
     backgroundColor: '#F0F0F0',
   },
-
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: scale.hp(5.2),
+    paddingVertical: 40,
   },
   emptyText: {
-    fontSize: scale.hp(2.1),
+    fontSize: 16,
     color: Colors.textSecondary,
-    marginTop: scale.hp(1.55),
+    marginTop: 12,
     textAlign: 'center',
   },
   emptySubtext: {
-    fontSize: scale.hp(1.8),
+    fontSize: 14,
     color: Colors.textSecondary,
-    marginTop: scale.hp(0.5),
+    marginTop: 4,
     textAlign: 'center',
   },
 };

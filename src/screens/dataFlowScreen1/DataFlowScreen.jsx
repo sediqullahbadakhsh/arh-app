@@ -26,6 +26,7 @@ import {
   useMutation,
   useQueryClient,
 } from '@tanstack/react-query';
+import LottieView from 'lottie-react-native';
 import { Colors } from "../../theme/colors";
 import ServiceHeader from "../../components/ServiceHeader";
 import PrimaryButton from "../../components/PrimaryButton";
@@ -49,7 +50,6 @@ import StepNumber from "./StepNumber";
 import StepProducts from "./StepProducts";
 import StepPay from "./StepPay";
 import { useTranslation } from "react-i18next";
-import LottieView from 'lottie-react-native';
 
 const { height: screenHeight } = Dimensions.get('window');
 const BASE_STEPS = { COUNTRY: 0, NUMBER: 1, PRODUCT: 2, PAY: 3 };
@@ -73,7 +73,7 @@ const queryClient = new QueryClient({
   },
 });
 
-// Query Keys
+
 const QUERY_KEYS = {
   COUNTRIES: ['countries'],
   BUNDLE_CATEGORIES: ['bundle-categories'],
@@ -83,8 +83,10 @@ const QUERY_KEYS = {
   CONTACTS: ['contacts'],
 };
 
-// API Service Functions with React Query
+
 const useCountries = () => {
+  const { t } = useTranslation();
+  
   return useQuery({
     queryKey: QUERY_KEYS.COUNTRIES,
     queryFn: async () => {
@@ -92,6 +94,10 @@ const useCountries = () => {
       return response?.data || [];
     },
     staleTime: 30 * 60 * 1000, // 30 minutes
+    onError: (error) => {
+      console.error('Error fetching countries:', error);
+      Alert.alert(t('common.error'), t('failedToLoadCountries'));
+    },
   });
 };
 
@@ -118,6 +124,8 @@ const useBundleTypes = () => {
 };
 
 const useDataProducts = (countryId, categoryId, typeId, enabled = false) => {
+  const { t } = useTranslation();
+  
   return useQuery({
     queryKey: QUERY_KEYS.DATA_PRODUCTS(countryId, categoryId, typeId),
     queryFn: async () => {
@@ -135,36 +143,22 @@ const useDataProducts = (countryId, categoryId, typeId, enabled = false) => {
     },
     enabled: !!countryId && enabled,
     staleTime: 5 * 60 * 1000, // 5 minutes
-  });
-};
-
-const useOrderStatus = (orderId, enabled = false) => {
-  return useQuery({
-    queryKey: QUERY_KEYS.ORDER_STATUS(orderId),
-    queryFn: async () => {
-      if (!orderId) return null;
-      const response = await getOrderStatus(orderId);
-      return response;
+    onError: (error) => {
+      console.error('Error fetching data products:', error);
+      Alert.alert(t('common.error'), t('failedToLoadProducts'));
     },
-    enabled: !!orderId && enabled,
-    refetchInterval: (data) => {
-      if (!data?.data?.status) return false;
-      const status = data.data.status;
-      return status === ORDER_STATUS.QUEUED || 
-             status === ORDER_STATUS.PROCESSING || 
-             status === ORDER_STATUS.PENDING ? 3000 : false;
-    },
-    refetchIntervalInBackground: true,
   });
 };
 
 const useContacts = () => {
+  const { t } = useTranslation();
+  
   return useQuery({
     queryKey: QUERY_KEYS.CONTACTS,
     queryFn: async () => {
       const { status } = await Contacts.requestPermissionsAsync();
       if (status !== 'granted') {
-        throw new Error('Contacts permission denied');
+        throw new Error(t('permissionDenied'));
       }
       
       const { data } = await Contacts.getContactsAsync({
@@ -176,11 +170,16 @@ const useContacts = () => {
     enabled: false,
     staleTime: Infinity,
     cacheTime: Infinity,
+    onError: (error) => {
+      console.error('Error loading contacts:', error);
+      Alert.alert(t('common.error'), t('failedToLoadContacts'));
+    },
   });
 };
 
 const useActivateBundle = () => {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   
   return useMutation({
     mutationFn: async (payload) => {
@@ -189,12 +188,7 @@ const useActivateBundle = () => {
     },
     onSuccess: (data, variables) => {
       if (data.orderId) {
-        // Invalidate order status query
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ORDER_STATUS(data.orderId) });
-        
-        // You might want to invalidate user transactions or balance here
-        // queryClient.invalidateQueries({ queryKey: ['user-transactions'] });
-        // queryClient.invalidateQueries({ queryKey: ['user-balance'] });
       }
     },
     onError: (error) => {
@@ -211,8 +205,19 @@ const OrderStatusScreen = ({
   getStatusColor, 
   getStatusMessage, 
   resetFlow, 
-  navigation 
+  navigation,
+  pollingRef
 }) => {
+  const { t } = useTranslation();
+  
+  const handleDonePress = () => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+    navigation.popToTop();
+  };
+  
   return (
     <View style={{ flex: 1, paddingBottom: 100 }}>
       <ScrollView
@@ -232,37 +237,44 @@ const OrderStatusScreen = ({
 
         <View style={styles.detailsCard}>
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Receiver Number</Text>
+            <Text style={styles.detailLabel}>{t('receiverNumber')}</Text>
             <Text style={styles.detailValue}>{orderDetails?.mobile}</Text>
           </View>
          
+          {orderDetails?.productName && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>{t('selectedPlan')}</Text>
+              <Text style={styles.detailValue}>
+                {typeof orderDetails?.productName === 'object' 
+                  ? orderDetails?.productName?.en || orderDetails?.productName 
+                  : orderDetails?.productName}
+              </Text>
+            </View>
+          )}
+
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Bundle Plan</Text>
-            <Text style={styles.detailValue}>{orderDetails?.productName?.en}</Text>
+            <Text style={styles.detailLabel}>{t('transactionId')}</Text>
+            <Text style={styles.detailValue}>{orderDetails?.txnNumber || t('common.pending')}</Text>
           </View>
 
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Transaction ID</Text>
-            <Text style={styles.detailValue}>{orderDetails?.txnNumber}</Text>
-          </View>
-
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Date</Text>
+            <Text style={styles.detailLabel}>{t('date')}</Text>
             <Text style={styles.detailValue}>
-              {new Date(orderDetails?.date).toLocaleString()}
+              {orderDetails?.date ? new Date(orderDetails?.date).toLocaleString() : new Date().toLocaleString()}
             </Text>
           </View>
 
           <View style={styles.amountSection}>
-            <Text style={styles.amountLabel}>Total Amount</Text>
-            <Text style={styles.amountValue}>{orderDetails?.amountAfn} AFN</Text>
+            <Text style={styles.amountLabel}>{t('totalAmount')}</Text>
+            <Text style={styles.amountValue}>{orderDetails?.amountAfn || '0'} AFN</Text>
           </View>
         </View>
 
         <View style={styles.statusMessageContainer}>
           <Text style={[styles.statusMessage, { color: getStatusColor() }]}>
             {getStatusMessage()}
-            {orderDetails?.error && `\n\nError: ${orderDetails.error}`}
+            {orderDetails?.error && `\n\n${t('common.error')}: ${orderDetails.error}`}
+            {orderDetails?.message && `\n\n${orderDetails.message}`}
           </Text>
         </View>
 
@@ -281,25 +293,23 @@ const OrderStatusScreen = ({
               />
             </View>
             <Text style={styles.progressText}>
-              {orderStatus === ORDER_STATUS.QUEUED ? 'Queued' : 
-              orderStatus === ORDER_STATUS.PROCESSING ? 'Processing' : 'Finalizing...'}
+              {orderStatus === ORDER_STATUS.QUEUED ? t('queued') : 
+              orderStatus === ORDER_STATUS.PROCESSING ? t('processing') : t('finalizing')}
             </Text>
           </View>
         )}
 
         {(orderStatus === ORDER_STATUS.SUCCEEDED || orderStatus === ORDER_STATUS.FAILED) && (
           <PrimaryButton
-            label="Done"
-            onPress={() => {
-              navigation.popToTop();
-            }}
+            label={t('done')}
+            onPress={handleDonePress}
             style={{ width: "100%", marginTop: 20 }}
           />
         )}
 
         <TouchableOpacity onPress={resetFlow} style={styles.moreButton}>
           <Text style={styles.moreButtonText}>
-            {orderStatus === ORDER_STATUS.FAILED ? "Try Again" : "Activate More"}
+            {orderStatus === ORDER_STATUS.FAILED ? t('tryAgain') : t('activateMore')}
           </Text>
         </TouchableOpacity>
       </ScrollView>
@@ -316,9 +326,10 @@ const ContactsModal = ({
   setSearchQuery, 
   filteredContacts, 
   handleContactSelect,
-  t,
   loadingContacts
 }) => {
+  const { t } = useTranslation();
+  
   return (
     <Modal
       visible={contactsModalVisible}
@@ -356,7 +367,7 @@ const ContactsModal = ({
           <View style={styles.searchContainer}>
             <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
             <TextInput
-              placeholder="Search contacts..."
+              placeholder={t("searchContacts")}
               value={searchQuery}
               onChangeText={setSearchQuery}
               style={styles.searchInput}
@@ -367,7 +378,7 @@ const ContactsModal = ({
           {loadingContacts ? (
             <View style={styles.emptyContainer}>
               <ActivityIndicator size="large" color={Colors.primary} />
-              <Text style={styles.emptyText}>Loading contacts...</Text>
+              <Text style={styles.emptyText}>{t("loadingContacts")}</Text>
             </View>
           ) : filteredContacts.length > 0 ? (
             <FlatList
@@ -420,6 +431,8 @@ const CountriesModal = ({
   setCountry,
   loadingCountries
 }) => {
+  const { t } = useTranslation();
+  
   const filteredCountries = useMemo(() => {
     if (!countrySearch) return countries;
     return countries.filter(c =>
@@ -453,7 +466,7 @@ const CountriesModal = ({
           ]}
         >
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Select Country</Text>
+            <Text style={styles.modalTitle}>{t("selectCountry")}</Text>
             <TouchableOpacity 
               onPress={() => setCountryOpen(false)}
               style={styles.closeButton}
@@ -465,7 +478,7 @@ const CountriesModal = ({
           <View style={styles.searchContainer}>
             <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
             <TextInput
-              placeholder="Search countries..."
+              placeholder={t("searchCountries")}
               value={countrySearch}
               onChangeText={setCountrySearch}
               style={styles.searchInput}
@@ -476,7 +489,7 @@ const CountriesModal = ({
           {loadingCountries ? (
             <View style={styles.emptyContainer}>
               <ActivityIndicator size="large" color={Colors.primary} />
-              <Text style={styles.emptyText}>Loading countries...</Text>
+              <Text style={styles.emptyText}>{t("loadingCountries")}</Text>
             </View>
           ) : (
             <FlatList
@@ -514,9 +527,11 @@ const CountriesModal = ({
 };
 
 function DataFlowScreenMerchant({ navigation }) {
+  const { t } = useTranslation();
   const { user } = useAuth?.() || { user: null };
   const isB2B = (user?.role || "").toLowerCase().includes("b2b");
   const lastStep = isB2B ? BASE_STEPS.PRODUCT : BASE_STEPS.PAY;
+  
   const [step, setStep] = useState(0);
   const [orderStatus, setOrderStatus] = useState(null);
   const [orderDetails, setOrderDetails] = useState(null);
@@ -530,24 +545,22 @@ function DataFlowScreenMerchant({ navigation }) {
   const [selectedType, setSelectedType] = useState(null);
   const [product, setProduct] = useState(null);
   const [search, setSearch] = useState("");
-  const { t } = useTranslation();  
+  const [loading, setLoading] = useState(false);
+  
   const [contactsSlideAnim] = useState(new Animated.Value(screenHeight));
   const [countriesSlideAnim] = useState(new Animated.Value(screenHeight));
   const insets = useSafeAreaInsets();
   
   const lottieRef = useRef(null);
+  const pollingRef = useRef(null);
 
   const dial = DIAL_CODES[country?.countryCode] || "";
   const operator = guessOperator(country?.countryCode, localNumber.replace(/\D/g, ""));
 
-  // React Query hooks
+
   const { data: countries = [], isLoading: loadingCountries } = useCountries();
   const { data: bundleCategories = [], isLoading: loadingCategories } = useBundleCategories();
   const { data: bundleTypes = [], isLoading: loadingTypes } = useBundleTypes();
-  const { 
-    data: orderStatusData, 
-    isFetching: pollingOrderStatus 
-  } = useOrderStatus(orderDetails?.orderId, !!orderDetails?.orderId);
   const { 
     data: contacts = [], 
     isLoading: loadingContacts,
@@ -567,6 +580,15 @@ function DataFlowScreenMerchant({ navigation }) {
     shouldFetchProducts
   );
 
+  // Clean up polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+      }
+    };
+  }, []);
+
   // Set initial country from cached data
   useEffect(() => {
     if (countries.length > 0 && !country) {
@@ -584,18 +606,6 @@ function DataFlowScreenMerchant({ navigation }) {
       setSelectedType(bundleTypes[0]);
     }
   }, [bundleCategories, bundleTypes]);
-
-  // Update order status from React Query polling
-  useEffect(() => {
-    if (orderStatusData?.data?.status) {
-      const currentStatus = orderStatusData.data.status;
-      setOrderStatus(currentStatus);
-      setOrderDetails(prev => ({
-        ...prev,
-        ...orderStatusData.data
-      }));
-    }
-  }, [orderStatusData]);
 
   // Lottie animation
   useEffect(() => {
@@ -696,7 +706,53 @@ function DataFlowScreenMerchant({ navigation }) {
     setProduct(null);
   }, [country?.countryCode]);
 
+  // Polling function for order status (same as TopUpFlow)
+  const startPollingOrderStatus = async (orderId) => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+    }
+
+    let pollCount = 0;
+    const maxPolls = 60;
+
+    pollingRef.current = setInterval(async () => {
+      try {
+        pollCount++;
+        const statusResponse = await getOrderStatus(orderId);
+        const currentStatus = statusResponse.data?.status;
+        
+        console.log(`Poll ${pollCount}: Order status:`, currentStatus);
+        
+        setOrderStatus(currentStatus);
+        setOrderDetails(prev => ({
+          ...prev,
+          ...statusResponse.data
+        }));
+
+        if (currentStatus === ORDER_STATUS.SUCCEEDED || 
+            currentStatus === ORDER_STATUS.FAILED || 
+            pollCount >= maxPolls) {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+          
+          if (pollCount >= maxPolls) {
+            setOrderStatus(ORDER_STATUS.FAILED);
+            console.log("Max polling attempts reached");
+          }
+        }
+      } catch (error) {
+        console.error("Error polling order status:", error);
+        if (pollCount >= maxPolls) {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+          setOrderStatus(ORDER_STATUS.FAILED);
+        }
+      }
+    }, 3000);
+  };
+
   const activateBundle = async () => {
+    setLoading(true);
     const cleanedNumber = localNumber.replace(/\D/g, "");
     const receiverNumber = `${dial}${cleanedNumber}`.replace(/\s/g, "");
     
@@ -721,9 +777,14 @@ function DataFlowScreenMerchant({ navigation }) {
           amountAfn: product?.price,
           productName: product?.productName,
           date: new Date().toISOString(),
-          operator: operator?.name || "Unknown",
-          message: res.message || "Bundle activation initiated successfully!",
+          operator: operator?.name || t('common.unknown'),
+          message: res.message || t('bundleActivationInitiated'),
         });
+        
+        // Start polling for status updates (same as TopUpFlow)
+        if (res.orderId) {
+          await startPollingOrderStatus(res.orderId);
+        }
       } else {
         setOrderStatus(ORDER_STATUS.FAILED);
         setOrderDetails({
@@ -731,7 +792,7 @@ function DataFlowScreenMerchant({ navigation }) {
           amountAfn: product?.price,
           productName: product?.productName,
           date: new Date().toISOString(),
-          error: res.error || "Activation failed. Please try again.",
+          error: res.error || t('bundleActivationFailed'),
         });
       }
     } catch (error) {
@@ -743,14 +804,16 @@ function DataFlowScreenMerchant({ navigation }) {
         amountAfn: product?.price,
         productName: product?.productName,
         date: new Date().toISOString(),
-        error: error.response?.data?.error || "Activation failed. Please try again.",
+        error: error.response?.data?.error || t('bundleActivationFailedContactSupport'),
       });
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleContactSelect = useCallback((phoneNumber) => {
     if (!phoneNumber) {
-      Alert.alert("Error", "Invalid phone number selected");
+      Alert.alert(t('error'), t('invalidPhoneNumber'));
       return;
     }
 
@@ -773,6 +836,11 @@ function DataFlowScreenMerchant({ navigation }) {
     setProduct(null);
     setLocalNumber("");
     
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+
     if (lottieRef.current) {
       lottieRef.current.reset();
     }
@@ -782,18 +850,18 @@ function DataFlowScreenMerchant({ navigation }) {
   const getStatusMessage = useCallback(() => {
     switch (orderStatus) {
       case ORDER_STATUS.QUEUED:
-        return "Your bundle activation has been queued and will be processed shortly.";
+        return t('bundleProcessing');
       case ORDER_STATUS.PROCESSING:
       case ORDER_STATUS.PENDING:
-        return "Your bundle is being activated. Please wait...";
+        return t('bundleProcessing');
       case ORDER_STATUS.SUCCEEDED:
-        return "Bundle activated successfully! ";
+        return t('bundleActivatedSuccessfully');
       case ORDER_STATUS.FAILED:
-        return "Bundle activation failed. ";
+        return t('bundleActivationFailed');
       default:
-        return "Processing your request...";
+        return t('processingYourRequest');
     }
-  }, [orderStatus]);
+  }, [orderStatus, t]);
 
   const getStatusIcon = useCallback(() => {
     switch (orderStatus) {
@@ -842,18 +910,18 @@ function DataFlowScreenMerchant({ navigation }) {
   const getStatusTitle = useCallback(() => {
     switch (orderStatus) {
       case ORDER_STATUS.QUEUED:
-        return "Bundle Queued";
+        return t('requestSubmitted');
       case ORDER_STATUS.PROCESSING:
       case ORDER_STATUS.PENDING:
-        return "Activating Bundle";
+        return t('processingRequest');
       case ORDER_STATUS.SUCCEEDED:
-        return "Bundle Activated!";
+        return t('bundleActivated');
       case ORDER_STATUS.FAILED:
-        return "Activation Failed";
+        return t('bundleActivationFailed');
       default:
-        return "Processing";
+        return t('processing');
     }
-  }, [orderStatus]);
+  }, [orderStatus, t]);
 
   const getStatusColor = useCallback(() => {
     switch (orderStatus) {
@@ -871,12 +939,10 @@ function DataFlowScreenMerchant({ navigation }) {
     }
   }, [orderStatus]);
 
-  const loading = activateBundleMutation.isLoading || pollingOrderStatus;
-
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
       <ServiceHeader 
-        title="Internet Bundle" 
+        title={t('dataBundle')} 
         onBack={orderStatus ? resetFlow : goBack} 
       />
 
@@ -890,6 +956,7 @@ function DataFlowScreenMerchant({ navigation }) {
           getStatusMessage={getStatusMessage}
           resetFlow={resetFlow}
           navigation={navigation}
+          pollingRef={pollingRef}
         />
       ) : (
         <KeyboardAvoidingView
@@ -957,17 +1024,18 @@ function DataFlowScreenMerchant({ navigation }) {
               label={
                 step === lastStep
                   ? isB2B
-                    ? "Activate Bundle"
-                    : `Pay ${product?.price} AFN`
-                  : "Continue"
+                    ? t('activateBundle')
+                    : `${t('pay')} ${product?.price} AFN`
+                  : t('continue')
               }
               onPress={goNext}
               style={{ marginTop: 24, opacity: canNext ? 1 : 0.5 }}
-              loading={loading}
+              loading={loading || activateBundleMutation.isLoading}
+              disabled={!canNext || loading}
             />
             {step > 0 && (
               <PrimaryButton
-                label="Back"
+                label={t('back')}
                 onPress={goBack}
                 style={{ marginTop: 12, marginBottom: 110, backgroundColor: "#4A4A4A" }}
               />
@@ -985,7 +1053,6 @@ function DataFlowScreenMerchant({ navigation }) {
         setSearchQuery={setSearchQuery}
         filteredContacts={filteredContacts}
         handleContactSelect={handleContactSelect}
-        t={t}
         loadingContacts={loadingContacts}
       />
 
@@ -1000,17 +1067,11 @@ function DataFlowScreenMerchant({ navigation }) {
         setCountry={setCountry}
         loadingCountries={loadingCountries}
       />
-
-      {loading && (
-        <View style={styles.loadingOverlay}>
-          <Text style={styles.loadingText}>Activating Bundle...</Text>
-        </View>
-      )}
     </SafeAreaView>
   );
 }
 
-// Wrap the component with QueryClientProvider
+
 export default function DataFlowScreenMerchantWrapper({ navigation }) {
   return (
     <QueryClientProvider client={queryClient}>
@@ -1020,7 +1081,6 @@ export default function DataFlowScreenMerchantWrapper({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  // Order Status Styles
   statusHeader: {
     alignItems: 'center',
     marginBottom: 24,
@@ -1040,8 +1100,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   lottieAnimation: {
-    width: 80,
-    height: 80,
+    width: 150,
+    height: 150,
   },
   detailsCard: {
     backgroundColor: '#fff',
@@ -1135,7 +1195,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // Modal Styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -1202,7 +1261,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginEnd: 12,
   },
   contactInfo: {
     flex: 1,
@@ -1237,17 +1296,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 16,
-  },
-  loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(255,255,255,0.8)",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 999,
-  },
-  loadingText: {
-    fontSize: 16,
-    color: Colors.textPrimary,
-    fontWeight: "600",
   },
 });

@@ -22,8 +22,10 @@ import { useModal } from "../hooks/useModal";
 import ProgressModal from "../components/modals/ProgressModal";
 import SuccessModal from "../components/modals/SuccessModal";
 import { scale } from "../utils/normalizeSize";
+import { useTranslation } from "react-i18next";
 
 export default function TransferToPrimaryScreen({ navigation, route }) {
+  const { t } = useTranslation();
   const { user, setUser } = useUser();
   const startBalance = route.params?.balance ?? 0;
   const [amount, setAmount] = useState(String(startBalance));
@@ -81,39 +83,48 @@ export default function TransferToPrimaryScreen({ navigation, route }) {
         amount: Number(amount),
         transactionId: res?.transactionId || `TX${Date.now()}`,
         timestamp: new Date().toISOString(),
-        fromWallet: "API Wallet",
-        toWallet: "Primary Wallet",
-        user: user?.username || "User"
+        fromWallet: t('wallet.commissionWallet'),
+        toWallet: t('wallet.primaryWallet'),
+        user: user?.username || t('common.user')
       };
       
       setTransferData(transferDetails);
       
       autoProgressToSuccess(
         {
-          title: "Processing Transfer",
-          message: `Transferring ${amount} AFN to your primary wallet...`,
+          title: t('transferToPrimary.processingTransfer'),
+          message: t('transferToPrimary.transferringAmount', { amount: amount }),
           onCancel: handleTransferCancel
         },
         {
-          title: "Transfer Successful!",
-          subtitle: "Your funds have been transferred successfully",
+          title: t('transferToPrimary.transferSuccessful'),
+          subtitle: t('transferToPrimary.transferSuccessMessage'),
           details: [
             {
               type: "amount",
-              label: "Amount Transferred",
+              label: t('transferToPrimary.amountTransferred'),
               value: `${transferDetails.amount} AFN`
             },
             {
               type: "transaction",
-              label: "Transaction ID",
+              label: t('receipt.transactionId'),
               value: transferDetails.transactionId
             },
             {
               type: "time",
-              label: "Completed At",
+              label: t('transferToPrimary.completedAt'),
               value: new Date(transferDetails.timestamp).toLocaleTimeString()
             },
-           
+            {
+              type: "from",
+              label: t('transferToPrimary.from'),
+              value: transferDetails.fromWallet
+            },
+            {
+              type: "to",
+              label: t('transferToPrimary.to'),
+              value: transferDetails.toWallet
+            }
           ],
           onShare: handleShareReceipt,
           onClose: handleSuccessClose
@@ -126,9 +137,9 @@ export default function TransferToPrimaryScreen({ navigation, route }) {
       const message =
         error.response?.data?.error ||
         error.message ||
-        "Failed to transfer to main wallet";
+        t('transferToPrimary.transferFailed');
       
-      Alert.alert("Transfer Failed", message);
+      Alert.alert(t('transferToPrimary.transferFailed'), message);
       setLoading(false);
     }
   };
@@ -141,7 +152,7 @@ export default function TransferToPrimaryScreen({ navigation, route }) {
   const handleShareReceipt = async () => {
     try {
       if (!transferData) {
-        Alert.alert("Error", "No transfer data available to share");
+        Alert.alert(t('common.error'), t('transferToPrimary.noTransferData'));
         return;
       }
 
@@ -149,7 +160,7 @@ export default function TransferToPrimaryScreen({ navigation, route }) {
       
       const result = await Share.share({
         message: shareMessage,
-        title: 'Transfer Receipt'
+        title: t('transferToPrimary.transferReceipt')
       });
 
       if (result.action === Share.sharedAction) {
@@ -159,27 +170,28 @@ export default function TransferToPrimaryScreen({ navigation, route }) {
       }
     } catch (error) {
       console.log('Error sharing receipt:', error);
-      Alert.alert("Share Error", "Failed to share receipt. Please try again.");
+      Alert.alert(t('transferToPrimary.shareError'), t('transferToPrimary.shareFailed'));
     }
   };
 
   const generateShareMessage = (data) => {
+    const { t } = useTranslation();
     const date = new Date(data.timestamp).toLocaleDateString();
     const time = new Date(data.timestamp).toLocaleTimeString();
     
-    return `💰 Transfer Receipt
+    return `💰 ${t('transferToPrimary.transferReceipt')}
 
-✅ Transfer Successful!
+✅ ${t('transferToPrimary.transferSuccessful')}!
 
-Amount: ${data.amount} AFN
-From: ${data.fromWallet}
-To: ${data.toWallet}
-Transaction ID: ${data.transactionId}
-Date: ${date}
-Time: ${time}
-User: ${data.user}
+${t('amount')}: ${data.amount} AFN
+${t('transferToPrimary.from')}: ${data.fromWallet}
+${t('transferToPrimary.to')}: ${data.toWallet}
+${t('receipt.transactionId')}: ${data.transactionId}
+${t('receipt.date')}: ${date}
+${t('receipt.time')}: ${time}
+${t('transferToPrimary.user')}: ${data.user}
 
-Thank you for using our service! 🎉`;
+${t('transferToPrimary.thankYouMessage')} 🎉`;
   };
 
   const handleSuccessClose = () => {
@@ -190,7 +202,7 @@ Thank you for using our service! 🎉`;
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
       <ServiceHeader
-        title="Transfer To Primary Wallet"
+        title={t('wallet.transferToPrimary')}
         onBack={() => navigation.goBack()}
       />
       
@@ -209,16 +221,16 @@ Thank you for using our service! 🎉`;
         >
    
           <View style={styles.balanceCard}>
-            <Text style={styles.balanceLabel}>Available Balance</Text>
+            <Text style={styles.balanceLabel}>{t('transferToPrimary.availableBalance')}</Text>
             <Text style={styles.balanceAmount}>{Number(startBalance).toFixed(2)} AFN</Text>
           </View>
 
      
           <View style={{ marginTop: 24 }}>
             <View style={TopUpStyles.editHeader}>
-              <Text style={TopUpStyles.sectionTitle}>Transfer Amount</Text>
+              <Text style={TopUpStyles.sectionTitle}>{t('transferToPrimary.transferAmount')}</Text>
               <TouchableOpacity onPress={setMaxAmount}>
-                <Text style={TopUpStyles.editLink}>Max</Text>
+                <Text style={TopUpStyles.editLink}>{t('transferToPrimary.max')}</Text>
               </TouchableOpacity>
             </View>
 
@@ -260,20 +272,31 @@ Thank you for using our service! 🎉`;
             <View style={{ marginTop: 8, minHeight: 20 }}>
               {amount && Number(amount) > startBalance && (
                 <Text style={styles.errorText}>
-                  Amount exceeds available balance
+                  {t('transferToPrimary.exceedsBalance')}
                 </Text>
               )}
               {amount && Number(amount) <= 0 && (
                 <Text style={styles.errorText}>
-                  Amount must be greater than 0
+                  {t('enterValidAmountGreaterThanZero')}
                 </Text>
               )}
             </View>
           </View>
 
+          {/* Info Section */}
+          <View style={styles.infoCard}>
+            <View style={styles.infoHeader}>
+              <Ionicons name="information-circle-outline" size={20} color={Colors.primary} />
+              <Text style={styles.infoTitle}>{t('transferToPrimary.importantInfo')}</Text>
+            </View>
+            <Text style={styles.infoText}>
+              {t('transferToPrimary.transferNote')}
+            </Text>
+          </View>
+
           {/* Transfer Button */}
           <PrimaryButton
-            label="Transfer to Primary Wallet"
+            label={t('wallet.transferToPrimary')}
             onPress={transferApi}
             style={{ 
               marginTop: 32, 
@@ -290,8 +313,8 @@ Thank you for using our service! 🎉`;
       <ProgressModal
         visible={isProgressVisible}
         onCancel={handleTransferCancel}
-        title="Processing Transfer"
-        message={`Transferring ${amount} AFN to your primary wallet...`}
+        title={t('transferToPrimary.processingTransfer')}
+        message={t('transferToPrimary.transferringAmount', { amount: amount })}
         duration={3000}
         onComplete={() => {}}
       />
@@ -300,11 +323,11 @@ Thank you for using our service! 🎉`;
         visible={isSuccessVisible}
         onClose={handleSuccessClose}
         onShare={handleShareReceipt}
-        title="Transfer Successful!"
-        subtitle="Your funds have been transferred successfully"
+        title={t('transferToPrimary.transferSuccessful')}
+        subtitle={t('transferToPrimary.transferSuccessMessage')}
         details={modalData?.details || []}
-        primaryButtonText="Continue"
-        shareButtonText="Share Receipt"
+        primaryButtonText={t('common.continue')}
+        shareButtonText={t('transferToPrimary.shareReceipt')}
         showConfetti={true}
         showAnimation={true}
         animationSize={120}

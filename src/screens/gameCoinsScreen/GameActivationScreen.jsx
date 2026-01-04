@@ -175,12 +175,12 @@ export default function GameActivationCustomerScreen({ navigation, route }) {
     try {
       console.log('Creating PaymentMethod with card details:', cardDetails);
       
-      // Create payment method using the card details from CardField
+ 
       const { paymentMethod, error } = await createPaymentMethod({
         paymentMethodType: 'Card',
         paymentMethodData: {
           billingDetails: {
-            // You can add billing details here if needed
+
             // name: 'Customer Name',
             // email: 'customer@example.com',
           },
@@ -984,7 +984,7 @@ const styles = StyleSheet.create({
   paymentMethodText: {
     fontSize: scale.hp(1.8),
     color: Colors.textSecondary,
-    marginLeft: scale.wp(2),
+    marginStart: scale.wp(2),
   },
   paymentMethodTextSelected: {
     color: Colors.primary,

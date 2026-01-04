@@ -713,7 +713,7 @@ const styles = StyleSheet.create({
     borderRadius: scale.wp(5.2),
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: scale.wp(3.1),
+    marginEnd: scale.wp(3.1),
   },
   txInIcon: {
     backgroundColor: 'rgba(11, 163, 96, 0.1)',

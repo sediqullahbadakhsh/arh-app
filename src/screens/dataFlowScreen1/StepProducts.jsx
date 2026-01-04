@@ -15,6 +15,7 @@ import { codeToFlag } from "../../utils/flag";
 import { Colors } from "../../theme/colors";
 import { getSetaraganMnoId } from "../../utils/getCompanyIdForSetaragan";
 import formatLocal from "../../utils/formatLocal";
+import { useTranslation } from "react-i18next";
 
 function StepProducts({
   country,
@@ -33,7 +34,7 @@ function StepProducts({
   summary,
 }) {
   const operatorLogo = getMnoLogo(getSetaraganMnoId(summary.localNumber));
-
+  const {t} = useTranslation();
   const renderItem = ({ item }) => {
     const active = product?.id === item.id;
     
@@ -120,7 +121,7 @@ function StepProducts({
         </View>
       </ScrollView>
 
-      <Text style={DataStyles.smallLabel}>Bundle Type</Text>
+      <Text style={DataStyles.smallLabel}>{t("bundleType")}</Text>
       <ScrollView 
         horizontal 
         showsHorizontalScrollIndicator={false} 

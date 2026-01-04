@@ -64,12 +64,11 @@ const ORDER_STATUS = {
   PENDING: 'pending'
 };
 
-// Create Query Client
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      cacheTime: 10 * 60 * 1000, // 10 minutes
+      staleTime: 5 * 60 * 1000,
+      cacheTime: 10 * 60 * 1000,
       retry: 1,
     },
   },
@@ -199,6 +198,7 @@ const useActivateBundle = () => {
 function DataFlowScreenMerchant({ navigation }) {
   const { user } = useAuth?.() || { user: null };
   const { confirmPayment } = useStripe();
+  const { t } = useTranslation();
   const lastStep = BASE_STEPS.PAY;
   const [step, setStep] = useState(0);
   const [orderStatus, setOrderStatus] = useState(null);
@@ -217,7 +217,6 @@ function DataFlowScreenMerchant({ navigation }) {
   const [slabPercentage, setSlabPercentage] = useState(0);
   const [paymentMethodId, setPaymentMethodId] = useState(null);
   const [cardDetailsComplete, setCardDetailsComplete] = useState(false);
-  const { t } = useTranslation();  
   const [contactsSlideAnim] = useState(new Animated.Value(screenHeight));
   const [countriesSlideAnim] = useState(new Animated.Value(screenHeight));
   const insets = useSafeAreaInsets();
@@ -252,7 +251,6 @@ function DataFlowScreenMerchant({ navigation }) {
     shouldFetchProducts
   );
 
-  // Manual polling function - same as social activation screen
   const startPollingOrderStatus = async (orderId) => {
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
@@ -370,7 +368,6 @@ function DataFlowScreenMerchant({ navigation }) {
   }, [countryOpen]);
 
   useEffect(() => {
-    // Clean up polling on unmount
     return () => {
       if (pollingRef.current) {
         clearInterval(pollingRef.current);
@@ -468,7 +465,7 @@ function DataFlowScreenMerchant({ navigation }) {
 
   const activateBundle = async () => {
     if (!paymentMethodId) {
-      Alert.alert("Payment Required", "Please enter your card details to proceed with the bundle activation.");
+      Alert.alert(t('paymentRequired'), t('pleaseEnterCardDetails'));
       return;
     }
 
@@ -493,7 +490,6 @@ function DataFlowScreenMerchant({ navigation }) {
       console.log("Customer Bundle Activation Response:", res);
       
       if (res.status === true || res.orderId) {
-        // Set order details IMMEDIATELY with orderId - same as social activation
         const newOrderDetails = {
           orderId: res.orderId,
           txnNumber: res.txnNumber || `TXN-${Date.now()}`,
@@ -502,23 +498,22 @@ function DataFlowScreenMerchant({ navigation }) {
           usdAmount: product?.totalAmountInUSD || usd,
           productName: product?.productName,
           date: new Date().toISOString(),
-          operator: operator?.name || "Unknown",
-          message: res.message || "Bundle activation request submitted successfully! Payment processed and our backoffice team will activate your bundle shortly.",
+          operator: operator?.name || t('unknown'),
+          message: res.message || t('bundleActivationRequestSubmitted'),
           status: ORDER_STATUS.QUEUED,
         };
         
         setOrderDetails(newOrderDetails);
         setOrderStatus(ORDER_STATUS.QUEUED);
         
-        // Start manual polling - same as social activation
         if (res.orderId) {
           await startPollingOrderStatus(res.orderId);
         }
         
         Alert.alert(
-          "Success",
-          "Bundle activation initiated successfully!",
-          [{ text: 'OK', onPress: () => {} }]
+          t('success'),
+          t('bundleActivationInitiated'),
+          [{ text: t('common.ok'), onPress: () => {} }]
         );
       } else {
         setOrderStatus(ORDER_STATUS.FAILED);
@@ -528,9 +523,9 @@ function DataFlowScreenMerchant({ navigation }) {
           usdAmount: usd,
           productName: product?.productName,
           date: new Date().toISOString(),
-          error: res.error || "Bundle activation request failed. Please try again.",
+          error: res.error || t('bundleActivationRequestFailed'),
         });
-        Alert.alert("Error", res.error || "Bundle activation request failed.");
+        Alert.alert(t('error'), res.error || t('bundleActivationRequestFailed'));
       }
     } catch (error) {
       console.error("❌ Failed To Activate Customer Bundle:", error);
@@ -542,10 +537,10 @@ function DataFlowScreenMerchant({ navigation }) {
         usdAmount: usd,
         productName: product?.productName,
         date: new Date().toISOString(),
-        error: error.response?.data?.error || error.message || "Bundle activation failed. Please try again.",
+        error: error.response?.data?.error || error.message || t('bundleActivationFailed'),
       });
       
-      Alert.alert("Error", error.response?.data?.error || error.message || "Bundle activation failed.");
+      Alert.alert(t('error'), error.response?.data?.error || error.message || t('bundleActivationFailed'));
     } finally {
       setLoading(false);
     }
@@ -553,7 +548,7 @@ function DataFlowScreenMerchant({ navigation }) {
 
   const handleContactSelect = (phoneNumber) => {
     if (!phoneNumber) {
-      Alert.alert("Error", "Invalid phone number selected");
+      Alert.alert(t('error'), t('invalidPhoneNumber'));
       return;
     }
 
@@ -591,86 +586,86 @@ function DataFlowScreenMerchant({ navigation }) {
   const getStatusMessage = () => {
     switch (orderStatus) {
       case ORDER_STATUS.QUEUED:
-        return "Your bundle activation request has been submitted and payment processed. Our backoffice team will activate your bundle shortly.";
+        return t('bundleActivationSubmitted');
       case ORDER_STATUS.PROCESSING:
       case ORDER_STATUS.PENDING:
-        return "Your bundle activation is being processed by our backoffice team. Please wait...";
+        return t('bundleProcessing');
       case ORDER_STATUS.SUCCEEDED:
-        return "Bundle activated successfully! Our team has processed your request.";
+        return t('bundleActivatedSuccessfully');
       case ORDER_STATUS.FAILED:
-        return orderDetails?.error || "Bundle activation failed. Please contact support if this continues.";
+        return orderDetails?.error || t('bundleActivationFailedContactSupport');
       default:
-        return "Processing your request...";
+        return t('processingYourRequest');
     }
   };
 
- const getStatusIcon = () => {
-  switch (orderStatus) {
-    case ORDER_STATUS.QUEUED:
-      return (
-        <View style={[styles.statusIconContainer, { backgroundColor: '#FFF3CD', borderColor: '#FFEAA7' }]}>
-          <View style={styles.simpleClockContainer}>
-            <Ionicons name="time-outline" size={48} color="#FFA500" />
+  const getStatusIcon = () => {
+    switch (orderStatus) {
+      case ORDER_STATUS.QUEUED:
+        return (
+          <View style={[styles.statusIconContainer, { backgroundColor: '#FFF3CD', borderColor: '#FFEAA7' }]}>
+            <View style={styles.simpleClockContainer}>
+              <Ionicons name="time-outline" size={48} color="#FFA500" />
+            </View>
           </View>
-        </View>
-      );
-    case ORDER_STATUS.PROCESSING:
-    case ORDER_STATUS.PENDING:
-      return (
-        <View style={[styles.statusIconContainer, { backgroundColor: '#D1ECF1', borderColor: '#B8DAE4' }]}>
-          <View style={styles.simpleProcessingContainer}>
-            <Ionicons name="sync" size={48} color={Colors.primary} />
+        );
+      case ORDER_STATUS.PROCESSING:
+      case ORDER_STATUS.PENDING:
+        return (
+          <View style={[styles.statusIconContainer, { backgroundColor: '#D1ECF1', borderColor: '#B8DAE4' }]}>
+            <View style={styles.simpleProcessingContainer}>
+              <Ionicons name="sync" size={48} color={Colors.primary} />
+            </View>
           </View>
-        </View>
-      );
-    case ORDER_STATUS.SUCCEEDED:
-      return (
-        <LottieView
-          ref={lottieRef}
-          source={require('../../../assets/lotties/succcess.json')}
-          autoPlay={true}
-          loop={false}
-          style={styles.lottieAnimation}
-          onAnimationFinish={() => {
-            console.log('Success animation finished');
-          }}
-        />
-      );
-    case ORDER_STATUS.FAILED:
-      return (
-        <LottieView
-          ref={lottieRef}
-          source={require('../../../assets/lotties/error.json')}
-          autoPlay={true}
-          loop={false}
-          style={styles.lottieAnimation}
-          onAnimationFinish={() => {
-            console.log('Error animation finished');
-          }}
-        />
-      );
-    default:
-      return (
-        <View style={[styles.statusIconContainer, { backgroundColor: '#E2E3E5', borderColor: '#D6D8DB' }]}>
-          <Ionicons name="help-circle" size={36} color="#6C757D" />
-        </View>
-      );
-  }
-};
+        );
+      case ORDER_STATUS.SUCCEEDED:
+        return (
+          <LottieView
+            ref={lottieRef}
+            source={require('../../../assets/lotties/succcess.json')}
+            autoPlay={true}
+            loop={false}
+            style={styles.lottieAnimation}
+            onAnimationFinish={() => {
+              console.log('Success animation finished');
+            }}
+          />
+        );
+      case ORDER_STATUS.FAILED:
+        return (
+          <LottieView
+            ref={lottieRef}
+            source={require('../../../assets/lotties/error.json')}
+            autoPlay={true}
+            loop={false}
+            style={styles.lottieAnimation}
+            onAnimationFinish={() => {
+              console.log('Error animation finished');
+            }}
+          />
+        );
+      default:
+        return (
+          <View style={[styles.statusIconContainer, { backgroundColor: '#E2E3E5', borderColor: '#D6D8DB' }]}>
+            <Ionicons name="help-circle" size={36} color="#6C757D" />
+          </View>
+        );
+    }
+  };
 
   const getStatusTitle = () => {
     switch (orderStatus) {
       case ORDER_STATUS.QUEUED:
-        return "Request Submitted";
+        return t('requestSubmitted');
       case ORDER_STATUS.PROCESSING:
       case ORDER_STATUS.PENDING:
-        return "Processing Request";
+        return t('processingRequest');
       case ORDER_STATUS.SUCCEEDED:
-        return "Bundle Activated!";
+        return t('bundleActivated');
       case ORDER_STATUS.FAILED:
-        return "Activation Failed";
+        return t('activationFailed');
       default:
-        return "Processing";
+        return t('processing');
     }
   };
 
@@ -727,30 +722,30 @@ function DataFlowScreenMerchant({ navigation }) {
 
           <View style={styles.detailsCard}>
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Receiver Number</Text>
+              <Text style={styles.detailLabel}>{t('receiverNumber')}</Text>
               <Text style={styles.detailValue}>{orderDetails?.mobile}</Text>
             </View>
           
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Bundle Plan</Text>
+              <Text style={styles.detailLabel}>{t('bundle')}</Text>
               <Text style={styles.detailValue}>{orderDetails?.productName?.en || orderDetails?.productName}</Text>
             </View>
 
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Transaction ID</Text>
+              <Text style={styles.detailLabel}>{t('transactionId')}</Text>
               <Text style={styles.detailValue}>{orderDetails?.txnNumber}</Text>
             </View>
 
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Date</Text>
+              <Text style={styles.detailLabel}>{t('date')}</Text>
               <Text style={styles.detailValue}>
                 {orderDetails?.date ? new Date(orderDetails.date).toLocaleString() : 'N/A'}
               </Text>
             </View>
 
             <View style={styles.amountSection}>
-              <Text style={styles.amountLabel}>Total Amount</Text>
-              <Text style={styles.amountSubValue}>${orderDetails?.usdAmount || usd} USD</Text>
+              <Text style={styles.amountLabel}>{t('receipt.totalAmount')}</Text>
+              <Text style={styles.amountSubValue}>${orderDetails?.usdAmount || usd} {t('usd')}</Text>
             </View>
           </View>
 
@@ -775,8 +770,8 @@ function DataFlowScreenMerchant({ navigation }) {
                 />
               </View>
               <Text style={styles.progressText}>
-                {orderStatus === ORDER_STATUS.QUEUED ? 'Queued' : 
-                orderStatus === ORDER_STATUS.PROCESSING ? 'Processing' : 'Finalizing...'}
+                {orderStatus === ORDER_STATUS.QUEUED ? t('queued') : 
+                orderStatus === ORDER_STATUS.PROCESSING ? t('processing') : t('finalizing')}
               </Text>
             </View>
           )}
@@ -791,13 +786,13 @@ function DataFlowScreenMerchant({ navigation }) {
                 navigation.popToTop();
               }}
             >
-              <Text style={styles.doneButtonText}>Yes</Text>
+              <Text style={styles.doneButtonText}>{t('done')}</Text>
             </TouchableOpacity>
           )}
 
           <TouchableOpacity onPress={resetFlow} style={styles.moreButton}>
             <Text style={styles.moreButtonText}>
-              {orderStatus === ORDER_STATUS.FAILED ? "Try Again" : "Activate More"}
+              {orderStatus === ORDER_STATUS.FAILED ? t('tryAgain') : t('activateMore')}
             </Text>
           </TouchableOpacity>
         </ScrollView>
@@ -854,7 +849,7 @@ function DataFlowScreenMerchant({ navigation }) {
             <View style={styles.searchContainer}>
               <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
               <TextInput
-                placeholder="Search contacts..."
+                placeholder={t('searchContacts')}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
                 style={styles.searchInput}
@@ -865,7 +860,7 @@ function DataFlowScreenMerchant({ navigation }) {
             {loadingContacts ? (
               <View style={styles.emptyContainer}>
                 <ActivityIndicator size="large" color={Colors.primary} />
-                <Text style={styles.emptyText}>Loading contacts...</Text>
+                <Text style={styles.emptyText}>{t('loading')}</Text>
               </View>
             ) : filteredContacts.length > 0 ? (
               <FlatList
@@ -951,7 +946,7 @@ function DataFlowScreenMerchant({ navigation }) {
             ]}
           >
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Country</Text>
+              <Text style={styles.modalTitle}>{t('selectCountry')}</Text>
               <TouchableOpacity 
                 onPress={() => setCountryOpen(false)}
                 style={styles.closeButton}
@@ -963,7 +958,7 @@ function DataFlowScreenMerchant({ navigation }) {
             <View style={styles.searchContainer}>
               <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
               <TextInput
-                placeholder="Search countries..."
+                placeholder={t('searchCountries')}
                 value={countrySearch}
                 onChangeText={setCountrySearch}
                 style={styles.searchInput}
@@ -974,7 +969,7 @@ function DataFlowScreenMerchant({ navigation }) {
             {loadingCountries ? (
               <View style={styles.emptyContainer}>
                 <ActivityIndicator size="large" color={Colors.primary} />
-                <Text style={styles.emptyText}>Loading countries...</Text>
+                <Text style={styles.emptyText}>{t('loading')}</Text>
               </View>
             ) : (
               <FlatList
@@ -1014,7 +1009,7 @@ function DataFlowScreenMerchant({ navigation }) {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
       <ServiceHeader 
-        title="Internet Bundle" 
+        title={t('dataBundle')} 
         onBack={orderStatus ? resetFlow : goBack} 
       />
 
@@ -1083,8 +1078,8 @@ function DataFlowScreenMerchant({ navigation }) {
             <PrimaryButton
               label={
                 step === lastStep
-                  ? "Pay"
-                  : "Continue"
+                  ? t('pay')
+                  : t('continue')
               }
               onPress={goNext}
               style={{ marginTop: 24, opacity: canNext ? 1 : 0.5 }}
@@ -1092,7 +1087,7 @@ function DataFlowScreenMerchant({ navigation }) {
             />
             {step > 0 && (
               <PrimaryButton
-                label="Back"
+                label={t('back')}
                 onPress={goBack}
                 style={{ marginTop: 12, marginBottom: 110, backgroundColor: "#4A4A4A" }}
               />
@@ -1129,7 +1124,7 @@ function DataFlowScreenMerchant({ navigation }) {
       {loading && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={styles.loadingText}>Processing Payment...</Text>
+          <Text style={styles.loadingText}>{t('processingPayment')}</Text>
         </View>
       )}
     </SafeAreaView>
@@ -1145,7 +1140,6 @@ export default function DataFlowScreenMerchantWrapper({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  // Status Screen Styles
   statusHeader: {
     alignItems: 'center',
     marginBottom: 24,
@@ -1193,7 +1187,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  
   detailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1353,7 +1346,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginEnd: 12,
   },
   contactInfo: {
     flex: 1,

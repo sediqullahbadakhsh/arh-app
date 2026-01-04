@@ -34,6 +34,49 @@ import { useTranslation } from 'react-i18next';
 import ReceiptModal from './ReceiptModal';
 import LottieView from 'lottie-react-native';
 
+const ITEMS_PER_PAGE = 10;
+
+// Skeleton Loader Component
+const ModernSkeletonLoader = () => (
+  <SafeAreaView style={styles.container}>
+    <View style={styles.skeletonHeader}>
+      <View style={styles.skeletonBackButton} />
+      <View style={styles.skeletonTitle} />
+      <View style={styles.skeletonFilterButton} />
+    </View>
+    
+    <View style={styles.skeletonSearchContainer}>
+      <View style={styles.skeletonSearchIcon} />
+      <View style={styles.skeletonSearchInput} />
+    </View>
+
+    {[1, 2, 3].map((item) => (
+      <View key={item} style={styles.skeletonCard}>
+        <View style={styles.skeletonCardHeader}>
+          <View style={styles.skeletonService}>
+            <View style={styles.skeletonIcon} />
+            <View>
+              <View style={styles.skeletonTextLarge} />
+              <View style={styles.skeletonTextSmall} />
+            </View>
+          </View>
+          <View style={styles.skeletonStatus} />
+        </View>
+        <View style={styles.skeletonBody}>
+          <View style={styles.skeletonReceiver} />
+          <View style={styles.skeletonTxn} />
+        </View>
+        <View style={styles.skeletonFooter}>
+          <View>
+            <View style={styles.skeletonLabel} />
+            <View style={styles.skeletonAmount} />
+          </View>
+          <View style={styles.skeletonActions} />
+        </View>
+      </View>
+    ))}
+  </SafeAreaView>
+);
 
 const ModernOrderCard = ({ item, onViewDetails, onRetry, onResend, t }) => {
   const [cardScale] = useState(new Animated.Value(1));
@@ -65,45 +108,44 @@ const ModernOrderCard = ({ item, onViewDetails, onRetry, onResend, t }) => {
     }
   };
 
-
   const serviceConfig = {
     recharge: { 
       name: t('services.mobileTopup'), 
       icon: 'phone-portrait-outline',
       color: Colors.primary,
-      showResend: true // Allow resend for recharge
+      showResend: true
     },
     bundle: { 
       name: t('services.dataBundle'), 
       icon: 'wifi-outline',
       color: '#8B5CF6',
-      showResend: true // Allow resend for bundle
+      showResend: true
     },
     game: { 
       name: t('services.gameCoins'), 
       icon: 'game-controller-outline',
       color: '#F59E0B',
-      showResend: false // Hide resend for game
+      showResend: false
     },
-    games: { // Added 'games' type to match your backend
+    games: {
       name: t('services.gameCoins'), 
       icon: 'game-controller-outline',
       color: '#F59E0B',
-      showResend: false // Hide resend for games
+      showResend: false
     },
-    social: { // Added 'social' type
+    social: {
       name: t('services.social'), 
       icon: 'share-social-outline',
       color: '#EC4899',
-      showResend: false // Hide resend for social
+      showResend: false
     },
-    others: { // Added 'others' type as fallback
+    others: {
       name: t('services.other'), 
       icon: 'cube-outline',
       color: '#6B7280',
-      showResend: false // Hide resend for others
+      showResend: false
     },
-    stripe_card: { // Default fallback
+    stripe_card: {
       name: t('services.payment'), 
       icon: 'card-outline',
       color: Colors.primary,
@@ -111,17 +153,10 @@ const ModernOrderCard = ({ item, onViewDetails, onRetry, onResend, t }) => {
     }
   };
 
-  // Safely get status config with fallback
   const config = statusConfig[item?.status] || statusConfig.pending;
-  
-  // Safely get service config with fallback
   const serviceType = item?.type || 'stripe_card';
   const service = serviceConfig[serviceType] || serviceConfig.stripe_card;
-
-  // Check if resend button should be shown
-  const shouldShowResend = 
-    item?.status !== 'cancelled' && 
-    service.showResend;
+  const shouldShowResend = item?.status !== 'cancelled' && service.showResend;
 
   const handlePressIn = () => {
     Animated.spring(cardScale, {
@@ -152,7 +187,6 @@ const ModernOrderCard = ({ item, onViewDetails, onRetry, onResend, t }) => {
       return 'Invalid date';
     }
   };
-
 
   if (!item) {
     return null;
@@ -227,7 +261,6 @@ const ModernOrderCard = ({ item, onViewDetails, onRetry, onResend, t }) => {
               </TouchableOpacity>
             )}
             
-            {/* Conditionally show resend button */}
             {shouldShowResend && (
               <TouchableOpacity 
                 style={[styles.actionIcon, styles.resendIcon]}
@@ -257,7 +290,6 @@ const ModernOrderCard = ({ item, onViewDetails, onRetry, onResend, t }) => {
     </Animated.View>
   );
 };
-
 
 const ModernFilterModal = ({ visible, onClose, filters, onFilterChange, t }) => {
   const [slideAnim] = useState(new Animated.Value(screenHeight));
@@ -392,7 +424,6 @@ const ModernFilterModal = ({ visible, onClose, filters, onFilterChange, t }) => 
   );
 };
 
-
 const ModernEmptyState = ({ filters, t, onClearFilters }) => (
   <View style={styles.emptyState}>
     <LottieView
@@ -421,7 +452,6 @@ const ModernEmptyState = ({ filters, t, onClearFilters }) => (
   </View>
 );
 
-
 const ModernErrorState = ({ error, onRetry, t }) => (
   <View style={styles.errorState}>
     <LottieView
@@ -444,71 +474,102 @@ const ModernErrorState = ({ error, onRetry, t }) => (
   </View>
 );
 
-
-const ModernSkeletonLoader = () => (
-  <SafeAreaView style={styles.container}>
-    <OrdersHeader title="Orders" onBack={() => {}} onFilter={() => {}} />
-    
-    <View style={styles.skeletonSearchContainer}>
-      <View style={styles.skeletonSearchIcon} />
-      <View style={styles.skeletonSearchInput} />
-    </View>
-
-    {[1, 2, 3].map((item) => (
-      <View key={item} style={styles.skeletonCard}>
-        <View style={styles.skeletonCardHeader}>
-          <View style={styles.skeletonService}>
-            <View style={styles.skeletonIcon} />
-            <View>
-              <View style={styles.skeletonTextLarge} />
-              <View style={styles.skeletonTextSmall} />
-            </View>
-          </View>
-          <View style={styles.skeletonStatus} />
-        </View>
-        <View style={styles.skeletonBody}>
-          <View style={styles.skeletonReceiver} />
-          <View style={styles.skeletonTxn} />
-        </View>
-        <View style={styles.skeletonFooter}>
-          <View>
-            <View style={styles.skeletonLabel} />
-            <View style={styles.skeletonAmount} />
-          </View>
-          <View style={styles.skeletonActions} />
-        </View>
-      </View>
-    ))}
-  </SafeAreaView>
-);
-
-
 const OrdersScreen = () => {
   const [filters, setFilters] = useState({
     search: '',
     status: '',
     page: 1,
-    limit: 10,
+    limit: ITEMS_PER_PAGE,
   });
   const [refreshing, setRefreshing] = useState(false);
-  const navigation = useNavigation(); 
+  const navigation = useNavigation();
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [receiptModalVisible, setReceiptModalVisible] = useState(false);
+  const [ordersData, setOrdersData] = useState([]);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [metaData, setMetaData] = useState(null);
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const searchInputRef = useRef();
+  const flatListRef = useRef();
 
-  const { data, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ['orders', filters],
-    queryFn: () => getOrdersC(filters),
-  });
+  const fetchOrders = async (page = 1, shouldReset = false) => {
+    try {
+      const response = await getOrdersC({
+        ...filters,
+        page,
+        limit: ITEMS_PER_PAGE,
+      });
+
+      if (response?.data) {
+        if (shouldReset || page === 1) {
+          setOrdersData(response.data);
+        } else {
+          setOrdersData(prev => [...prev, ...response.data]);
+        }
+        
+        setMetaData(response?.meta);
+        setHasMore(response?.meta ? page < response.meta.pages : false);
+      }
+      
+      return response;
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      throw error;
+    }
+  };
+
+  useEffect(() => {
+    loadInitialData();
+  }, [filters.search, filters.status]);
+
+  const loadInitialData = async () => {
+    try {
+      setInitialLoading(true);
+      await fetchOrders(1, true);
+    } catch (error) {
+      console.error('Error loading initial data:', error);
+    } finally {
+      setInitialLoading(false);
+    }
+  };
+
+  const loadMoreData = async () => {
+    if (loadingMore || !hasMore) return;
+
+    try {
+      setLoadingMore(true);
+      const nextPage = filters.page + 1;
+      await fetchOrders(nextPage, false);
+      setFilters(prev => ({ ...prev, page: nextPage }));
+    } catch (error) {
+      console.error('Error loading more data:', error);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    try {
+      setRefreshing(true);
+      await fetchOrders(1, true);
+      setFilters(prev => ({ ...prev, page: 1 }));
+    } catch (error) {
+      console.error('Error refreshing:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const retryOrderMutation = useMutation({
     mutationFn: (id) => retryOrder(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
+      loadInitialData(); // Refresh the list
       Alert.alert(t('success'), t('orderRetrySuccess'));
     },
     onError: (error) => {
@@ -520,12 +581,6 @@ const OrdersScreen = () => {
   const goBack = () => {
     navigation.goBack();
   };
-
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    refetch().finally(() => setRefreshing(false));
-  }, [refetch]);
 
   const handleSearch = (text) => {
     setFilters(prev => ({ ...prev, search: text, page: 1 }));
@@ -562,7 +617,7 @@ const OrdersScreen = () => {
       search: '',
       status: '',
       page: 1,
-      limit: 10,
+      limit: ITEMS_PER_PAGE,
     });
   };
 
@@ -576,7 +631,38 @@ const OrdersScreen = () => {
     />
   );
 
-  if (isLoading && !refreshing) {
+  const renderFooter = () => {
+    if (loadingMore) {
+      return (
+        <View style={styles.footerContainer}>
+          <ActivityIndicator size="small" color={Colors.primary} />
+          <Text style={styles.footerText}>
+            {t('loadingMore') || "Loading more orders..."}
+          </Text>
+        </View>
+      );
+    }
+    
+    if (ordersData.length > 0 && !hasMore) {
+      return (
+        <View style={styles.noMoreContainer}>
+          <Text style={styles.noMoreText}>
+            {t('noMoreOrders') || "No more orders"}
+          </Text>
+        </View>
+      );
+    }
+    
+    return null;
+  };
+
+  const handleEndReached = () => {
+    if (!loadingMore && hasMore && ordersData.length > 0) {
+      loadMoreData();
+    }
+  };
+
+  if (initialLoading) {
     return <ModernSkeletonLoader />;
   }
 
@@ -647,41 +733,39 @@ const OrdersScreen = () => {
         </View>
       )}
 
-      {isError ? (
-        <ModernErrorState error={error} onRetry={refetch} t={t} />
-      ) : (
-        <FlatList
-          data={data?.data || []}
-          renderItem={renderOrderItem}
-          keyExtractor={(item) => item.id.toString()}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={Colors.primary}
-              colors={[Colors.primary]}
-            />
-          }
-          ListEmptyComponent={
-            <ModernEmptyState 
-              filters={filters} 
-              t={t} 
-              onClearFilters={clearFilters}
-            />
-          }
-          contentContainerStyle={styles.listContainer}
-          showsVerticalScrollIndicator={false}
-          onEndReached={() => {
-            if (data?.data?.length >= filters.limit) {
-              setFilters(prev => ({ ...prev, page: prev.page + 1 }));
-            }
-          }}
-          onEndReachedThreshold={0.5}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-        />
-      )}
+      <FlatList
+        ref={flatListRef}
+        data={ordersData}
+        renderItem={renderOrderItem}
+        keyExtractor={(item, index) => `order-${item.id}-${index}`}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={Colors.primary}
+            colors={[Colors.primary]}
+          />
+        }
+        ListEmptyComponent={
+          <ModernEmptyState 
+            filters={filters} 
+            t={t} 
+            onClearFilters={clearFilters}
+          />
+        }
+        ListFooterComponent={renderFooter}
+        contentContainerStyle={styles.listContainer}
+        showsVerticalScrollIndicator={false}
+        onEndReached={handleEndReached}
+        onEndReachedThreshold={0.3}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        removeClippedSubviews={false}
+        maxToRenderPerBatch={10}
+        initialNumToRender={10}
+        windowSize={10}
+      />
 
-      {data?.data?.length > 0 && (
+      {ordersData.length > 0 && (
         <View style={styles.statsContainer}>
           <LinearGradient
             colors={['#FFFFFF', '#F8FAFC']}
@@ -690,7 +774,7 @@ const OrdersScreen = () => {
             <View style={styles.statsGrid}>
               <View style={styles.statItem}>
                 <Text style={[styles.statValue, { color: '#10B981' }]}>
-                  {data.data.filter(item => item.status === 'succeeded').length}
+                  {ordersData.filter(item => item.status === 'succeeded').length}
                 </Text>
                 <Text style={styles.statLabel}>{t('successful')}</Text>
               </View>
@@ -699,7 +783,7 @@ const OrdersScreen = () => {
               
               <View style={styles.statItem}>
                 <Text style={[styles.statValue, { color: '#F59E0B' }]}>
-                  {data.data.filter(item => item.status === 'pending').length}
+                  {ordersData.filter(item => item.status === 'pending').length}
                 </Text>
                 <Text style={styles.statLabel}>{t('pending')}</Text>
               </View>
@@ -708,7 +792,7 @@ const OrdersScreen = () => {
               
               <View style={styles.statItem}>
                 <Text style={[styles.statValue, { color: '#EF4444' }]}>
-                  {data.data.filter(item => item.status === 'failed').length}
+                  {ordersData.filter(item => item.status === 'failed').length}
                 </Text>
                 <Text style={styles.statLabel}>{t('failed')}</Text>
               </View>
@@ -717,7 +801,7 @@ const OrdersScreen = () => {
               
               <View style={styles.statItem}>
                 <Text style={[styles.statValue, { color: '#6B7280' }]}>
-                  {data.data.filter(item => item.status === 'cancelled').length}
+                  {ordersData.filter(item => item.status === 'cancelled').length}
                 </Text>
                 <Text style={styles.statLabel}>{t('cancelled')}</Text>
               </View>
@@ -743,12 +827,154 @@ const OrdersScreen = () => {
   );
 };
 
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
+  // Skeleton Styles
+  skeletonHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  skeletonBackButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#E5E7EB',
+  },
+  skeletonTitle: {
+    width: 100,
+    height: 20,
+    borderRadius: 8,
+    backgroundColor: '#E5E7EB',
+  },
+  skeletonFilterButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#E5E7EB',
+  },
+  skeletonSearchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+  },
+  skeletonSearchIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#E5E7EB',
+  },
+  skeletonSearchInput: {
+    flex: 1,
+    height: 20,
+    borderRadius: 8,
+    backgroundColor: '#E5E7EB',
+    marginLeft: 12,
+  },
+  skeletonCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    marginHorizontal: 16,
+    marginVertical: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  skeletonCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  skeletonService: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  skeletonIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#E5E7EB',
+    marginRight: 12,
+  },
+  skeletonTextLarge: {
+    width: 120,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#E5E7EB',
+    marginBottom: 4,
+  },
+  skeletonTextSmall: {
+    width: 80,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#E5E7EB',
+  },
+  skeletonStatus: {
+    width: 60,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#E5E7EB',
+    marginLeft: 8,
+  },
+  skeletonBody: {
+    marginBottom: 16,
+  },
+  skeletonReceiver: {
+    width: 150,
+    height: 15,
+    borderRadius: 8,
+    backgroundColor: '#E5E7EB',
+    marginBottom: 4,
+  },
+  skeletonTxn: {
+    width: 100,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#E5E7EB',
+  },
+  skeletonFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  skeletonLabel: {
+    width: 40,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#E5E7EB',
+    marginBottom: 4,
+  },
+  skeletonAmount: {
+    width: 80,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#E5E7EB',
+  },
+  skeletonActions: {
+    width: 120,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#E5E7EB',
+  },
+  // Original Styles
   searchContainer: {
     paddingHorizontal: 16,
     paddingVertical: 4,
@@ -815,10 +1041,7 @@ const styles = StyleSheet.create({
     marginVertical: 8,
     borderLeftWidth: 4,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
@@ -930,10 +1153,31 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     paddingTop: 8,
-    paddingBottom: 100,
+    paddingBottom: 120,
   },
   separator: {
     height: 8,
+  },
+  footerContainer: {
+    paddingVertical: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+  },
+  footerText: {
+    marginLeft: 10,
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  noMoreContainer: {
+    paddingVertical: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noMoreText: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontStyle: 'italic',
   },
   statsContainer: {
     position: 'absolute',
@@ -946,10 +1190,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: -2,
-    },
+    shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 5,
@@ -1174,120 +1415,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginLeft: 8,
-  },
-  skeletonSearchContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
-  },
-  skeletonSearchIcon: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#E5E7EB',
-  },
-  skeletonSearchInput: {
-    flex: 1,
-    height: 20,
-    borderRadius: 8,
-    backgroundColor: '#E5E7EB',
-    marginLeft: 12,
-  },
-  skeletonCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    marginHorizontal: 16,
-    marginVertical: 8,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  skeletonCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  skeletonService: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  skeletonIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: '#E5E7EB',
-    marginRight: 12,
-  },
-  skeletonTextLarge: {
-    width: 120,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#E5E7EB',
-    marginBottom: 4,
-  },
-  skeletonTextSmall: {
-    width: 80,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#E5E7EB',
-  },
-  skeletonStatus: {
-    width: 60,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#E5E7EB',
-    marginLeft: 8,
-  },
-  skeletonBody: {
-    marginBottom: 16,
-  },
-  skeletonReceiver: {
-    width: 150,
-    height: 15,
-    borderRadius: 8,
-    backgroundColor: '#E5E7EB',
-    marginBottom: 4,
-  },
-  skeletonTxn: {
-    width: 100,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#E5E7EB',
-  },
-  skeletonFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-  },
-  skeletonLabel: {
-    width: 40,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#E5E7EB',
-    marginBottom: 4,
-  },
-  skeletonAmount: {
-    width: 80,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#E5E7EB',
-  },
-  skeletonActions: {
-    width: 120,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: '#E5E7EB',
   },
 });
 

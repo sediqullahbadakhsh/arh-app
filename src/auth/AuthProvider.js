@@ -27,8 +27,10 @@ const AuthCtx = createContext({
   loginPassword: async () => {},
   loginOtpSend: async () => {},
   loginOtpVerify: async () => {},
+  loginOtpResend: async () => {}, // Added to context
   signupCustomerSendOtp: async () => {},
   signupCustomerVerifyOtp: async () => {},
+  signupCustomerResendOtp: async () => {}, // Added to context
   setToken: async () => {},
   setRoleLocal: async () => {},
   logout: async () => {},
@@ -40,7 +42,7 @@ export function AuthProvider({ children }) {
   const [pending, setPending] = useState(null);
   const [initializing, setInitializing] = useState(true);
 
-    const isTokenExpired = (token) => {
+  const isTokenExpired = (token) => {
     if (!token) return true;
     
     try {
@@ -55,8 +57,7 @@ export function AuthProvider({ children }) {
 
   const fetchUserProfile = async (token) => {
     try {
-
-        if (isTokenExpired(token)) {
+      if (isTokenExpired(token)) {
         await logout();
         throw new Error("Token expired");
       }
@@ -69,7 +70,7 @@ export function AuthProvider({ children }) {
     }
   };
 
-    useEffect(() => {
+  useEffect(() => {
     if (token) {
       console.log("🔐 Current token in AuthProvider:", token);
       const checkTokenInterval = setInterval(() => {
@@ -83,9 +84,7 @@ export function AuthProvider({ children }) {
     }
   }, [token]);
 
-
-
-useEffect(() => {
+  useEffect(() => {
     (async () => {
       try {
         const [t, role] = await Promise.all([
@@ -124,14 +123,13 @@ useEffect(() => {
     })();
   }, []);
 
- useEffect(() => {
+  useEffect(() => {
     const originalFetch = global.fetch;
     
     global.fetch = async (...args) => {
       try {
         const response = await originalFetch(...args);
         
-  
         if (response.status === 401) {
           console.log("Unauthorized access detected");
           await logout();
@@ -148,6 +146,7 @@ useEffect(() => {
       global.fetch = originalFetch;
     };
   }, []);
+
   const setRoleLocal = async (role) => {
     if (!role) return;
     await AsyncStorage.setItem("auth_role", role);
@@ -163,7 +162,6 @@ useEffect(() => {
     }
 
     const role = meta.role || (await AsyncStorage.getItem("auth_role")) || null;
-
 
     const u = {
       token: newToken,
@@ -200,29 +198,49 @@ useEffect(() => {
     return data;
   };
 
-const loginPasswordFn = async ({ identifier, password }) => {
-  const data = await loginWithPassword({ identifier, password });
-  
-  console.log("Login response:", data); 
-  
+  // FIXED: Changed from recursive call to API call
+  const loginOtpResend = async ({ identifier }) => {
+    try {
+      const response = await loginOtpGenerate(identifier); // FIXED THIS LINE
+      return response;
+    } catch (error) {
+      console.error("Login OTP resend error:", error);
+      throw error;
+    }
+  };
 
-  const userId = data.id; 
-  const username = data.username; 
-  
-  console.log("User ID from login response:", userId);
-  console.log("Username from login response:", username);
-  
-  await setRoleLocal("b2b");
-  await setToken(data.access_token, {
-    role: "b2b",
-    role_id: data.role_id,
-    id: userId, 
-    username: username, 
-  });
-  
-  setPending(null);
-  return data;
-};
+  const signupCustomerResendOtp = async ({ identifier }) => {
+    try {
+      const response = await signupOtpGenerate({ email: identifier });
+      return response;
+    } catch (error) {
+      console.error("Signup OTP resend error:", error);
+      throw error;
+    }
+  };
+
+  const loginPasswordFn = async ({ identifier, password }) => {
+    const data = await loginWithPassword({ identifier, password });
+    
+    console.log("Login response:", data); 
+    
+    const userId = data.id; 
+    const username = data.username; 
+    
+    console.log("User ID from login response:", userId);
+    console.log("Username from login response:", username);
+    
+    await setRoleLocal("b2b");
+    await setToken(data.access_token, {
+      role: "b2b",
+      role_id: data.role_id,
+      id: userId, 
+      username: username, 
+    });
+    
+    setPending(null);
+    return data;
+  };
 
   const loginOtpSendFn = async (identifier) => {
     const data = await loginOtpGenerate(identifier);
@@ -234,7 +252,6 @@ const loginPasswordFn = async ({ identifier, password }) => {
   const loginOtpVerifyFn = async ({ identifier, otp }) => {
     const data = await loginOtpVerify({ identifier, otp });
     console.log(data, "this is data");
-
 
     const userProfile = await fetchUserProfile(data.access_token);
 
@@ -266,7 +283,6 @@ const loginPasswordFn = async ({ identifier, password }) => {
   const signupCustomerVerifyOtpFn = async ({ identifier, otp }) => {
     const data = await signupOtpVerify({ otp });
     
-
     const userProfile = await fetchUserProfile(data.access_token);
     
     await setRoleLocal("b2c");
@@ -299,8 +315,10 @@ const loginPasswordFn = async ({ identifier, password }) => {
       loginPassword: loginPasswordFn,
       loginOtpSend: loginOtpSendFn,
       loginOtpVerify: loginOtpVerifyFn,
+      loginOtpResend, // Added to context
       signupCustomerSendOtp: signupCustomerSendOtpFn,
       signupCustomerVerifyOtp: signupCustomerVerifyOtpFn,
+      signupCustomerResendOtp, // Added to context
       setToken,
       setRoleLocal,
       logout,

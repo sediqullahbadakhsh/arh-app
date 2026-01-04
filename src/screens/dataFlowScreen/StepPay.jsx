@@ -392,7 +392,7 @@ const styles = StyleSheet.create({
   paymentIcon: {
     width: scale.wp(6),
     height: scale.wp(6),
-    marginRight: scale.wp(2),
+    marginEnd: scale.wp(2),
     tintColor: Colors.textSecondary,
   },
   paymentIconSelected: {

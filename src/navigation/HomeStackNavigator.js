@@ -24,6 +24,8 @@ import GameActivationMerchantScreen from "../screens/gameCoinsScreenMerchant/Gam
 import SocialMerchantScreen from "../screens/socialScreenMerchant/SocialScreen";
 import SocialActivationMerchantScreen from "../screens/socialScreenMerchant/SocialActivationScreen";
 import ProfileScreenMerchant from "../screens/ProfileScreenMerchant";
+import PurchaseStockScreen from "../screens/stockRequest/stockRequestScreen";
+
 
 
 
@@ -54,6 +56,7 @@ export default function HomeStackNavigator() {
               component={MerchantAnalyticsScreen} 
             />
       <Stack.Screen name="GameCoins" component={GameCoinsScreen} /> 
+      <Stack.Screen name="StockRequest" component={PurchaseStockScreen} /> 
       <Stack.Screen name="GameActivationCustomer" component={GameActivationScreen} />
       <Stack.Screen name="GameCoinsMerchant" component={GameCoinsMerchantScreen} /> 
       <Stack.Screen name="GameActivationMerchant" component={GameActivationMerchantScreen} /> 

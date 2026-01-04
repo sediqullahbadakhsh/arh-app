@@ -226,6 +226,7 @@ export default function ReverseStockReportScreen({ navigation }) {
       visible={detailModalVisible}
       transparent
       animationType="slide"
+      statusBarTranslucent
       onRequestClose={() => setDetailModalVisible(false)}
     >
       <View style={styles.modalOverlay}>
@@ -354,6 +355,7 @@ function DetailRow({ label, value }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    paddingBottom: scale.hp(20),
     backgroundColor: Colors.white,
   },
   listContainer: {

@@ -214,7 +214,7 @@ export default function WalletScreen({ navigation }) {
           {item.key === "commission" && (
             <TouchableOpacity
               onPress={() =>
-                navigation.navigate("TransferToPrimary", {
+                navigation.navigate("TransferToPrimary1", {
                   balance: item.balance,
                 })
               }
@@ -302,7 +302,7 @@ export default function WalletScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
-      <ServiceHeader title={t('wallet')} onBack={goBack} />
+      <ServiceHeader title={t('wallet1')} onBack={goBack} />
 
       <ScrollView 
         style={styles.scrollView}

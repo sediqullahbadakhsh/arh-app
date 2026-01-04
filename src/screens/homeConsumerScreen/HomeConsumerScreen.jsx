@@ -39,6 +39,7 @@ import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as MediaLibrary from 'expo-media-library';
 import ReceiptModal1 from "../orderScreen/ReceiptModal";
+import { useFocusEffect } from '@react-navigation/native';
 
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -106,7 +107,7 @@ const CountdownTimer = ({ expiresAt }) => {
         </View>
         <View style={HomeStyles.timeUnit}>
           <Text style={HomeStyles.timeValue}>{formatTimeUnit(timeLeft.seconds)}</Text>
-          <Text style={HomeStyles.timeLabel}>{t('seconds')}</Text>
+            <Text style={HomeStyles.timeLabel}>{t('seconds')}</Text>
         </View>
       </View>
       {isExpired && (
@@ -707,14 +708,54 @@ export default function HomeConsumerScreen({ navigation }) {
     }
   };
 
+  // Enhanced orders query with polling and automatic refetching
   const { data: ordersData, isLoading, isError, refetch } = useQuery({
     queryKey: ['recent-orders'],
     queryFn: () => getOrdersC({ page: 1, limit: 10, status: '' }),
+    refetchOnWindowFocus: true, // Refetch when app comes to foreground
+    staleTime: 30000, // Consider data stale after 30 seconds
   });
 
   useEffect(() => {
     fetchCustomerProfile();
   }, []);
+
+  // Add focus effect to automatically refetch when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+      
+      const refreshData = async () => {
+        if (isActive) {
+          try {
+            await Promise.all([
+              refetch(),
+              refetchOffers(),
+              fetchCustomerProfile()
+            ]);
+          } catch (error) {
+            console.error('Error refreshing data:', error);
+          }
+        }
+      };
+      
+      // Refresh immediately when screen is focused
+      refreshData();
+      
+      return () => {
+        isActive = false;
+      };
+    }, [refetch, refetchOffers])
+  );
+
+  // Optional: Add polling for real-time updates (every 30 seconds)
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      refetch();
+    }, 30000); // 30 seconds
+    
+    return () => clearInterval(intervalId);
+  }, [refetch]);
 
   const getStatusText = (status) => {
     switch (status) {

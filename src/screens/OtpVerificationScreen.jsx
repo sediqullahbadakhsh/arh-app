@@ -1,5 +1,5 @@
 // src/screens/OtpVerificationScreen.jsx
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import {
   SafeAreaView,
   View,
@@ -25,12 +25,28 @@ import { scale } from "../utils/normalizeSize";
 const CODE_LENGTH = 6;
 const RESEND_SECONDS = 120;
 
-
 const useTimer = (initialTime) => {
   const [timeLeft, setTimeLeft] = useState(initialTime);
+  const [resetKey, setResetKey] = useState(0);
   const timerRef = useRef(null);
   const appStateRef = useRef(AppState.currentState);
   const endTimeRef = useRef(null);
+
+  const resetTimer = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    
+    const newEndTime = Date.now() + initialTime * 1000;
+    endTimeRef.current = newEndTime;
+
+    setTimeLeft(initialTime);
+    
+    setResetKey(prev => prev + 1);
+    
+    console.log(`Timer reset to ${initialTime} seconds`);
+  }, [initialTime]);
 
   useEffect(() => {
     if (!endTimeRef.current) {
@@ -49,6 +65,8 @@ const useTimer = (initialTime) => {
 
       if (remaining > 0) {
         timerRef.current = setTimeout(updateTimer, 1000);
+      } else {
+        timerRef.current = null;
       }
     };
 
@@ -60,13 +78,12 @@ const useTimer = (initialTime) => {
         const remaining = calculateTimeLeft();
         setTimeLeft(remaining);
         
-        if (remaining > 0) {
-          timerRef.current = setTimeout(updateTimer, 1000);
+        if (remaining > 0 && !timerRef.current) {
+          updateTimer();
         }
       }
       appStateRef.current = nextAppState;
     };
-
 
     updateTimer();
 
@@ -78,15 +95,7 @@ const useTimer = (initialTime) => {
       }
       subscription.remove();
     };
-  }, [initialTime]);
-
-  const resetTimer = () => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-    }
-    endTimeRef.current = Date.now() + initialTime * 1000;
-    setTimeLeft(initialTime);
-  };
+  }, [initialTime, resetKey]);
 
   return { timeLeft, resetTimer };
 };
@@ -182,10 +191,12 @@ export default function OtpVerificationScreen({ route, navigation }) {
     target = "",
     mode = "login",
   } = route?.params || {};
+  
   const [codes, setCodes] = useState(Array(CODE_LENGTH).fill(""));
   const inputsRef = useRef([]);
   const { timeLeft, resetTimer } = useTimer(RESEND_SECONDS);
   const [showHelpModal, setShowHelpModal] = useState(false);
+  const [isResending, setIsResending] = useState(false);
   const auth = useAuth();
   const { t } = useTranslation();
 
@@ -249,34 +260,53 @@ export default function OtpVerificationScreen({ route, navigation }) {
         );
       }
     } catch (e) {
+      console.error("Verification error:", e);
       Alert.alert(
         t('otpVerification.title'),
-        e.message || t('otpVerification.verificationFailed')
+        e.response?.data?.message || e.message || t('otpVerification.verificationFailed')
       );
     }
   };
 
   const resend = async () => {
+    if (isResending) return;
+    
+    setIsResending(true);
+    
+    // Reset timer immediately - user sees 02:00 instantly
     resetTimer();
+    
     try {
       if (mode === "login") {
-        await auth?.loginOtpResend?.({ identifier: target });
+        await auth.loginOtpResend({ identifier: target });
         Alert.alert(
           t('otpVerification.success'),
           t('otpVerification.otpResent')
         );
       } else if (mode === "signup_customer") {
-        await auth?.signupCustomerResendOtp?.({ identifier: target });
+        await auth.signupCustomerResendOtp({ identifier: target });
         Alert.alert(
           t('otpVerification.success'),
           t('otpVerification.otpResent')
         );
+      } else {
+        Alert.alert(
+          t('otpVerification.title'),
+          t('otpVerification.unsupportedMode')
+        );
       }
     } catch (e) {
+      console.error("Resend OTP error:", e);
+      
+      // If error occurs, timer should still reset for next attempt
+      resetTimer();
+      
       Alert.alert(
         t('otpVerification.title'),
-        t('otpVerification.resendFailed')
+        e.response?.data?.message || e.message || t('otpVerification.resendFailed')
       );
+    } finally {
+      setIsResending(false);
     }
   };
 
@@ -308,7 +338,6 @@ export default function OtpVerificationScreen({ route, navigation }) {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={{ flex: 1 }}
       >
-        
         <View style={styles.container}>
           <Text style={styles.infoTxt}>
             {getInfoText()}
@@ -342,23 +371,32 @@ export default function OtpVerificationScreen({ route, navigation }) {
                 {formatTime(timeLeft)}
               </Text>
             ) : (
-              <TouchableOpacity onPress={resend}>
-                <Text style={[styles.resendText, { color: Colors.primary }]}>
-                  {t('otpVerification.resend')}
+              <TouchableOpacity onPress={resend} disabled={isResending}>
+                <Text style={[
+                  styles.resendText, 
+                  { 
+                    color: Colors.primary,
+                    opacity: isResending ? 0.7 : 1 
+                  }
+                ]}>
+                  {isResending ? t('otpVerification.resending') : t('otpVerification.resend')}
                 </Text>
               </TouchableOpacity>
             )}
           </View>
-   <View style={styles.watermarkContainer}>
-        <Image 
-          source={require('../../assets/logo4.png')} 
-          style={styles.watermarkLogo}
-          resizeMode="contain"
-        />
-      </View>
+          
+          <View style={styles.watermarkContainer}>
+            <Image 
+              source={require('../../assets/logo4.png')} 
+              style={styles.watermarkLogo}
+              resizeMode="contain"
+            />
+          </View>
+          
           <TouchableOpacity 
             style={styles.helpLink}
             onPress={() => setShowHelpModal(true)}
+            disabled={isResending}
           >
             <Text style={styles.helpLinkText}>
               {t('otpVerification.didNotReceive')}
@@ -369,12 +407,11 @@ export default function OtpVerificationScreen({ route, navigation }) {
             label={t('otpVerification.verify')}
             onPress={verify}
             style={{ marginTop: 28 }}
-            disabled={codes.join("").length !== CODE_LENGTH}
+            disabled={codes.join("").length !== CODE_LENGTH || isResending}
           />
         </View>
       </KeyboardAvoidingView>
 
-     
       <HelpModal
         visible={showHelpModal}
         onClose={() => setShowHelpModal(false)}
@@ -389,9 +426,8 @@ export default function OtpVerificationScreen({ route, navigation }) {
 function formatTime(sec) {
   const m = Math.floor(sec / 60);
   const s = sec % 60;
-  return `${m}:${s.toString().padStart(2, "0")}`;
+  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, "0")}`;
 }
-
 
 const styles = StyleSheet.create({
   container: {
@@ -524,19 +560,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   editText: {
-    fontSize: scale.hp(1.75),
-    color: Colors.primary,
-    fontWeight: '500',
-  },
-  contactDomainButton: {
-    backgroundColor: '#f0f0f0',
-    padding: scale.hp(1.5),
-    borderRadius: scale.hp(1),
-    alignItems: 'center',
-    marginTop: scale.hp(1),
-    marginLeft: scale.wp(5),
-  },
-  contactDomainText: {
     fontSize: scale.hp(1.75),
     color: Colors.primary,
     fontWeight: '500',
