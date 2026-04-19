@@ -461,9 +461,9 @@ export default function SocialMerchantScreen({ navigation, route }) {
         styles.categoryText,
         selectedCategory?.id === item.id && styles.selectedCategoryText
       ]}>
-        {typeof item.category_name === 'object' 
-          ? item.category_name.en || item.category_name[Object.keys(item.category_name)[0]]
-          : item.category_name || item.name}
+        {typeof item.categoryName === 'object' 
+          ? item.categoryName.en || item.categoryName[Object.keys(item.categoryName)[0]]
+          : item.categoryName || item.name}
       </Text>
     </TouchableOpacity>
   );
@@ -766,7 +766,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
     marginBottom: 100,
   },
-  // Skeleton Styles
   headerSkeleton: {
     flexDirection: 'row',
     justifyContent: 'space-between',

@@ -10,20 +10,20 @@ export default function AuthHeaderSignIn({ title, onBack, onLanguagePress, selec
   const insets = useSafeAreaInsets();
   
   const renderLanguageFlag = () => {
-    if (!selectedLang?.flag) {
+    if (selectedLang?.flag) {
       return (
         <View style={styles.flagPlaceholder}>
           <Ionicons name="language" size={16} color="#fff" />
         </View>
       );
     }
-    return (
-      <Image
-        source={{ uri: selectedLang.flag }}
-        style={styles.languageFlag}
-        resizeMode="contain"
-      />
-    );
+    // return (
+    //   <Image
+    //     source={{ uri: selectedLang.flag }}
+    //     style={styles.languageFlag}
+    //     resizeMode="contain"
+    //   />
+    // );
   };
 
   return (
@@ -105,6 +105,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.2)",
     justifyContent: "center",
     alignItems: "center",
+    zIndex: 99,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.3)",
   },

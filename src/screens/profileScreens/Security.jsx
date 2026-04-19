@@ -214,7 +214,7 @@ const SecurityScreen = ({ navigation }) => {
                     </View>
                     <CustomToggle isEnabled={isBiometricEnabled} onToggle={handleBiometricToggle} />
                 </Pressable>
-<Pressable 
+{/* <Pressable 
   style={styles.optionRow}
   onPress={changePassword}
 >
@@ -238,7 +238,7 @@ const SecurityScreen = ({ navigation }) => {
     size={24} 
     color="#BDBDBD" 
   />
-</Pressable>
+</Pressable> */}
              
             </View>
 

@@ -13,7 +13,9 @@ import {
   Alert,
   Animated,
   Easing,
-  Dimensions
+  Dimensions,
+  ActivityIndicator,
+  RefreshControl
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../theme/colors";
@@ -26,41 +28,80 @@ import SuccessModal from "../components/modals/SuccessModal";
 import ErrorModal from "../components/modals/ErrorModal";
 import { scale } from "../utils/normalizeSize";
 import { useTranslation } from "react-i18next";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 const STEPS = { FORM: 0, CONFIRM: 1, DONE: 2 };
 
 export default function StockTransferScreen({ navigation }) {
   const { t } = useTranslation();
+  const { user } = useUser();
+  console.log("user in StockTransferScreen: ", user);
+  const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
+  
   const [step, setStep] = useState(STEPS.FORM);
-  const [loading, setLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
-  const { user, setUser } = useUser();
-  const insets = useSafeAreaInsets();
-  const modalSlideAnim = useRef(new Animated.Value(screenHeight)).current;
-  const modalScaleAnim = useRef(new Animated.Value(0.8)).current;
-  const modalOpacityAnim = useRef(new Animated.Value(0)).current;
-  const successIconScale = useRef(new Animated.Value(0)).current;
-  const successIconRotate = useRef(new Animated.Value(0)).current;
-  const contentStaggerAnim = useRef(new Animated.Value(0)).current;
-  const [agentPickerAnim] = useState(new Animated.Value(screenHeight));
   const [agent, setAgent] = useState(null);
-  const [agents, setAgents] = useState([]);
   const [amountText, setAmountText] = useState("");
   const [isAmountFocused, setIsAmountFocused] = useState(false);
   const [agentPickerOpen, setAgentPickerOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+  
+  const modalSlideAnim = useRef(new Animated.Value(screenHeight)).current;
+  const [agentPickerAnim] = useState(new Animated.Value(screenHeight));
 
-  useEffect(() => {
-    const getAgentChildUsers = async() => {
-      const res = await getAgentDownlineAgents(user?.id);
-      setAgents(res?.data);
+  const {
+    data: agents = [],
+    isLoading: loadingAgents,
+    error: agentsError,
+    refetch: refetchAgents,
+    isRefetching: isRefetchingAgents
+  } = useQuery({
+    queryKey: ['downlineAgents', user?.id],
+    queryFn: async () => {
+      if (!user?.id) {
+        console.log("No user ID available");
+        return [];
+      }
+      
+      const res = await getAgentDownlineAgents(user.id);
+      return res?.data || [];
+    },
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000, 
+    cacheTime: 10 * 60 * 1000, 
+    onError: (error) => {
+      console.log("Error fetching agents:", error);
     }
-    getAgentChildUsers();
-  }, []);
+  });
+  console.log("Downline agents: ", agents);
+  const transferStockMutation = useMutation({
+    mutationFn: async (payload) => {
+      return await transferStockToDownlineAgent(payload);
+    },
+    onSuccess: (response) => {
+      queryClient.invalidateQueries(['downlineAgents']);
+      queryClient.invalidateQueries(['agentTransactions']);
+      queryClient.invalidateQueries(['walletBalance']);
+      
+      setSuccessMessage(t('transactions.stockSent'));
+      setShowSuccessModal(true);
+      setStep(STEPS.FORM);
+      setAgent(null);
+      setAmountText("");
+    },
+    onError: (error) => {
+      console.log("Transfer stock error: ", error);
+      const message = error.response?.data?.error || error.message || t('common.error');
+      setErrorMessage(message);
+      setShowErrorModal(true);
+    },
+  });
 
   useEffect(() => {
     if (agentPickerOpen) {
@@ -80,14 +121,10 @@ export default function StockTransferScreen({ navigation }) {
     }
   }, [agentPickerOpen]);
 
-  const showCustomSuccessModal = (message) => {
-    setSuccessMessage(message);
-    setShowSuccessModal(true);
-  };
-
-  const showCustomErrorModal = (message) => {
-    setErrorMessage(message);
-    setShowErrorModal(true);
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await refetchAgents();
+    setRefreshing(false);
   };
 
   const handleSuccessClose = () => {
@@ -123,34 +160,20 @@ export default function StockTransferScreen({ navigation }) {
 
   const transferStock = async () => {
     try {
-      setLoading(true);
       const payload = {
-        agentId: agent?.user?.id,
+        agentId: agent?.user?.id || agent?.userUid,
         amount: Number(amountText),
         total_amount: total
       };
 
-      const res = await transferStockToDownlineAgent(payload);
-      
-      showCustomSuccessModal(t('transactions.stockSent'));
-      setStep(STEPS.FORM); 
-      setAgent(null);
-      setAmountText("");
+      transferStockMutation.mutate(payload);
       
     } catch (error) {
       console.log("Transfer stock error: ", error);
       const message = error.response?.data?.error || error.message || t('common.error');
-      showCustomErrorModal(message);
-    } finally {
-      setLoading(false);
+      setErrorMessage(message);
+      setShowErrorModal(true);
     }
-  };
-
-  const modalTransform = {
-    transform: [
-      { translateY: modalSlideAnim },
-      { scale: modalScaleAnim }
-    ]
   };
 
   const agentPickerTransform = {
@@ -159,13 +182,19 @@ export default function StockTransferScreen({ navigation }) {
     ]
   };
 
-  const filteredAgents = searchQuery
-    ? agents.filter(item =>
-        item.user?.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+  const filteredAgents = useMemo(() => {
+    if (!searchQuery) return agents;
+    
+    return agents.filter(item => {
+      const searchLower = searchQuery.toLowerCase();
+      return (
+        item.user?.username?.toLowerCase().includes(searchLower) ||
         item.user?.mobileNumber?.includes(searchQuery) ||
-        item.user?.email?.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : agents;
+        item.user?.email?.toLowerCase().includes(searchLower) ||
+        item.userUid?.toLowerCase().includes(searchLower)
+      );
+    });
+  }, [agents, searchQuery]);
 
   const AgentPickerModal = () => (
     <Modal
@@ -217,49 +246,75 @@ export default function StockTransferScreen({ navigation }) {
             ) : null}
           </View>
 
-          <FlatList
-            data={filteredAgents}
-            keyExtractor={(item) => item.id.toString()}
-            renderItem={({ item }) => (
+          {loadingAgents ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={Colors.primary} />
+              <Text style={styles.loadingText}>{t('common.loading')}</Text>
+            </View>
+          ) : agentsError ? (
+            <View style={styles.errorContainer}>
+              <Ionicons name="alert-circle-outline" size={48} color="#DC2626" />
+              <Text style={styles.errorText}>{t('common.failedToLoad')}</Text>
               <TouchableOpacity
-                style={styles.agentItem}
-                onPress={() => {
-                  setAgent(item);
-                  setAgentPickerOpen(false);
-                  setSearchQuery("");
-                }}
-                activeOpacity={0.7}
+                style={styles.retryButton}
+                onPress={() => refetchAgents()}
               >
-                <View style={styles.agentAvatar}>
-                  <Ionicons name="person-circle-outline" size={24} color={Colors.primary} />
-                </View>
-                <View style={styles.agentInfo}>
-                  <Text style={styles.agentName}>{item.user?.username}</Text>
-                  <Text style={styles.agentPhone}>{item.user?.mobileNumber}</Text>
-                  <Text style={styles.agentCommission}>
-                    {t('stockTransfer.commission')}: {item.commissionRateDetails?.percentage || item.commission_rate || 0}%
+                <Text style={styles.retryButtonText}>{t('common.retry')}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <FlatList
+              data={filteredAgents}
+              keyExtractor={(item) => item.uid || item.userUid || Math.random().toString()}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.agentItem}
+                  onPress={() => {
+                    setAgent(item);
+                    setAgentPickerOpen(false);
+                    setSearchQuery("");
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.agentAvatar}>
+                    <Ionicons name="person-circle-outline" size={24} color={Colors.primary} />
+                  </View>
+                  <View style={styles.agentInfo}>
+                    <Text style={styles.agentName}>{item.user?.username || t('common.unknown')}</Text>
+                    <Text style={styles.agentPhone}>{item.user?.mobileNumber || t('common.notAvailable')}</Text>
+                    <Text style={styles.agentCommission}>
+                      {t('stockTransfer.commission')}: {item.commissionRateDetails?.percentage || item.commission_rate || 0}%
+                    </Text>
+                  </View>
+                  {item.uid === agent?.uid && (
+                    <Ionicons name="checkmark-circle" size={24} color={Colors.primary} />
+                  )}
+                </TouchableOpacity>
+              )}
+              ItemSeparatorComponent={() => <View style={styles.agentSeparator} />}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.modalContent}
+              ListEmptyComponent={
+                <View style={styles.emptyState}>
+                  <Ionicons name="people-outline" size={48} color="#9E9E9E" />
+                  <Text style={styles.emptyText}>
+                    {searchQuery ? t('stockTransfer.noAgentsFound') : t('stockTransfer.noAgentsAvailable')}
+                  </Text>
+                  <Text style={styles.emptySubtext}>
+                    {searchQuery ? t('stockTransfer.adjustSearch') : t('stockTransfer.noDownlineAgents')}
                   </Text>
                 </View>
-                {item.id === agent?.id && (
-                  <Ionicons name="checkmark-circle" size={24} color={Colors.primary} />
-                )}
-              </TouchableOpacity>
-            )}
-            ItemSeparatorComponent={() => <View style={styles.agentSeparator} />}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.modalContent}
-            ListEmptyComponent={
-              <View style={styles.emptyState}>
-                <Ionicons name="people-outline" size={48} color="#9E9E9E" />
-                <Text style={styles.emptyText}>
-                  {searchQuery ? t('stockTransfer.noAgentsFound') : t('stockTransfer.noAgentsAvailable')}
-                </Text>
-                <Text style={styles.emptySubtext}>
-                  {searchQuery ? t('stockTransfer.adjustSearch') : t('stockTransfer.noDownlineAgents')}
-                </Text>
-              </View>
-            }
-          />
+              }
+              refreshControl={
+                <RefreshControl
+                  refreshing={isRefetchingAgents}
+                  onRefresh={handleRefresh}
+                  colors={[Colors.primary]}
+                  tintColor={Colors.primary}
+                />
+              }
+            />
+          )}
         </Animated.View>
       </View>
     </Modal>
@@ -304,12 +359,23 @@ export default function StockTransferScreen({ navigation }) {
             contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 30 }}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                colors={[Colors.primary]}
+                tintColor={Colors.primary}
+              />
+            }
           >
             {step === STEPS.FORM && (
               <>
                 <View style={{ marginBottom: 20 }}>
                   <View style={styles.editHeader}>
                     <Text style={styles.label}>{t('stockTransfer.selectAgent')}</Text>
+                    <TouchableOpacity onPress={() => refetchAgents()}>
+                      <Ionicons name="refresh" size={20} color={Colors.primary} />
+                    </TouchableOpacity>
                   </View>
                   <TouchableOpacity
                     style={[
@@ -326,9 +392,14 @@ export default function StockTransferScreen({ navigation }) {
                     ]}
                     activeOpacity={0.85}
                     onPress={() => setAgentPickerOpen(true)}
+                    disabled={loadingAgents}
                   >
                     <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
-                      {agent ? (
+                      {loadingAgents ? (
+                        <View style={{ flex: 1, alignItems: 'center' }}>
+                          <ActivityIndicator size="small" color={Colors.primary} />
+                        </View>
+                      ) : agent ? (
                         <>
                           <View style={styles.agentAvatarSmall}>
                             <Ionicons name="person-circle-outline" size={20} color={Colors.primary} />
@@ -336,19 +407,26 @@ export default function StockTransferScreen({ navigation }) {
                           <View style={{ flex: 1 }}>
                             <Text style={styles.dropdownText}>{agent.user?.username}</Text>
                             <Text style={styles.dropdownSubtext}>{agent.user?.mobileNumber}</Text>
-                            <Text style={styles.dropdownCommission}>
-                              {t('stockTransfer.commission')}: {agentCommissionRate}%
-                            </Text>
+                   
                           </View>
                         </>
                       ) : (
                         <Text style={[styles.dropdownText, { color: '#9E9E9E' }]}>
-                          {t('stockTransfer.chooseAgent')}
+                          {agents.length === 0 ? t('stockTransfer.noAgentsAvailable') : t('stockTransfer.chooseAgent')}
                         </Text>
                       )}
                     </View>
-                    <Ionicons name="chevron-down" size={20} color="#7A7A7A" />
+                    <Ionicons 
+                      name="chevron-down" 
+                      size={20} 
+                      color={loadingAgents ? '#CCC' : '#7A7A7A'} 
+                    />
                   </TouchableOpacity>
+                  {agentsError && (
+                    <Text style={styles.errorTextSmall}>
+                      {t('common.failedToLoadAgents')}
+                    </Text>
+                  )}
                 </View>
 
                 <View style={{ marginBottom: 20 }}>
@@ -375,11 +453,13 @@ export default function StockTransferScreen({ navigation }) {
                       style={styles.input}
                       onFocus={() => setIsAmountFocused(true)}
                       onBlur={() => setIsAmountFocused(false)}
+                      editable={!transferStockMutation.isLoading}
                     />
                     {amountText && (
                       <TouchableOpacity
                         style={styles.clearBtn}
                         onPress={() => setAmountText("")}
+                        disabled={transferStockMutation.isLoading}
                       >
                         <Ionicons name="close-circle" size={18} color="#A3A3A3" />
                       </TouchableOpacity>
@@ -392,7 +472,7 @@ export default function StockTransferScreen({ navigation }) {
                   <View style={[styles.inputContainer, styles.inputDisabled]}>
                     <Text style={styles.currencyTag}>%</Text>
                     <Text style={[styles.input, { color: Colors.textPrimary, paddingVertical: 15 }]}>
-                      {agentCommissionRate}%
+                      {parseFloat(agentCommissionRate).toFixed(2)}%
                     </Text>
                   </View>
                 </View>
@@ -421,7 +501,7 @@ export default function StockTransferScreen({ navigation }) {
                   label={t('common.continue')}
                   onPress={() => setStep(STEPS.CONFIRM)}
                   style={{ marginTop: 24, opacity: canContinue ? 1 : 0.5 }}
-                  disabled={!canContinue}
+                  disabled={!canContinue || transferStockMutation.isLoading}
                 />
               </>
             )}
@@ -437,7 +517,7 @@ export default function StockTransferScreen({ navigation }) {
                   <DetailRow label={t('stockTransfer.agent')} value={`${agent?.user?.username}`} />
                   <DetailRow label={t('mobileNumber')} value={agent?.user?.mobileNumber} />
                   <DetailRow label={t('stockTransfer.transferAmount')} value={fmtAFN(amount)} />
-                  <DetailRow label={t('stockTransfer.commissionRate')} value={`${agentCommissionRate}%`} />
+                  <DetailRow label={t('stockTransfer.commissionRate')} value={`${parseFloat(agentCommissionRate).toFixed(2)}%`} />
                   <DetailRow label={t('stockTransfer.commissionAmount')} value={fmtAFN(commission)} />
                   <View style={styles.totalRow}>
                     <Text style={styles.totalLabel}>{t('stockTransfer.totalAmount')}</Text>
@@ -449,12 +529,14 @@ export default function StockTransferScreen({ navigation }) {
                   label={t('stockTransfer.confirmTransferButton')}
                   onPress={transferStock}
                   style={{ marginTop: 32 }}
-                  loading={loading}
+                  loading={transferStockMutation.isLoading}
+                  disabled={transferStockMutation.isLoading}
                 />
                 <PrimaryButton
                   label={t('common.back')}
                   onPress={goBack}
                   style={{ marginTop: 12, backgroundColor: "#6B7280" }}
+                  disabled={transferStockMutation.isLoading}
                 />
               </>
             )}
@@ -585,8 +667,49 @@ const styles = {
   modalContent: {
     paddingBottom: 20,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: Colors.textSecondary,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  errorText: {
+    fontSize: 16,
+    color: Colors.textSecondary,
+    marginTop: 12,
+    textAlign: 'center',
+  },
+  errorTextSmall: {
+    fontSize: 14,
+    color: '#DC2626',
+    marginTop: 8,
+    fontStyle: 'italic',
+  },
+  retryButton: {
+    marginTop: 16,
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
   sectionTitle: {
-    fontSize: 22,
+    fontSize: scale.hp(3),
     fontWeight: '700',
     color: Colors.textPrimary,
     marginBottom: 10,
@@ -605,7 +728,7 @@ const styles = {
     marginBottom: 10,
   },
   dropdown: {
-    height: 80,
+    height: scale.hp(8),
     borderRadius: 16,
     borderWidth: 1,
     backgroundColor: '#FFFFFF',
@@ -637,7 +760,7 @@ const styles = {
     borderRadius: 16,
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 20,
-    height: 60,
+    height: scale.hp(8),
   },
   currencyTag: {
     fontWeight: '700',
@@ -659,16 +782,16 @@ const styles = {
   confirmCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    padding: 20,
+    // padding: 20,
     marginTop: 20,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 3,
+    // elevation: 3,
   },
   confirmSubtitle: {
-    fontSize: 16,
+    fontSize: scale.hp(2.2),
     color: Colors.textSecondary,
     marginBottom: 25,
     lineHeight: 22,
@@ -682,12 +805,12 @@ const styles = {
     borderBottomColor: '#F1F5F9',
   },
   detailLabel: {
-    fontSize: 14,
+    fontSize: scale.hp(2),
     color: Colors.textSecondary,
     fontWeight: '500',
   },
   detailValue: {
-    fontSize: 14,
+    fontSize: scale.hp(2),
     color: Colors.textPrimary,
     fontWeight: '600',
   },
@@ -701,12 +824,12 @@ const styles = {
     borderTopColor: '#F1F5F9',
   },
   totalLabel: {
-    fontSize: 16,
+    fontSize: scale.hp(2),
     color: Colors.textPrimary,
     fontWeight: '600',
   },
   totalValue: {
-    fontSize: 20,
+    fontSize: scale.hp(3),
     color: Colors.primary,
     fontWeight: '700',
   },

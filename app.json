@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "Yes Charge",
+    "name": "YES Charge",
     "slug": "arh",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
-    "owner": "karim2015",
+    "owner": "karim1224",
     "icon": "./assets/icon.png",
     "assetBundlePatterns": [
       "**/*"
@@ -18,19 +18,20 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.sediqullah.badakhsh.arh",
+      "bundleIdentifier": "com.yescharge.app",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Allow $(PRODUCT_NAME) to save transaction receipts to your photos.",
-        "NSPhotoLibraryAddUsageDescription": "Allow $(PRODUCT_NAME) to save transaction receipts to your photos."
+        "NSPhotoLibraryAddUsageDescription": "Allow $(PRODUCT_NAME) to save transaction receipts to your photos.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "package": "com.sediqullah.badakhsh.arh",
-      "versionCode": 3,
-      "versionName": "1.0.1",
+      "versionCode": 10,
+      "versionName": "1.1.6",
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/foreground.png",
         "backgroundColor": "#ffffff"
       },
       "permissions": [
@@ -43,25 +44,28 @@
         "SCHEDULE_EXACT_ALARM",
         "USE_FULL_SCREEN_INTENT",
         "POST_NOTIFICATIONS",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
-        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
         "android.permission.READ_MEDIA_IMAGES",
         "android.permission.READ_MEDIA_VIDEO",
         "android.permission.READ_MEDIA_AUDIO"
       ],
       "blockedPermissions": [
         "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.READ_MEDIA_IMAGES",
         "android.permission.RECORD_AUDIO",
         "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.WRITE_EXTERNAL_STORAGE"
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.CAPTURE_VIDEO_OUTPUT"
       ],
       "allowBackup": true,
       "usesCleartextTraffic": true
     },
     "extra": {
       "eas": {
-        "projectId": "6df9a1f0-d057-44d0-8bea-840973ee4215"
+        "projectId": "38589898-6912-4328-8434-33fbfb422422"
       }
     },
     "plugins": [
@@ -79,9 +83,10 @@
       [
         "expo-media-library",
         {
-          "photosPermission": "Allow Yes Charge to save transaction receipts.",
-          "savePhotosPermission": "Allow Yes Charge to save receipts to your photos.",
-          "isAccessMediaLocationEnabled": false
+          "photosPermission": "Allow YES Charge to save transaction receipts.",
+          "savePhotosPermission": "Allow YES Charge to save receipts to your photos.",
+          "isAccessMediaLocationEnabled": false,
+          "grantPermission": "photos-add-only"
         }
       ],
       [

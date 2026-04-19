@@ -674,7 +674,7 @@ export default function LoginScreen({ navigation }) {
                 disabled={isChangingLanguage}
               />
 
-              <View style={styles.dividerRow}>
+              {/* <View style={styles.dividerRow}>
                 <View style={styles.divider} />
                 <Text style={styles.dividerText}>{t('orContinueWith')}</Text>
                 <View style={styles.divider} />
@@ -706,7 +706,7 @@ export default function LoginScreen({ navigation }) {
                 <Text style={styles.devInfo}>
                   Development: Using mock Google authentication
                 </Text>
-              )}
+              )} */}
             </View>
           </ScrollView>
         </View>
@@ -825,6 +825,7 @@ const loginStyles = StyleSheet.create({
   modalCard: {
     position: 'absolute',
     bottom: 0,
+    paddingBottom: Platform.OS === 'ios' ? 20 : 35,
     left: 0,
     right: 0,
     backgroundColor: '#fff',

@@ -1,4 +1,3 @@
-// services/slabs.js
 import apiClient from "./apiClient";
 
 export const getAllSlabsForMerchant = async (params = {}) => {

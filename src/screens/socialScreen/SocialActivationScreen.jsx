@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -22,9 +22,14 @@ import {
   activateSocialProductByCustomer,
   checkGameOrderStatus 
 } from "../../services/merchantApi";
-import { CardField, useStripe } from "@stripe/stripe-react-native";
+import { 
+  useStripe,
+  initPaymentSheet,
+  presentPaymentSheet 
+} from "@stripe/stripe-react-native";
 import { validatePromoCode } from "../../services/promoCodeApi";
 import LottieView from "lottie-react-native";
+import { useFocusEffect } from "@react-navigation/native";
 
 const { width } = Dimensions.get('window');
 
@@ -35,19 +40,21 @@ const ORDER_STATUS = {
   CANCELLED: 'cancelled'
 };
 
+const PAYMENT_METHODS = [
+  { id: 'card', name: 'Credit/Debit Card', icon: 'card-outline' },
+  { id: 'apple_pay', name: 'Apple Pay', icon: 'logo-apple' },
+  { id: 'google_pay', name: 'Google Pay', icon: 'logo-google' },
+];
+
 export default function SocialActivationCustomerScreen({ navigation, route }) {
   const { t } = useTranslation();
-  const { confirmPayment, createPaymentMethod } = useStripe();
+  const { initPaymentSheet: stripeInitPaymentSheet, presentPaymentSheet: stripePresentPaymentSheet } = useStripe();
   const { product, customer } = route?.params || {};
   
   const [loading, setLoading] = useState(false);
   const [orderStatus, setOrderStatus] = useState(null);
   const [orderDetails, setOrderDetails] = useState(null);
   const [receiver, setReceiver] = useState("");
-  const [cardDetails, setCardDetails] = useState(null);
-  const [paymentMethodId, setPaymentMethodId] = useState(null);
-  const [cardDetailsComplete, setCardDetailsComplete] = useState(false);
-  const [isCreatingPaymentMethod, setIsCreatingPaymentMethod] = useState(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('card');
   const [promoCode, setPromoCode] = useState("");
   const [appliedPromoCode, setAppliedPromoCode] = useState(null);
@@ -56,6 +63,9 @@ export default function SocialActivationCustomerScreen({ navigation, route }) {
   const [discountAmount, setDiscountAmount] = useState(0);
   const [finalAmount, setFinalAmount] = useState(0);
   const [promoModalVisible, setPromoModalVisible] = useState(false);
+  const [paymentProcessing, setPaymentProcessing] = useState(false);
+  const [showPaymentMethodSheet, setShowPaymentMethodSheet] = useState(false);
+  const [readyForStripePayment, setReadyForStripePayment] = useState(false);
   const successLottieRef = useRef(null);
   const errorLottieRef = useRef(null);
   const pollingRef = useRef(null);
@@ -69,15 +79,6 @@ export default function SocialActivationCustomerScreen({ navigation, route }) {
   }, [discountAmount, baseUsdAmount]);
 
   useEffect(() => {
-    if (selectedPaymentMethod !== 'card') {
-      setPaymentMethodId(null);
-      setCardDetails(null);
-      setCardDetailsComplete(false);
-    }
-  }, [selectedPaymentMethod]);
-
-
-  useEffect(() => {
     if (orderStatus === ORDER_STATUS.SUCCEEDED && successLottieRef.current) {
       successLottieRef.current.play();
     }
@@ -85,6 +86,25 @@ export default function SocialActivationCustomerScreen({ navigation, route }) {
       errorLottieRef.current.play();
     }
   }, [orderStatus]);
+
+  useEffect(() => {
+    if (readyForStripePayment) {
+      handleStripePayment();
+      setReadyForStripePayment(false);
+    }
+  }, [readyForStripePayment]);
+
+  // Clean up on unmount
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        if (pollingRef.current) {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+        }
+      };
+    }, [])
+  );
 
   const handleApplyPromoCode = async () => {
     if (!promoCode.trim()) {
@@ -158,11 +178,17 @@ export default function SocialActivationCustomerScreen({ navigation, route }) {
         
         console.log(`Poll ${pollCount}: Order status:`, currentStatus);
         
+        // Force re-render by creating new objects
         setOrderStatus(currentStatus);
         setOrderDetails(prev => ({
           ...prev,
-          ...statusResponse.data
+          ...statusResponse.data,
+          // Add timestamp to force update
+          _updatedAt: Date.now()
         }));
+
+        console.log('Updated order status:', currentStatus);
+        console.log('Order details:', statusResponse.data);
 
         if (
           currentStatus === ORDER_STATUS.SUCCEEDED || 
@@ -175,6 +201,7 @@ export default function SocialActivationCustomerScreen({ navigation, route }) {
           
           if (pollCount >= maxPolls) {
             console.log("Max polling attempts reached");
+            setOrderStatus(ORDER_STATUS.FAILED);
           }
         }
       } catch (error) {
@@ -185,80 +212,6 @@ export default function SocialActivationCustomerScreen({ navigation, route }) {
         }
       }
     }, 3000);
-  };
-
-  const handleCreateStripePaymentMethod = async () => {
-    if (!cardDetails?.complete || isCreatingPaymentMethod) return;
-
-    setIsCreatingPaymentMethod(true);
-    
-    try {
-      console.log('Creating PaymentMethod with card details:', cardDetails);
-      
-      const { paymentMethod, error } = await createPaymentMethod({
-        paymentMethodType: 'Card',
-        paymentMethodData: {
-          billingDetails: {
-
-          },
-        },
-      });
-
-      if (error) {
-        console.error('Error creating PaymentMethod:', error);
-        Alert.alert(t('paymentError'), error.message);
-        setCardDetailsComplete(false);
-        setPaymentMethodId(null);
-      } else if (paymentMethod) {
-        console.log('PaymentMethod created successfully:', paymentMethod.id);
-        setPaymentMethodId(paymentMethod.id);
-        setCardDetailsComplete(true);
-        Alert.alert(t('success'), t('cardVerified'));
-      }
-    } catch (error) {
-      console.error('Exception creating PaymentMethod:', error);
-      Alert.alert(t('error'), t('paymentMethodCreationFailed'));
-      setCardDetailsComplete(false);
-      setPaymentMethodId(null);
-    } finally {
-      setIsCreatingPaymentMethod(false);
-    }
-  };
-
-  useEffect(() => {
-    if (selectedPaymentMethod === 'card' && cardDetails?.complete) {
-      const timer = setTimeout(() => {
-        handleCreateStripePaymentMethod();
-      }, 500);
-      
-      return () => clearTimeout(timer);
-    } else {
-      setPaymentMethodId(null);
-      setCardDetailsComplete(false);
-    }
-  }, [cardDetails, selectedPaymentMethod]);
-
-  const handleCardFieldChange = (cardDetails) => {
-    console.log('Card details changed:', cardDetails);
-    setCardDetails(cardDetails);
-    
-    if (!cardDetails.complete && paymentMethodId) {
-      setPaymentMethodId(null);
-      setCardDetailsComplete(false);
-    }
-  };
-
-  const clearCardDetails = () => {
-    setCardDetails(null);
-    setPaymentMethodId(null);
-    setCardDetailsComplete(false);
-  };
-
-  const handlePaymentMethodSelect = (methodId) => {
-    setSelectedPaymentMethod(methodId);
-    setPaymentMethodId(null);
-    setCardDetails(null);
-    setCardDetailsComplete(false);
   };
 
   const validateReceiver = () => {
@@ -275,15 +228,22 @@ export default function SocialActivationCustomerScreen({ navigation, route }) {
     return true;
   };
 
-  const activateSocialProduct = async () => {
+  const handlePaymentMethodSelect = (methodId) => {
+    setSelectedPaymentMethod(methodId);
+    setShowPaymentMethodSheet(false);
+    setReadyForStripePayment(true);
+  };
+
+  const handleActivateNow = async () => {
     if (!validateReceiver()) return;
     
-    if (selectedPaymentMethod === 'card' && !cardDetailsComplete) {
-      Alert.alert(t('error'), t('pleaseEnterCardDetails'));
-      return;
-    }
+    setPaymentProcessing(true);
+    setShowPaymentMethodSheet(true);
+    setPaymentProcessing(false);
+  };
 
-    setLoading(true);
+  const handleStripePayment = async () => {
+    setPaymentProcessing(true);
     
     try {
       const payload = {
@@ -291,22 +251,26 @@ export default function SocialActivationCustomerScreen({ navigation, route }) {
         receiver: receiver.trim(),
         currency: "USD",
         cardCurrency: "USD",
-        paymentMethodId: paymentMethodId, 
-        confirmNow: true, 
+        confirmNow: false,
         promoCode: appliedPromoCode?.code || null,
         finalDiscountAmount: finalAmount,
         promoDiscountAmount: discountAmount,
+        paymentMethod: selectedPaymentMethod,
       };
 
-      console.log("Sending social activation payload:", payload);
+      console.log("Creating order and payment intent...", payload);
 
       const response = await activateSocialProductByCustomer(payload);
       
-      console.log("Social activation response:", response);
+      console.log("Backend response:", {
+        status: response.status,
+        hasClientSecret: !!response.clientSecret,
+        orderId: response.orderId,
+        txnNumber: response.txnNumber,
+      });
       
-      if (response.status === true) {
-        setOrderStatus(ORDER_STATUS.PENDING);
-        setOrderDetails({
+      if (response.status === true && response.clientSecret) {
+        const orderData = {
           orderId: response.orderId,
           txnNumber: response.txnNumber,
           playerId: receiver,
@@ -317,50 +281,119 @@ export default function SocialActivationCustomerScreen({ navigation, route }) {
           date: new Date().toISOString(),
           productName: product?.productName || product?.name,
           productImage: product?.image,
+          paymentIntentId: response.paymentIntentId,
+        };
+
+        setOrderDetails(orderData);
+        setOrderStatus(ORDER_STATUS.PENDING);
+
+        console.log("Initializing Payment Sheet with client secret...");
+        const { error: initError } = await stripeInitPaymentSheet({
+          paymentIntentClientSecret: response.clientSecret,
+          merchantDisplayName: "Your Company",
+          applePay: {
+            merchantCountryCode: 'US',
+          },
+          googlePay: {
+            merchantCountryCode: 'US',
+            testEnv: __DEV__,
+            currencyCode: 'USD',
+          },
+          style: 'alwaysDark',
+          defaultBillingDetails: {
+            name: customer?.name || '',
+            email: customer?.email || '',
+          },
+          allowsDelayedPaymentMethods: false,
+          returnURL: 'yourapp://stripe-redirect',
+          primaryButtonColor: '#CD0202',
         });
+
+        if (initError) {
+          console.error('Error initializing payment sheet:', initError);
+          Alert.alert(
+            t('error') || "Error",
+            initError.message || "Failed to initialize payment"
+          );
+          setPaymentProcessing(false);
+          return;
+        }
+
+        console.log('Payment sheet initialized successfully');
         
+        console.log("Presenting Payment Sheet...");
+        const { error: presentError } = await stripePresentPaymentSheet();
+
+        if (presentError) {
+          console.error('Error presenting payment sheet:', presentError);
+          
+          if (presentError.code === 'Canceled') {
+            console.log('Payment sheet was cancelled by user');
+            Alert.alert(
+              "Payment Cancelled",
+              "You cancelled the payment. You can try again."
+            );
+          } else if (presentError.code === 'Failed') {
+            Alert.alert(
+              "Payment Failed",
+              "Payment could not be processed. Please try again."
+            );
+          } else if (presentError.code === 'Timeout') {
+            Alert.alert(
+              "Timeout",
+              "Payment sheet timed out. Please try again."
+            );
+          } else {
+            Alert.alert(
+              "Error",
+              presentError.message || "Payment failed"
+            );
+          }
+          setPaymentProcessing(false);
+          return;
+        }
+
+        console.log('Payment sheet completed successfully');
+        
+        // Start polling immediately after successful payment
         if (response.orderId) {
           await startPollingOrderStatus(response.orderId);
         }
         
         Alert.alert(
-          t('success'),
-          t('socialActivationInitiated'),
+          "Payment Successful!",
+          "Payment successful! Your order is being processed.",
           [{ text: 'OK', onPress: () => {} }]
         );
-      } else if (response.error) {
-        throw new Error(response.error);
+        
       } else {
-        throw new Error(t('activationFailed'));
+        const errorMsg = response.error || "Failed to create payment";
+        console.error('Payment intent creation failed:', errorMsg);
+        Alert.alert("Error", errorMsg);
+        setPaymentProcessing(false);
       }
-
     } catch (error) {
-      console.log("Activation error: ", error);
-      const message = error.response?.data?.error || error.message || t('activationFailed');
-      
-      setOrderStatus(ORDER_STATUS.FAILED);
-      setOrderDetails(prev => ({
-        ...prev,
-        error: message,
-      }));
-      
-      Alert.alert(t('error'), message);
+      console.error('Error in activation process:', error);
+      Alert.alert(
+        "Error", 
+        error.message || "Activation failed"
+      );
+      setPaymentProcessing(false);
     }
-    setLoading(false);
   };
 
   const resetFlow = () => {
     setOrderStatus(null);
     setOrderDetails(null);
     setReceiver("");
-    setCardDetails(null);
-    setPaymentMethodId(null);
-    setCardDetailsComplete(false);
     setAppliedPromoCode(null);
     setDiscountAmount(0);
     setFinalAmount(baseUsdAmount);
     setPromoCode("");
     setPromoError("");
+    setPaymentProcessing(false);
+    setShowPaymentMethodSheet(false);
+    setReadyForStripePayment(false);
     
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
@@ -414,6 +447,8 @@ export default function SocialActivationCustomerScreen({ navigation, route }) {
   };
 
   const OrderStatusScreen = () => {
+    console.log('Rendering OrderStatusScreen with status:', orderStatus);
+    
     return (
       <ScrollView
         contentContainerStyle={styles.statusContainer}
@@ -549,19 +584,82 @@ export default function SocialActivationCustomerScreen({ navigation, route }) {
     );
   };
 
-  const getImageUrl = () => {
-    if (product?.image) {
-      if (product.image.startsWith('http')) {
-        return product.image;
-      } else {
-        const encodedImage = encodeURIComponent(product.image);
-        return `http://3.67.144.22/backend/uploads/product_images/${encodedImage}`;
-      }
-    }
-    return null;
-  };
+  const PaymentMethodSheet = () => (
+    <Modal
+      visible={showPaymentMethodSheet}
+      transparent={true}
+      animationType="slide"
+      statusBarTranslucent={true}
+      onRequestClose={() => setShowPaymentMethodSheet(false)}
+    >
+      <View style={sheetStyles.modalOverlay}>
+        <View style={sheetStyles.sheetContainer}>
+          <View style={sheetStyles.sheetHeader}>
+            <Text style={sheetStyles.sheetTitle}>Select Payment Method</Text>
+            <TouchableOpacity 
+              onPress={() => setShowPaymentMethodSheet(false)}
+              style={sheetStyles.closeButton}
+            >
+              <Ionicons name="close" size={24} color="#666" />
+            </TouchableOpacity>
+          </View>
 
-  if (orderStatus) {
+          <View style={sheetStyles.paymentMethodsList}>
+            {PAYMENT_METHODS.map((method) => (
+              <TouchableOpacity
+                key={method.id}
+                style={[
+                  sheetStyles.paymentMethodItem,
+                  selectedPaymentMethod === method.id && sheetStyles.paymentMethodItemSelected
+                ]}
+                onPress={() => handlePaymentMethodSelect(method.id)}
+              >
+                <View style={sheetStyles.paymentMethodContent}>
+                  <Ionicons 
+                    name={method.icon} 
+                    size={24} 
+                    color={selectedPaymentMethod === method.id ? '#CD0202' : '#666'} 
+                  />
+                  <Text style={[
+                    sheetStyles.paymentMethodName,
+                    selectedPaymentMethod === method.id && sheetStyles.paymentMethodNameSelected
+                  ]}>
+                    {method.name}
+                  </Text>
+                </View>
+                {selectedPaymentMethod === method.id && (
+                  <Ionicons name="checkmark-circle" size={24} color="#CD0202" />
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <View style={sheetStyles.sheetFooter}>
+            <Text style={sheetStyles.totalText}>
+              Total: ${finalAmount.toFixed(2)} USD
+            </Text>
+            <TouchableOpacity
+              style={sheetStyles.payButton}
+              onPress={() => {
+                if (selectedPaymentMethod) {
+                  setShowPaymentMethodSheet(false);
+                  setReadyForStripePayment(true);
+                }
+              }}
+            >
+              <Text style={sheetStyles.payButtonText}>
+                Pay ${finalAmount.toFixed(2)} USD
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  // Show status screen when orderStatus is not null
+  if (orderStatus !== null) {
+    console.log('Showing status screen with orderStatus:', orderStatus);
     return (
       <SafeAreaView style={styles.container}>
         <ServiceHeader 
@@ -585,47 +683,6 @@ export default function SocialActivationCustomerScreen({ navigation, route }) {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-     
-        {/* <View style={styles.productCard}>
-          {getImageUrl() ? (
-            <Image 
-              source={{ uri: getImageUrl() }} 
-              style={styles.productImage}
-              resizeMode="cover"
-            />
-          ) : (
-            <View style={styles.productImagePlaceholder}>
-              <Ionicons name="chatbubbles" size={64} color={Colors.primary} />
-            </View>
-          )}
-          
-          <Text style={styles.productName}>
-            {product?.productName || product?.name}
-          </Text>
-          
-          <Text style={styles.productDescription}>
-            {product?.description || "Social product activation"}
-          </Text>
-          
-          <View style={styles.priceContainer}>
-            {appliedPromoCode ? (
-              <>
-                <Text style={styles.originalPriceStriked}>
-                  ${totalAmount} USD
-                </Text>
-                <Text style={styles.finalPrice}>
-                  ${finalAmount.toFixed(2)} USD
-                </Text>
-              </>
-            ) : (
-              <Text style={styles.originalPrice}>
-                ${totalAmount} USD
-              </Text>
-            )}
-          </View>
-        </View> */}
-
-       
         <View style={styles.inputSection}>
           <Text style={styles.sectionTitle}>
             {t("socialId") || "Social ID/Username"}
@@ -642,86 +699,7 @@ export default function SocialActivationCustomerScreen({ navigation, route }) {
           />
         </View>
 
-
-        <View style={styles.paymentSection}>
-          <Text style={styles.sectionTitle}>
-            {t("paymentMethod") || "Payment Method"}
-          </Text>
-          
-          <View style={styles.paymentMethodContainer}>
-            <TouchableOpacity
-              style={[
-                styles.paymentMethodButton,
-                selectedPaymentMethod === 'card' && styles.paymentMethodButtonSelected
-              ]}
-              onPress={() => handlePaymentMethodSelect('card')}
-            >
-              <View style={styles.paymentMethodContent}>
-                <Ionicons 
-                  name="card" 
-                  size={24} 
-                  color={selectedPaymentMethod === 'card' ? Colors.primary : Colors.textSecondary} 
-                />
-                <Text style={[
-                  styles.paymentMethodText,
-                  selectedPaymentMethod === 'card' && styles.paymentMethodTextSelected
-                ]}>
-                  {t("creditDebitCard") || "Credit/Debit Card"}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-
-          {selectedPaymentMethod === 'card' && (
-            <View style={styles.cardDetailsContainer}>
-              <View style={styles.fieldContainer}>
-                <View style={styles.fieldHeader}>
-                  <Text style={styles.fieldLabel}>{t("cardDetails") || "Card Details"}</Text>
-                  {cardDetails && (
-                    <TouchableOpacity onPress={clearCardDetails} style={styles.clearButton}>
-                      <Text style={styles.clearButtonText}>{t("clear") || "Clear"}</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-                <CardField
-                  postalCodeEnabled={false}
-                  placeholders={{
-                    number: '1234 1234 1234 1234',
-                    expiration: 'MM/YY',
-                    cvc: 'CVC',
-                  }}
-                  cardStyle={{
-                    backgroundColor: '#FFFFFF',
-                    textColor: '#000000',
-                    borderWidth: 1,
-                    borderColor: cardDetails?.complete ? '#10B981' : '#E0E0E0',
-                    borderRadius: 8,
-                    fontSize: 16,
-                  }}
-                  style={{
-                    width: '100%',
-                    height: 50,
-                    marginVertical: 8,
-                  }}
-                  onCardChange={handleCardFieldChange}
-                />
-                {cardDetails?.error && (
-                  <Text style={styles.errorText}>
-                    {cardDetails.error.message || t('cardError') || 'Invalid card details'}
-                  </Text>
-                )}
-                
-               
-               
-              </View>
-              <Text style={styles.securePaymentNotice}>
-                {t("securePaymentNotice") || "Your payment is secured with Stripe"}
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {/* <View style={styles.promoSection}>
+        <View style={styles.promoSection}>
           {appliedPromoCode ? (
             <View style={styles.appliedPromoContainer}>
               <View style={styles.appliedPromoInfo}>
@@ -746,7 +724,7 @@ export default function SocialActivationCustomerScreen({ navigation, route }) {
               <Text style={styles.promoButtonText}>{t('promoCode.havePromoCode') || "Have a promo code?"}</Text>
             </TouchableOpacity>
           )}
-        </View> */}
+        </View>
 
         <View style={styles.summaryCard}>
           <Text style={styles.summaryTitle}>
@@ -786,30 +764,34 @@ export default function SocialActivationCustomerScreen({ navigation, route }) {
             </Text>
           </View>
         </View>
+        
+        <Text style={styles.securePaymentNotice}>
+          {t("securePaymentNotice") || "Your payment is secured with Stripe Payment Sheet"}
+        </Text>
+        
+        <View style={styles.activateButtonContainer}>
+          <TouchableOpacity
+            style={[
+              styles.activateButton,
+              (!receiver.trim() || paymentProcessing) && 
+              styles.activateButtonDisabled
+            ]}
+            onPress={handleActivateNow}
+            disabled={!receiver.trim() || paymentProcessing}
+          >
+            {paymentProcessing ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={styles.activateButtonText}>
+                {t("activateNow") || "Activate Now"} - ${finalAmount.toFixed(2)} USD
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
       </ScrollView>
 
-      {/* Activate Button */}
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={[
-            styles.activateButton,
-            (!receiver.trim() || (selectedPaymentMethod === 'card' && !cardDetailsComplete)) && 
-            styles.activateButtonDisabled
-          ]}
-          onPress={activateSocialProduct}
-          disabled={!receiver.trim() || (selectedPaymentMethod === 'card' && !cardDetailsComplete) || loading}
-        >
-          {loading ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <Text style={styles.activateButtonText}>
-              {t("activateNow") || "Activate Now"} - ${finalAmount.toFixed(2)} USD
-            </Text>
-          )}
-        </TouchableOpacity>
-      </View>
+      <PaymentMethodSheet />
 
-      {/* Promo Code Modal */}
       <Modal
         visible={promoModalVisible}
         transparent={true}
@@ -883,80 +865,18 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
-    marginBottom: 110,
+    paddingBottom: scale.hp(18),
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: scale.wp(4),
-    paddingBottom: scale.hp(16),
-  },
-  productCard: {
-    backgroundColor: '#fff',
-    borderRadius: scale.wp(3),
-    padding: scale.wp(4),
-    marginTop: scale.hp(2),
-    alignItems: 'center',
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  productImage: {
-    width: scale.wp(40),
-    height: scale.wp(40),
-    borderRadius: scale.wp(2),
-    marginBottom: scale.hp(2),
-  },
-  productImagePlaceholder: {
-    width: scale.wp(40),
-    height: scale.wp(40),
-    borderRadius: scale.wp(2),
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: scale.hp(2),
-  },
-  productName: {
-    fontSize: scale.hp(2.2),
-    fontWeight: '600',
-    color: Colors.textPrimary,
-    textAlign: 'center',
-    marginBottom: scale.hp(1),
-  },
-  productDescription: {
-    fontSize: scale.hp(1.6),
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: scale.hp(2),
-  },
-  priceContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexWrap: 'wrap',
-  },
-  originalPrice: {
-    fontSize: scale.hp(2.5),
-    fontWeight: '700',
-    color: Colors.primary,
-  },
-  originalPriceStriked: {
-    fontSize: scale.hp(2.2),
-    fontWeight: '600',
-    color: Colors.textSecondary,
-    textDecorationLine: 'line-through',
-    marginRight: scale.wp(2),
-  },
-  finalPrice: {
-    fontSize: scale.hp(2.5),
-    fontWeight: '700',
-    color: '#10B981',
+    paddingBottom: scale.hp(4),
   },
   inputSection: {
-    marginTop: scale.hp(3),
+    marginTop: scale.hp(2),
+    marginBottom: scale.hp(2),
   },
   sectionTitle: {
     fontSize: scale.hp(1.8),
@@ -973,99 +893,6 @@ const styles = StyleSheet.create({
     paddingVertical: scale.hp(1.5),
     fontSize: scale.hp(1.8),
     color: Colors.textPrimary,
-  },
-  inputHelp: {
-    fontSize: scale.hp(1.4),
-    color: Colors.textSecondary,
-    marginTop: scale.hp(0.5),
-  },
-  paymentSection: {
-    marginTop: scale.hp(3),
-  },
-  paymentMethodContainer: {
-    marginTop: scale.hp(1),
-  },
-  paymentMethodButton: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: scale.wp(2),
-    padding: scale.hp(1.5),
-  },
-  paymentMethodButtonSelected: {
-    borderColor: Colors.primary,
-    backgroundColor: 'rgba(59, 130, 246, 0.05)',
-  },
-  paymentMethodContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  paymentMethodText: {
-    fontSize: scale.hp(1.8),
-    color: Colors.textSecondary,
-    marginStart: scale.wp(2),
-  },
-  paymentMethodTextSelected: {
-    color: Colors.primary,
-    fontWeight: '500',
-  },
-  cardDetailsContainer: {
-    marginTop: scale.hp(2),
-  },
-  fieldContainer: {
-    marginBottom: scale.hp(1),
-  },
-  fieldHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: scale.hp(1),
-  },
-  fieldLabel: {
-    fontSize: scale.hp(1.6),
-    fontWeight: '500',
-    color: Colors.textPrimary,
-  },
-  clearButton: {
-    padding: scale.hp(0.5),
-  },
-  clearButtonText: {
-    color: Colors.primary,
-    fontSize: scale.hp(1.4),
-    fontWeight: '500',
-  },
-  errorText: {
-    color: '#DC2626',
-    fontSize: scale.hp(1.4),
-    fontWeight: '500',
-    marginTop: scale.hp(0.5),
-  },
-  verifyingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: scale.hp(1),
-  },
-  verifyingText: {
-    fontSize: scale.hp(1.4),
-    color: Colors.textSecondary,
-    marginLeft: scale.wp(2),
-  },
-  verifiedContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: scale.hp(1),
-  },
-  verifiedText: {
-    fontSize: scale.hp(1.4),
-    color: '#10B981',
-    fontWeight: '500',
-    marginLeft: scale.wp(2),
-  },
-  securePaymentNotice: {
-    fontSize: scale.hp(1.4),
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    marginTop: scale.hp(1),
   },
   promoSection: {
     marginTop: scale.hp(3),
@@ -1132,7 +959,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: "#CD0202"
   },
   summaryTitle: {
     fontSize: scale.hp(1.8),
@@ -1176,17 +1004,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.primary,
   },
-  footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#fff',
-    paddingHorizontal: scale.wp(4),
-    paddingVertical: scale.hp(2),
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    paddingBottom: scale.hp(2),
+  activateButtonContainer: {
+    marginTop: scale.hp(3),
+    marginBottom: scale.hp(2),
   },
   activateButton: {
     backgroundColor: Colors.primary,
@@ -1203,7 +1023,12 @@ const styles = StyleSheet.create({
     fontSize: scale.hp(1.8),
     fontWeight: '600',
   },
-  // Status Screen Styles
+  securePaymentNotice: {
+    fontSize: scale.hp(1.4),
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    marginTop: scale.hp(1),
+  },
   statusContainer: {
     paddingHorizontal: scale.wp(4),
     paddingTop: scale.hp(4),
@@ -1327,6 +1152,95 @@ const styles = StyleSheet.create({
   moreButtonText: {
     color: Colors.primary,
     fontSize: scale.hp(1.6),
+    fontWeight: '600',
+  },
+});
+
+const sheetStyles = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+    marginBottom: 20,
+  },
+  sheetContainer: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 30,
+    maxHeight: '80%',
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  sheetTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  closeButton: {
+    padding: 4,
+  },
+  paymentMethodsList: {
+    marginBottom: 20,
+  },
+  paymentMethodItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginBottom: 12,
+  },
+  paymentMethodItemSelected: {
+    borderColor: '#CD0202',
+    backgroundColor: 'rgba(205, 2, 2, 0.05)',
+  },
+  paymentMethodContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  paymentMethodName: {
+    fontSize: 16,
+    color: '#374151',
+    marginLeft: 12,
+  },
+  paymentMethodNameSelected: {
+    color: '#CD0202',
+    fontWeight: '500',
+  },
+  sheetFooter: {
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    paddingTop: 20,
+  },
+  totalText: {
+    fontSize: 16,
+    color: '#374151',
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  payButton: {
+    backgroundColor: '#CD0202',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  payButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
     fontWeight: '600',
   },
 });

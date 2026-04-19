@@ -15,6 +15,49 @@ const DataStyles = StyleSheet.create({
     marginBottom: scale.hp(0.8),
     marginTop: scale.hp(1.55),
   },
+  activeFiltersContainer: {
+    backgroundColor: '#F8F9FA',
+    padding: scale.hp(1.55),
+    borderRadius: scale.hp(1.0),
+    marginBottom: scale.hp(1.55),
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.primary,
+  },
+  activeFiltersText: {
+    fontSize: scale.hp(1.7),
+    color: Colors.textSecondary,
+    marginBottom: scale.hp(0.8),
+    fontWeight: '600',
+  },
+  activeFiltersChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  activeFilterChip: {
+    backgroundColor: Colors.primary + '20',
+    paddingHorizontal: scale.wp(2.4),
+    paddingVertical: scale.hp(0.5),
+    borderRadius: scale.hp(1.0),
+    marginRight: scale.wp(1.5),
+    marginBottom: scale.hp(0.5),
+  },
+  activeFilterText: {
+    fontSize: scale.hp(1.5),
+    color: Colors.primary,
+    fontWeight: '500',
+  },
+  clearFiltersButton: {
+    marginTop: scale.hp(1.55),
+    padding: scale.hp(1.05),
+    backgroundColor: Colors.primary,
+    borderRadius: scale.hp(1.0),
+    alignItems: 'center',
+  },
+  clearFiltersText: {
+    color: Colors.white,
+    fontSize: scale.hp(1.7),
+    fontWeight: '600',
+  },
   dropField: {
     height: scale.hp(8.4),
     borderRadius: scale.hp(6.5),
@@ -100,7 +143,7 @@ const DataStyles = StyleSheet.create({
   categoryText: {
     fontSize: scale.hp(1.8),
     fontWeight: "600",
-    color: Colors.textSecondary,
+    color: "#F0533F",
   },
   categoryTextActive: {
     color: Colors.white,

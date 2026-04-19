@@ -63,12 +63,12 @@ const AboutAppScreen = ({ navigation }) => {
     version: "1.0.1",
     build: "3",
     releaseDate: "December 2024",
-    company: "Yes Charge Technologies"
+    company: "YES Charge Technologies"
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <ServiceHeader title="About Yes Charge" onBack={goBack} />
+      <ServiceHeader title="About YES Charge" onBack={goBack} />
       
       <ScrollView 
         style={styles.scrollView}

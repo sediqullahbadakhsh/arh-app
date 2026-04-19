@@ -237,12 +237,9 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
   const [originalData, setOriginalData] = useState({});
   const [errors, setErrors] = useState({});
   const [showImagePicker, setShowImagePicker] = useState(false);
-  
-  // Modal states
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  
   const [scaleAnim] = useState(new Animated.Value(0));
   const [slideAnim] = useState(new Animated.Value(screenHeight));
   const [isEditing, setIsEditing] = useState(false);
@@ -253,7 +250,6 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
   const [loadingCountries, setLoadingCountries] = useState(false);
   const [loadingProvinces, setLoadingProvinces] = useState(false);
   const [loadingDistricts, setLoadingDistricts] = useState(false);
-
   const [selectedCountry, setSelectedCountry] = useState(null);
   const [selectedProvince, setSelectedProvince] = useState(null);
   const [selectedDistrict, setSelectedDistrict] = useState(null);
@@ -302,10 +298,10 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
           setFormData(newFormData);
           setOriginalData(newFormData); 
           
-          if (userInfo.profile_picture) {
-            const fullImageUrl = userInfo.profile_picture.startsWith('http') 
-              ? userInfo.profile_picture
-              : `http://3.67.144.22/uploads/profile_pictures/${userInfo.profile_picture}`;
+          if (userInfo.profilePicture) {
+            const fullImageUrl = userInfo.profilePicture.startsWith('http') 
+              ? userInfo.profilePicture
+              : `http://3.67.144.22/uploads/profile_pictures/${userInfo.profilePicture}`;
             setAvatar(fullImageUrl);
           }
 
@@ -832,7 +828,11 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
       </LinearGradient>
 
       <View style={ProfileStyles.formContainer}>
-        <ScrollView style={ProfileStyles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={ProfileStyles.scrollContent}>
+        <ScrollView 
+          style={ProfileStyles.scrollView} 
+          showsVerticalScrollIndicator={false} 
+          contentContainerStyle={ProfileStyles.scrollContent}
+        >
           <Text style={ProfileStyles.sectionTitle}>{t('personalInformation')}</Text>
           
           <View style={ProfileStyles.inputGroup}>
@@ -1062,7 +1062,7 @@ export default function ProfileDetailsScreenMerchant({ navigation }) {
   );
 }
 
-const styles = {
+const styles = StyleSheet.create({
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(255,255,255,0.8)",
@@ -1075,4 +1075,4 @@ const styles = {
     color: Colors.textPrimary,
     fontWeight: "600",
   },
-};
+});

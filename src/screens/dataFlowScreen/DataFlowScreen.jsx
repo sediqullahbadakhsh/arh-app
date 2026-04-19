@@ -52,6 +52,9 @@ import StepPay from "./StepPay";
 import { useTranslation } from "react-i18next";
 import LottieView from 'lottie-react-native';
 import { useStripe } from "@stripe/stripe-react-native";
+import { validatePromoCode } from "../../services/promoCodeApi";
+import { scale } from "../../utils/normalizeSize";
+import { useFocusEffect } from "@react-navigation/native";
 
 const { height: screenHeight } = Dimensions.get('window');
 const BASE_STEPS = { COUNTRY: 0, NUMBER: 1, PRODUCT: 2, PAY: 3 };
@@ -78,13 +81,15 @@ const QUERY_KEYS = {
   COUNTRIES: ['countries'],
   BUNDLE_CATEGORIES: ['bundle-categories'],
   BUNDLE_TYPES: ['bundle-types'],
-  DATA_PRODUCTS: (countryId, categoryId, typeId) => ['data-products', countryId, categoryId, typeId],
+  DATA_PRODUCTS: (countryId, categoryId, typeId, prefix) => ['data-products', countryId, categoryId, typeId, prefix],
   CURRENCIES: ['currencies'],
   SLABS: ['slabs'],
   CONTACTS: ['contacts'],
 };
 
 const useCountries = () => {
+  const queryClient = useQueryClient();
+  
   return useQuery({
     queryKey: QUERY_KEYS.COUNTRIES,
     queryFn: async () => {
@@ -96,6 +101,8 @@ const useCountries = () => {
 };
 
 const useBundleCategories = () => {
+  const queryClient = useQueryClient();
+  
   return useQuery({
     queryKey: QUERY_KEYS.BUNDLE_CATEGORIES,
     queryFn: async () => {
@@ -107,6 +114,8 @@ const useBundleCategories = () => {
 };
 
 const useBundleTypes = () => {
+  const queryClient = useQueryClient();
+  
   return useQuery({
     queryKey: QUERY_KEYS.BUNDLE_TYPES,
     queryFn: async () => {
@@ -117,9 +126,9 @@ const useBundleTypes = () => {
   });
 };
 
-const useDataProducts = (countryId, categoryId, typeId, enabled = false) => {
+const useDataProducts = (countryId, categoryId, typeId, prefix, enabled = false) => {
   return useQuery({
-    queryKey: QUERY_KEYS.DATA_PRODUCTS(countryId, categoryId, typeId),
+    queryKey: QUERY_KEYS.DATA_PRODUCTS(countryId, categoryId, typeId, prefix),
     queryFn: async () => {
       if (!countryId) return [];
       
@@ -131,10 +140,11 @@ const useDataProducts = (countryId, categoryId, typeId, enabled = false) => {
       };
       
       const response = await getDataProductsCustomer(filter);
+      console.log("Fetched Data Products:", response);
       return response?.data || [];
     },
     enabled: !!countryId && enabled,
-    staleTime: 5 * 60 * 1000, 
+    staleTime: 5 * 60 * 1000,
   });
 };
 
@@ -195,6 +205,341 @@ const useActivateBundle = () => {
   });
 };
 
+const usePromoCodeValidation = () => {
+  return useMutation({
+    mutationFn: async ({ code, orderAmount }) => {
+      const response = await validatePromoCode({
+        code,
+        orderAmount
+      });
+      return response;
+    },
+    onSuccess: (data) => {
+      if (!data.status) {
+        throw new Error(data.error || 'Invalid promo code');
+      }
+    },
+  });
+};
+
+const normalizePhoneNumber = (phoneNumber, countryDialCode) => {
+  if (!phoneNumber) return "";
+  
+  let normalized = phoneNumber.replace(/\D/g, "");
+  
+  const countryCodes = [
+    '+1', '1',  // USA/Canada
+    '+44', '44', // UK
+    '+91', '91', // India
+    '+92', '92', // Pakistan
+    '+93', '93', // Afghanistan
+    '+94', '94', // Sri Lanka
+    '+95', '95', // Myanmar
+    '+96', '96', // 
+    '+97', '97', // UAE
+    '+98', '98', // Iran
+    '+99', '99', // 
+    '+20', '20', // Egypt
+    '+30', '30', // Greece
+    '+31', '31', // Netherlands
+    '+32', '32', // Belgium
+    '+33', '33', // France
+    '+34', '34', // Spain
+    '+39', '39', // Italy
+    '+40', '40', // Romania
+    '+41', '41', // Switzerland
+    '+43', '43', // Austria
+    '+45', '45', // Denmark
+    '+46', '46', // Sweden
+    '+47', '47', // Norway
+    '+48', '48', // Poland
+    '+49', '49', // Germany
+    '+51', '51', // Peru
+    '+52', '52', // Mexico
+    '+53', '53', // Cuba
+    '+54', '54', // Argentina
+    '+55', '55', // Brazil
+    '+56', '56', // Chile
+    '+57', '57', // Colombia
+    '+58', '58', // Venezuela
+    '+60', '60', // Malaysia
+    '+61', '61', // Australia
+    '+62', '62', // Indonesia
+    '+63', '63', // Philippines
+    '+64', '64', // New Zealand
+    '+65', '65', // Singapore
+    '+66', '66', // Thailand
+    '+81', '81', // Japan
+    '+82', '82', // South Korea
+    '+84', '84', // Vietnam
+    '+86', '86', // China
+    '+90', '90', // Turkey
+    '+212', '212', // Morocco
+    '+213', '213', // Algeria
+    '+216', '216', // Tunisia
+    '+218', '218', // Libya
+    '+220', '220', // Gambia
+    '+221', '221', // Senegal
+    '+222', '222', // Mauritania
+    '+223', '223', // Mali
+    '+224', '224', // Guinea
+    '+225', '225', // Ivory Coast
+    '+226', '226', // Burkina Faso
+    '+227', '227', // Niger
+    '+228', '228', // Togo
+    '+229', '229', // Benin
+    '+230', '230', // Mauritius
+    '+231', '231', // Liberia
+    '+232', '232', // Sierra Leone
+    '+233', '233', // Ghana
+    '+234', '234', // Nigeria
+    '+235', '235', // Chad
+    '+236', '236', // Central African Republic
+    '+237', '237', // Cameroon
+    '+238', '238', // Cape Verde
+    '+239', '239', // Sao Tome and Principe
+    '+240', '240', // Equatorial Guinea
+    '+241', '241', // Gabon
+    '+242', '242', // Republic of the Congo
+    '+243', '243', // Democratic Republic of the Congo
+    '+244', '244', // Angola
+    '+245', '245', // Guinea-Bissau
+    '+246', '246', // Diego Garcia
+    '+247', '247', // Ascension Island
+    '+248', '248', // Seychelles
+    '+249', '249', // Sudan
+    '+250', '250', // Rwanda
+    '+251', '251', // Ethiopia
+    '+252', '252', // Somalia
+    '+253', '253', // Djibouti
+    '+254', '254', // Kenya
+    '+255', '255', // Tanzania
+    '+256', '256', // Uganda
+    '+257', '257', // Burundi
+    '+258', '258', // Mozambique
+    '+260', '260', // Zambia
+    '+261', '261', // Madagascar
+    '+262', '262', // Reunion
+    '+263', '263', // Zimbabwe
+    '+264', '264', // Namibia
+    '+265', '265', // Malawi
+    '+266', '266', // Lesotho
+    '+267', '267', // Botswana
+    '+268', '268', // Eswatini
+    '+269', '269', // Comoros
+    '+290', '290', // Saint Helena
+    '+291', '291', // Eritrea
+    '+297', '297', // Aruba
+    '+298', '298', // Faroe Islands
+    '+299', '299', // Greenland
+    '+350', '350', // Gibraltar
+    '+351', '351', // Portugal
+    '+352', '352', // Luxembourg
+    '+353', '353', // Ireland
+    '+354', '354', // Iceland
+    '+355', '355', // Albania
+    '+356', '356', // Malta
+    '+357', '357', // Cyprus
+    '+358', '358', // Finland
+    '+359', '359', // Bulgaria
+    '+370', '370', // Lithuania
+    '+371', '371', // Latvia
+    '+372', '372', // Estonia
+    '+373', '373', // Moldova
+    '+374', '374', // Armenia
+    '+375', '375', // Belarus
+    '+376', '376', // Andorra
+    '+377', '377', // Monaco
+    '+378', '378', // San Marino
+    '+379', '379', // Vatican City
+    '+380', '380', // Ukraine
+    '+381', '381', // Serbia
+    '+382', '382', // Montenegro
+    '+383', '383', // Kosovo
+    '+385', '385', // Croatia
+    '+386', '386', // Slovenia
+    '+387', '387', // Bosnia and Herzegovina
+    '+389', '389', // North Macedonia
+    '+420', '420', // Czech Republic
+    '+421', '421', // Slovakia
+    '+423', '423', // Liechtenstein
+    '+500', '500', // Falkland Islands
+    '+501', '501', // Belize
+    '+502', '502', // Guatemala
+    '+503', '503', // El Salvador
+    '+504', '504', // Honduras
+    '+505', '505', // Nicaragua
+    '+506', '506', // Costa Rica
+    '+507', '507', // Panama
+    '+508', '508', // Saint Pierre and Miquelon
+    '+509', '509', // Haiti
+    '+590', '590', // Guadeloupe
+    '+591', '591', // Bolivia
+    '+592', '592', // Guyana
+    '+593', '593', // Ecuador
+    '+594', '594', // French Guiana
+    '+595', '595', // Paraguay
+    '+596', '596', // Martinique
+    '+597', '597', // Suriname
+    '+598', '598', // Uruguay
+    '+599', '599', // Caribbean Netherlands
+    '+670', '670', // East Timor
+    '+672', '672', // Australian External Territories
+    '+673', '673', // Brunei
+    '+674', '674', // Nauru
+    '+675', '675', // Papua New Guinea
+    '+676', '676', // Tonga
+    '+677', '677', // Solomon Islands
+    '+678', '678', // Vanuatu
+    '+679', '679', // Fiji
+    '+680', '680', // Palau
+    '+681', '681', // Wallis and Futuna
+    '+682', '682', // Cook Islands
+    '+683', '683', // Niue
+    '+685', '685', // Samoa
+    '+686', '686', // Kiribati
+    '+687', '687', // New Caledonia
+    '+688', '688', // Tuvalu
+    '+689', '689', // French Polynesia
+    '+690', '690', // Tokelau
+    '+691', '691', // Micronesia
+    '+692', '692', // Marshall Islands
+    '+850', '850', // North Korea
+    '+852', '852', // Hong Kong
+    '+853', '853', // Macau
+    '+855', '855', // Cambodia
+    '+856', '856', // Laos
+    '+880', '880', // Bangladesh
+    '+886', '886', // Taiwan
+    '+960', '960', // Maldives
+    '+961', '961', // Lebanon
+    '+962', '962', // Jordan
+    '+963', '963', // Syria
+    '+964', '964', // Iraq
+    '+965', '965', // Kuwait
+    '+966', '966', // Saudi Arabia
+    '+967', '967', // Yemen
+    '+968', '968', // Oman
+    '+970', '970', // Palestine
+    '+971', '971', // United Arab Emirates
+    '+972', '972', // Israel
+    '+973', '973', // Bahrain
+    '+974', '974', // Qatar
+    '+975', '975', // Bhutan
+    '+976', '976', // Mongolia
+    '+977', '977', // Nepal
+    '+992', '992', // Tajikistan
+    '+993', '993', // Turkmenistan
+    '+994', '994', // Azerbaijan
+    '+995', '995', // Georgia
+    '+996', '996', // Kyrgyzstan
+    '+998', '998', // Uzbekistan
+  ];
+  
+ 
+  const sortedCountryCodes = [...countryCodes].sort((a, b) => b.length - a.length);
+  
+  for (const code of sortedCountryCodes) {
+    if (normalized.startsWith(code)) {
+      normalized = normalized.substring(code.length);
+      break;
+    }
+  }
+  
+  normalized = normalized.replace(/^0+/, '');
+  
+  return normalized;
+};
+
+const PromoCodeModal = React.memo(({ 
+  visible, 
+  onClose, 
+  promoCode = "", 
+  setPromoCode, 
+  validatingPromo, 
+  promoError = "", 
+  onApply 
+}) => {
+  const { t } = useTranslation();
+  
+  const handleTextChange = useCallback((text) => {
+    setPromoCode(text.toUpperCase());
+  }, [setPromoCode]);
+
+  const handleApply = useCallback(() => {
+    onApply?.();
+  }, [onApply]);
+
+  const handleClose = useCallback(() => {
+    onClose?.();
+  }, [onClose]);
+
+  return (
+    <Modal
+      visible={visible}
+      transparent={true}
+      animationType="slide"
+      statusBarTranslucent={true}
+      onRequestClose={handleClose}
+    >
+      <View style={promoModalStyles.modalOverlay}>
+        <View style={promoModalStyles.modalContent}>
+          <View style={promoModalStyles.modalHeader}>
+            <Text style={promoModalStyles.modalTitle}>{t('promoCode.applyPromo')}</Text>
+            <TouchableOpacity onPress={handleClose} style={promoModalStyles.closeButton}>
+              <Text style={promoModalStyles.closeButtonText}>×</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={promoModalStyles.promoInputContainer}>
+            <TextInput
+              style={promoModalStyles.promoInput}
+              placeholder={t('promoCode.enterCodePlaceholder')}
+              value={promoCode}
+              onChangeText={handleTextChange}
+              placeholderTextColor="#999"
+              autoCapitalize="characters"
+              autoFocus={true}
+            />
+          </View>
+
+          {promoError ? (
+            <View style={promoModalStyles.errorContainer}>
+              <Text style={promoModalStyles.errorText}>{promoError}</Text>
+            </View>
+          ) : null}
+
+          <View style={promoModalStyles.modalButtons}>
+            <TouchableOpacity 
+              style={[promoModalStyles.modalButton, promoModalStyles.cancelButton]} 
+              onPress={handleClose}
+              disabled={validatingPromo}
+            >
+              <Text style={promoModalStyles.cancelButtonText}>{t('cancel')}</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[
+                promoModalStyles.modalButton, 
+                promoModalStyles.applyButton, 
+                (!promoCode.trim() || validatingPromo) && promoModalStyles.disabledButton
+              ]} 
+              onPress={handleApply}
+              disabled={!promoCode.trim() || validatingPromo}
+            >
+              {validatingPromo ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={promoModalStyles.applyButtonText}>{t('promoCode.apply')}</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+});
+
 function DataFlowScreenMerchant({ navigation }) {
   const { user } = useAuth?.() || { user: null };
   const { confirmPayment } = useStripe();
@@ -209,6 +554,7 @@ function DataFlowScreenMerchant({ navigation }) {
   const [countryOpen, setCountryOpen] = useState(false);
   const [countrySearch, setCountrySearch] = useState('');
   const [localNumber, setLocalNumber] = useState("");
+  const [mobilePrefix, setMobilePrefix] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedType, setSelectedType] = useState(null);
   const [product, setProduct] = useState(null);
@@ -220,35 +566,123 @@ function DataFlowScreenMerchant({ navigation }) {
   const [contactsSlideAnim] = useState(new Animated.Value(screenHeight));
   const [countriesSlideAnim] = useState(new Animated.Value(screenHeight));
   const insets = useSafeAreaInsets();
-  
+  const [promoModalVisible, setPromoModalVisible] = useState(false);
+  const [promoCode, setPromoCode] = useState("");
+  const [appliedPromoCode, setAppliedPromoCode] = useState(null);
+  const [promoError, setPromoError] = useState("");
+  const [discountAmount, setDiscountAmount] = useState(0);
+  const [finalAmount, setFinalAmount] = useState(0);
   const pollingRef = useRef(null);
   const lottieRef = useRef(null);
   const [loading, setLoading] = useState(false);
-
+  const queryClient = useQueryClient();
   const dial = DIAL_CODES[country?.countryCode] || "";
   const operator = guessOperator(country?.countryCode, localNumber.replace(/\D/g, ""));
-
-  const { data: countries = [], isLoading: loadingCountries } = useCountries();
-  const { data: bundleCategories = [], isLoading: loadingCategories } = useBundleCategories();
-  const { data: bundleTypes = [], isLoading: loadingTypes } = useBundleTypes();
-  const { data: currenciesData, isLoading: loadingCurrencies } = useCurrencies();
-  const { data: slabsData, isLoading: loadingSlabs } = useSlabs();
+  const { data: countries = [], isLoading: loadingCountries, refetch: refetchCountries } = useCountries();
+  const { data: bundleCategories = [], isLoading: loadingCategories, refetch: refetchCategories } = useBundleCategories();
+  const { data: bundleTypes = [], isLoading: loadingTypes, refetch: refetchTypes } = useBundleTypes();
+  const { data: currenciesData, isLoading: loadingCurrencies, refetch: refetchCurrencies } = useCurrencies();
+  const { data: slabsData, isLoading: loadingSlabs, refetch: refetchSlabs } = useSlabs();
   const { 
     data: contacts = [], 
     isLoading: loadingContacts,
     refetch: refetchContacts 
   } = useContacts();
   const activateBundleMutation = useActivateBundle();
-  
+  const promoCodeValidation = usePromoCodeValidation();
   const shouldFetchProducts = step >= BASE_STEPS.PRODUCT && !!country?.id;
   const { 
     data: products = [], 
-    isLoading: loadingProducts 
+    isLoading: loadingProducts,
+    refetch: refetchProducts 
   } = useDataProducts(
     country?.id, 
     selectedCategory?.id, 
-    selectedType?.id,      
+    selectedType?.id,
+    mobilePrefix,
     shouldFetchProducts
+  );
+
+  const handleNumberChange = (number) => {
+    setLocalNumber(number);
+    
+    if (number.length >= 2) {
+      const prefix = number.substring(0, 2);
+      setMobilePrefix(prefix);
+    } else {
+      setMobilePrefix(null);
+    }
+  };
+
+
+  const filteredProducts = useMemo(() => {
+    if (!products || products.length === 0) return [];
+    
+    let filtered = products;
+    
+
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      filtered = filtered.filter((p) =>
+        p.productName?.toLowerCase().includes(q) ||
+        p.description?.toLowerCase().includes(q) ||
+        p.price?.toString().includes(q)
+      );
+    }
+    
+ 
+    if (mobilePrefix) {
+      filtered = filtered.filter((p) => {
+
+        if (!p.prefix && p.prefix !== 0) return true;
+        
+        if (Array.isArray(p.prefix)) {
+          return p.prefix.includes(parseInt(mobilePrefix));
+        }
+        
+        return p.prefix.toString() === mobilePrefix;
+      });
+    }
+    
+    return filtered;
+  }, [products, search, mobilePrefix]);
+
+  
+  useFocusEffect(
+    useCallback(() => {
+      console.log('DataFlowScreenMerchant focused');
+      
+
+      if (!orderStatus) {
+        const refetchData = async () => {
+          try {
+            await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.COUNTRIES });
+            await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.BUNDLE_CATEGORIES });
+            await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.BUNDLE_TYPES });
+            await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CURRENCIES });
+            await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SLABS });
+            
+            await Promise.all([
+              refetchCountries(),
+              refetchCategories(),
+              refetchTypes(),
+              refetchCurrencies(),
+              refetchSlabs(),
+            ]);
+            
+            console.log('All data refetched successfully');
+          } catch (error) {
+            console.error('Error refetching data:', error);
+          }
+        };
+        
+        refetchData();
+      }
+      
+      return () => {
+        console.log('DataFlowScreenMerchant unfocused');
+      };
+    }, [queryClient, orderStatus])
   );
 
   const startPollingOrderStatus = async (orderId) => {
@@ -324,6 +758,15 @@ function DataFlowScreenMerchant({ navigation }) {
     }
   }, [slabsData, country]);
 
+
+  useEffect(() => {
+    if (product?.totalAmountInUSD) {
+      const originalUsd = parseFloat(product.totalAmountInUSD);
+      const newFinalAmount = Math.max(0, originalUsd - discountAmount);
+      setFinalAmount(parseFloat(newFinalAmount.toFixed(2)));
+    }
+  }, [product, discountAmount]);
+
   useEffect(() => {
     if (lottieRef.current && (orderStatus === ORDER_STATUS.SUCCEEDED || orderStatus === ORDER_STATUS.FAILED)) {
       lottieRef.current.play();
@@ -384,16 +827,6 @@ function DataFlowScreenMerchant({ navigation }) {
       )
     );
   }, [searchQuery, contacts]);
-
-  const filteredProducts = useMemo(() => {
-    if (!search.trim()) return products;
-    const q = search.trim().toLowerCase();
-    return products.filter((p) =>
-      p.productName?.toLowerCase().includes(q) ||
-      p.description?.toLowerCase().includes(q) ||
-      p.price?.toString().includes(q)
-    );
-  }, [products, search]);
 
   const calculateUsdAmount = useCallback((afnAmount) => {
     if (!exchangeRate || !afnAmount) return 0;
@@ -460,8 +893,82 @@ function DataFlowScreenMerchant({ navigation }) {
 
   useEffect(() => {
     setLocalNumber("");
+    setMobilePrefix(null);
     setProduct(null);
   }, [country?.countryCode]);
+
+  useEffect(() => {
+    if (mobilePrefix && product) {
+      if (product.prefix && product.prefix.toString() !== mobilePrefix) {
+        setProduct(null);
+      }
+    }
+  }, [mobilePrefix, product]);
+
+  const handleApplyPromoCode = async () => {
+    if (!promoCode.trim()) {
+      setPromoError(t('promoCode.enterCode'));
+      return;
+    }
+
+    if (!product?.totalAmountInUSD) {
+      setPromoError(t('promoCode.selectProductFirst'));
+      return;
+    }
+
+    setPromoError("");
+
+    try {
+      const orderAmount = product?.totalAmountInUSD || afn;
+      
+      const response = await promoCodeValidation.mutateAsync({
+        code: promoCode.trim(),
+        orderAmount: orderAmount
+      });
+
+      let discount = 0;
+      const baseUsdAmount = parseFloat(product.totalAmountInUSD);
+      
+      if (response.discount_type === 'percentage') {
+        discount = (baseUsdAmount * response.discount_value) / 100;
+      } else {
+        discount = response.discount_value;
+      }
+
+      if (response.max_discount && discount > response.max_discount) {
+        discount = response.max_discount;
+      }
+
+      setDiscountAmount(discount);
+      setAppliedPromoCode({
+        code: promoCode.trim(),
+        discount_type: response.discount_type,
+        discount_value: response.discount_value,
+        discount_amount: discount
+      });
+      
+      setPromoModalVisible(false);
+      Alert.alert(t('success'), t('promoCode.appliedSuccessfully'));
+    } catch (error) {
+      setPromoError(error.message || t('promoCode.invalidCode'));
+    }
+  };
+
+  const handleRemovePromoCode = () => {
+    setAppliedPromoCode(null);
+    setDiscountAmount(0);
+    setPromoError("");
+  };
+
+  const openPromoModal = () => {
+    setPromoModalVisible(true);
+    setPromoError("");
+  };
+
+  const closePromoModal = () => {
+    setPromoModalVisible(false);
+    setPromoError("");
+  };
 
   const activateBundle = async () => {
     if (!paymentMethodId) {
@@ -479,9 +986,12 @@ function DataFlowScreenMerchant({ navigation }) {
       cardCurrency: "USD",
       paymentMethodId: paymentMethodId,
       confirmNow: false,
+      promo_code: appliedPromoCode?.code || null,
+      finalDiscountAmount: discountAmount,
+      promodiscountamoun: discountAmount,
     };
 
-    console.log("🔄 Customer Bundle Activation Payload:", payload);
+    console.log("Customer Bundle Activation Payload:", payload);
 
     try {
       setLoading(true);
@@ -495,7 +1005,10 @@ function DataFlowScreenMerchant({ navigation }) {
           txnNumber: res.txnNumber || `TXN-${Date.now()}`,
           mobile: `${dial} ${formatLocal(localNumber)}`,
           amountAfn: product?.price,
-          usdAmount: product?.totalAmountInUSD || usd,
+          usdAmount: finalAmount,
+          originalUsdAmount: product?.totalAmountInUSD || usd,
+          discountAmount: discountAmount,
+          promoCode: appliedPromoCode?.code,
           productName: product?.productName,
           date: new Date().toISOString(),
           operator: operator?.name || t('unknown'),
@@ -510,17 +1023,15 @@ function DataFlowScreenMerchant({ navigation }) {
           await startPollingOrderStatus(res.orderId);
         }
         
-        Alert.alert(
-          t('success'),
-          t('bundleActivationInitiated'),
-          [{ text: t('common.ok'), onPress: () => {} }]
-        );
       } else {
         setOrderStatus(ORDER_STATUS.FAILED);
         setOrderDetails({
           mobile: `${dial} ${formatLocal(localNumber)}`,
           amountAfn: product?.price,
-          usdAmount: usd,
+          usdAmount: finalAmount,
+          originalUsdAmount: product?.totalAmountInUSD || usd,
+          discountAmount: discountAmount,
+          promoCode: appliedPromoCode?.code,
           productName: product?.productName,
           date: new Date().toISOString(),
           error: res.error || t('bundleActivationRequestFailed'),
@@ -534,7 +1045,10 @@ function DataFlowScreenMerchant({ navigation }) {
       setOrderDetails({
         mobile: `${dial} ${formatLocal(localNumber)}`,
         amountAfn: product?.price,
-        usdAmount: usd,
+        usdAmount: finalAmount,
+        originalUsdAmount: product?.totalAmountInUSD || usd,
+        discountAmount: discountAmount,
+        promoCode: appliedPromoCode?.code,
         productName: product?.productName,
         date: new Date().toISOString(),
         error: error.response?.data?.error || error.message || t('bundleActivationFailed'),
@@ -546,23 +1060,46 @@ function DataFlowScreenMerchant({ navigation }) {
     }
   };
 
-  const handleContactSelect = (phoneNumber) => {
+  const handleContactSelect = useCallback((phoneNumber) => {
     if (!phoneNumber) {
       Alert.alert(t('error'), t('invalidPhoneNumber'));
       return;
     }
 
-    let number = phoneNumber.replace(/\D/g, "");
+    console.log("Selected contact phone number:", phoneNumber);
+    
+    let normalizedNumber = normalizePhoneNumber(phoneNumber, dial.replace('+', ''));
+    
+    console.log("Normalized number after removing country codes:", normalizedNumber);
 
-    const countryDialCode = country?.dialCode?.replace('+', '') || DIAL_CODES[country?.countryCode]?.replace('+', '') || '';
-    if (countryDialCode && number.startsWith(countryDialCode)) {
-      number = number.substring(countryDialCode.length);
+    normalizedNumber = normalizedNumber.replace(/^0+/, '');
+    
+    console.log("Final normalized number:", normalizedNumber);
+    
+    if (normalizedNumber.length < 7) {
+      Alert.alert(t('error'), t('invalidPhoneNumberLength'));
+      return;
     }
-    number = number.replace(/^0+/, '');
-    setLocalNumber(number);
+    
+    setLocalNumber(normalizedNumber);
+    
+    if (normalizedNumber.length >= 2) {
+      const prefix = normalizedNumber.substring(0, 2);
+      setMobilePrefix(prefix);
+      console.log("Extracted prefix:", prefix);
+    } else {
+      setMobilePrefix(null);
+    }
+    
     setContactsModalVisible(false);
     setSearchQuery('');
-  };
+    
+    Alert.alert(
+      t('success'),
+      t('contactNumberImportedSuccessfully', { number: normalizedNumber }),
+      [{ text: t('ok') }]
+    );
+  }, [dial, t]);
 
   const resetFlow = () => {
     setOrderStatus(null);
@@ -570,8 +1107,18 @@ function DataFlowScreenMerchant({ navigation }) {
     setStep(0);
     setProduct(null);
     setLocalNumber("");
+    setMobilePrefix(null);
     setPaymentMethodId(null);
     setCardDetailsComplete(false);
+    setAppliedPromoCode(null);
+    setDiscountAmount(0);
+    setFinalAmount(0);
+    setPromoCode("");
+    setPromoError("");
+    setPromoModalVisible(false);
+    setSelectedCategory(null);
+    setSelectedType(null);
+    setSearch("");
     
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
@@ -580,6 +1127,12 @@ function DataFlowScreenMerchant({ navigation }) {
     
     if (lottieRef.current) {
       lottieRef.current.reset();
+    }
+    
+    if (country?.id) {
+      queryClient.invalidateQueries({ 
+        queryKey: QUERY_KEYS.DATA_PRODUCTS(country.id, selectedCategory?.id, selectedType?.id, mobilePrefix) 
+      });
     }
   };
 
@@ -663,7 +1216,7 @@ function DataFlowScreenMerchant({ navigation }) {
       case ORDER_STATUS.SUCCEEDED:
         return t('bundleActivated');
       case ORDER_STATUS.FAILED:
-        return t('activationFailed');
+        return t('bundleActivationFailed');
       default:
         return t('processing');
     }
@@ -694,6 +1247,16 @@ function DataFlowScreenMerchant({ navigation }) {
       calculateBaseAmount: () => baseAmount,
       calculateFeeAmount: () => feeAmount,
       slabPercentage: slabPercentage,
+      finalAmount: finalAmount,
+      discountAmount: discountAmount,
+      appliedPromoCode: appliedPromoCode,
+      
+      onApplyPromoCode: openPromoModal,
+      onRemovePromoCode: handleRemovePromoCode,
+      openPromoModal: openPromoModal,
+      closePromoModal: closePromoModal,
+      validatingPromo: promoCodeValidation.isLoading,
+      promoError: promoError
     };
   };
 
@@ -728,8 +1291,26 @@ function DataFlowScreenMerchant({ navigation }) {
           
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>{t('bundle')}</Text>
-              <Text style={styles.detailValue}>{orderDetails?.productName?.en || orderDetails?.productName}</Text>
+              <Text style={styles.detailValue}>
+                {orderDetails?.productName?.en || orderDetails?.productName}
+              </Text>
             </View>
+
+            {orderDetails?.promoCode && (
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>{t('promoCode.promoCode')}</Text>
+                <Text style={styles.detailValue}>{orderDetails?.promoCode}</Text>
+              </View>
+            )}
+
+            {orderDetails?.discountAmount > 0 && (
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>{t('promoCode.discount')}</Text>
+                <Text style={[styles.detailValue, { color: '#10B981' }]}>
+                  -${orderDetails?.discountAmount?.toFixed(2)} USD
+                </Text>
+              </View>
+            )}
 
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>{t('transactionId')}</Text>
@@ -745,7 +1326,17 @@ function DataFlowScreenMerchant({ navigation }) {
 
             <View style={styles.amountSection}>
               <Text style={styles.amountLabel}>{t('receipt.totalAmount')}</Text>
-              <Text style={styles.amountSubValue}>${orderDetails?.usdAmount || usd} {t('usd')}</Text>
+              <Text style={styles.amountValue}>
+                {orderDetails?.amountAfn} AFN
+              </Text>
+              <Text style={styles.amountSubValue}>
+                ${orderDetails?.usdAmount || finalAmount || usd} {t('usd')}
+              </Text>
+              {orderDetails?.originalUsdAmount && orderDetails?.originalUsdAmount > orderDetails?.usdAmount && (
+                <Text style={[styles.amountSubValue, { fontSize: 14, color: '#666', textDecorationLine: 'line-through' }]}>
+                  ${orderDetails?.originalUsdAmount} USD
+                </Text>
+              )}
             </View>
           </View>
 
@@ -913,13 +1504,18 @@ function DataFlowScreenMerchant({ navigation }) {
     setCountry,
     loadingCountries
   }) => {
-    const filteredCountries = useMemo(() => {
-      if (!countrySearch) return countries;
-      return countries.filter(c =>
-        c.countryName?.toLowerCase().includes(countrySearch.toLowerCase()) ||
-        c.countryCode?.toLowerCase().includes(countrySearch.toLowerCase())
-      );
-    }, [countries, countrySearch]);
+const filteredCountries = useMemo(() => {
+  let availableCountries = countries.filter(c => 
+    c.countryCode !== 'IR' && c.countryName !== 'Iran'
+  );
+
+  if (!countrySearch) return availableCountries;
+  
+  return availableCountries.filter(c =>
+    c.countryName?.toLowerCase().includes(countrySearch.toLowerCase()) ||
+    c.countryCode?.toLowerCase().includes(countrySearch.toLowerCase())
+  );
+}, [countries, countrySearch]);
 
     return (
       <Modal
@@ -982,6 +1578,11 @@ function DataFlowScreenMerchant({ navigation }) {
                       setCountry(item);
                       setCountryOpen(false);
                       setCountrySearch('');
+                      
+                      // Invalidate products query for the new country
+                      queryClient.invalidateQueries({ 
+                        queryKey: QUERY_KEYS.DATA_PRODUCTS(item.id, selectedCategory?.id, selectedType?.id, mobilePrefix) 
+                      });
                     }}
                   >
                     <Text style={{ fontSize: 24, marginRight: 12 }}>
@@ -1038,11 +1639,12 @@ function DataFlowScreenMerchant({ navigation }) {
                 dial={dial}
                 country={country}
                 value={localNumber}
-                onChange={setLocalNumber}
+                onChange={handleNumberChange}
                 localNumber={localNumber}
                 operator={operator}
                 onEditCountry={() => jumpTo(BASE_STEPS.COUNTRY)}
                 openContacts={() => setContactsModalVisible(true)}
+                onPrefixChange={setMobilePrefix}
               />
             )}
 
@@ -1051,10 +1653,24 @@ function DataFlowScreenMerchant({ navigation }) {
                 country={country}
                 bundleCategories={bundleCategories}
                 selectedCategory={selectedCategory}
-                setSelectedCategory={setSelectedCategory}
+                setSelectedCategory={(category) => {
+                  setSelectedCategory(category);
+                  if (country?.id) {
+                    queryClient.invalidateQueries({ 
+                      queryKey: QUERY_KEYS.DATA_PRODUCTS(country.id, category?.id, selectedType?.id, mobilePrefix) 
+                    });
+                  }
+                }}
                 bundleTypes={bundleTypes}
                 selectedType={selectedType}
-                setSelectedType={setSelectedType}
+                setSelectedType={(type) => {
+                  setSelectedType(type);
+                  if (country?.id) {
+                    queryClient.invalidateQueries({ 
+                      queryKey: QUERY_KEYS.DATA_PRODUCTS(country.id, selectedCategory?.id, type?.id, mobilePrefix) 
+                    });
+                  }
+                }}
                 search={search}
                 setSearch={setSearch}
                 products={filteredProducts}
@@ -1064,6 +1680,7 @@ function DataFlowScreenMerchant({ navigation }) {
                 summary={{ dial, localNumber, product }}
                 isLoading={loadingCategories || loadingTypes}
                 isLoadingProducts={loadingProducts}
+                mobilePrefix={mobilePrefix}
               />
             )}
 
@@ -1078,12 +1695,13 @@ function DataFlowScreenMerchant({ navigation }) {
             <PrimaryButton
               label={
                 step === lastStep
-                  ? t('pay')
+                  ? `${t('pay')} $${finalAmount.toFixed(2)} USD`
                   : t('continue')
               }
               onPress={goNext}
               style={{ marginTop: 24, opacity: canNext ? 1 : 0.5 }}
               loading={loading}
+              disabled={step === lastStep && !paymentMethodId}
             />
             {step > 0 && (
               <PrimaryButton
@@ -1121,6 +1739,16 @@ function DataFlowScreenMerchant({ navigation }) {
         loadingCountries={loadingCountries}
       />
 
+      <PromoCodeModal
+        visible={promoModalVisible}
+        onClose={closePromoModal}
+        promoCode={promoCode}
+        setPromoCode={setPromoCode}
+        validatingPromo={promoCodeValidation.isLoading}
+        promoError={promoError}
+        onApply={handleApplyPromoCode}
+      />
+
       {loading && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color={Colors.primary} />
@@ -1139,7 +1767,102 @@ export default function DataFlowScreenMerchantWrapper({ navigation }) {
   );
 }
 
+const promoModalStyles = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center', 
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: scale.hp(2),
+    padding: scale.hp(2.5),
+    width: '100%',
+    maxWidth: scale.wp(90),
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: scale.hp(2),
+  },
+  modalTitle: {
+    fontSize: scale.hp(2.25),
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  closeButton: {
+    padding: scale.hp(0.5),
+  },
+  closeButtonText: {
+    fontSize: scale.hp(3),
+    color: '#666',
+  },
+  promoInputContainer: {
+    marginBottom: scale.hp(2),
+  },
+  promoInput: {
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+    borderRadius: scale.hp(1),
+    padding: scale.hp(1.5),
+    fontSize: scale.hp(1.75),
+    fontWeight: '600',
+    textAlign: 'center',
+    letterSpacing: 1,
+    backgroundColor: '#F8F9FA',
+  },
+  errorContainer: {
+    backgroundColor: '#FEF2F2',
+    padding: scale.hp(1),
+    borderRadius: scale.hp(0.75),
+    marginBottom: scale.hp(2),
+    borderLeftWidth: 4,
+    borderLeftColor: '#EF4444',
+  },
+  errorText: {
+    color: '#DC2626',
+    fontSize: scale.hp(1.5),
+    fontWeight: '500',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: scale.wp(3),
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: scale.hp(1.5),
+    borderRadius: scale.hp(1),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+  },
+  cancelButtonText: {
+    color: Colors.textSecondary,
+    fontSize: scale.hp(1.75),
+    fontWeight: '600',
+  },
+  applyButton: {
+    backgroundColor: Colors.primary,
+  },
+  disabledButton: {
+    backgroundColor: '#9CA3AF',
+    opacity: 0.6,
+  },
+  applyButtonText: {
+    color: '#FFFFFF',
+    fontSize: scale.hp(1.75),
+    fontWeight: '600',
+  },
+});
+
 const styles = StyleSheet.create({
+  // OrderStatusScreen styles
   statusHeader: {
     alignItems: 'center',
     marginBottom: 24,
@@ -1173,7 +1896,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 4,
+    // elevation: 4,
   },
   simpleClockContainer: {
     width: 80,
@@ -1216,6 +1939,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     marginBottom: 8,
+  },
+  amountValue: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: Colors.primary,
+    marginBottom: 4,
   },
   amountSubValue: {
     fontSize: 16,
@@ -1280,6 +2009,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
+  
+  // Modal styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -1394,5 +2125,109 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     fontWeight: "600",
     marginTop: 12,
+  },
+  
+  // Receipt capture styles (for OrderStatusScreen)
+  captureHeader: {
+    alignItems: 'center',
+    marginBottom: 20,
+    borderBottomWidth: 2,
+    borderBottomColor: Colors.primary,
+    paddingBottom: 16,
+  },
+  captureLogo: {
+    width: 200,
+    height: 50,
+    marginBottom: 10,
+  },
+  captureTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: Colors.primary,
+    textAlign: 'center',
+  },
+  captureStatusSection: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  captureStatusTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: Colors.textPrimary,
+    textAlign: 'center',
+  },
+  captureDetails: {
+    marginBottom: 20,
+  },
+  captureDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  captureDetailLabel: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '600',
+    flex: 1,
+  },
+  captureDetailValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+    flex: 1,
+    textAlign: 'right',
+  },
+  captureAmountSection: {
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  captureAmountLabel: {
+    fontSize: 16,
+    color: '#6B7280',
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  captureAmountValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: Colors.textPrimary,
+  },
+  captureAmountSubValue: {
+    fontSize: 16,
+    color: '#6B7280',
+    marginTop: 4,
+  },
+  captureFooter: {
+    alignItems: 'center',
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  captureFooterText: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontStyle: 'italic',
+    marginBottom: 8,
+  },
+  receiptCaptureContainer: {
+    width: 350,
+    backgroundColor: '#ffffff',
+    padding: 24,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
   },
 });

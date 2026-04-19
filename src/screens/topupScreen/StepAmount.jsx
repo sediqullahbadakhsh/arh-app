@@ -1,6 +1,16 @@
-import Animated from "react-native-reanimated";
+//screens/topupscreen/StepAmount.jsx
+import Animated, { 
+  useAnimatedStyle, 
+  withRepeat, 
+  withTiming, 
+  withSequence,
+  Easing,
+  useSharedValue,
+  cancelAnimation,
+  interpolateColor
+} from "react-native-reanimated";
 import TopUpStyles from "./TopupStyle";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Colors } from "../../theme/colors";
 import { 
   TouchableOpacity, 
@@ -11,18 +21,16 @@ import {
   FlatList,
   Image,
   Alert,
-  Modal,
   Dimensions
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import PrimaryButton from "../../components/PrimaryButton";
 import { useTranslation } from "react-i18next";
-import { getDataProducts, getProductsCustomer, getBundleCategories, getBundleTypes } from "../../services/merchantApi";
-import { getSetaraganMnoId } from "../../utils/getCompanyIdForSetaragan";
-import formatLocal from "../../utils/formatLocal";
-import { scale } from "../../utils/normalizeSize";
+import { getDataProducts, getTopupProductsCustomer, getBundleCategories, getBundleTypes } from "../../services/merchantApi";
+import { useQuery } from "@tanstack/react-query";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const MINIMUM_CUSTOM_AMOUNT = 60; // Minimum amount for custom topup
 
 const SkeletonLoader = ({ type = 'card', count = 3 }) => {
   if (type === 'card') {
@@ -39,7 +47,6 @@ const SkeletonLoader = ({ type = 'card', count = 3 }) => {
               </View>
             </View>
             
-   
             <View style={{ 
               flexDirection: "row", 
               justifyContent: "space-between", 
@@ -303,7 +310,6 @@ const ProductStyles = {
     justifyContent: 'center',
     alignItems: 'center',
   },
-  // Skeleton Loader Styles
   skeletonCard: {
     borderRadius: 20,
     backgroundColor: "#fff",
@@ -338,72 +344,110 @@ const ProductStyles = {
   },
 };
 
-const OPERATOR_LOGOS = {
-  'AWCC': require('../../../assets/mnos/awcc.png'),
-  'Roshan': require('../../../assets/mnos/roshan.png'),
-  'MTN': require('../../../assets/mnos/mtn.png'),
-  'Salaam': require('../../../assets/mnos/salaam.png'),
-  'Etisalat': require('../../../assets/mnos/etisalat.png'),
-  'default': require('../../../assets/mnos/awcc.png'),
-};
-
-const getOperatorLogo = (operatorName) => {
-  if (!operatorName || typeof operatorName !== 'string') {
-    return OPERATOR_LOGOS.default;
-  }
+// Animated Amount Item Component
+const AnimatedAmountItem = ({ amount, isSelected, onPress, index }) => {
+  const animationProgress = useSharedValue(0);
+  const borderAnimation = useSharedValue(0);
   
-  try {
-    const normalizedName = operatorName.toLowerCase();
-    
-    if (normalizedName.includes('awcc')) return OPERATOR_LOGOS.AWCC;
-    if (normalizedName.includes('roshan')) return OPERATOR_LOGOS.Roshan;
-    if (normalizedName.includes('mtn')) return OPERATOR_LOGOS.MTN;
-    if (normalizedName.includes('salaam')) return OPERATOR_LOGOS.Salaam;
-    if (normalizedName.includes('etisalat')) return OPERATOR_LOGOS.Etisalat;
-    
-    return OPERATOR_LOGOS.default;
-  } catch (error) {
-    return OPERATOR_LOGOS.default;
-  }
-};
-
-const extractFeatures = (description) => {
-  if (!description) return [];
-  
-  const features = [];
-  const desc = description.toLowerCase();
-  
-  if (desc.includes('gb') || desc.includes('gigabyte')) {
-    const gbMatch = desc.match(/(\d+)\s*gb/);
-    if (gbMatch) {
-      features.push(`${gbMatch[1]} GB Data`);
-    }
-  }
-  
-  if (desc.includes('day') || desc.includes('validity')) {
-    const dayMatch = desc.match(/(\d+)\s*day/);
-    if (dayMatch) {
-      features.push(`${dayMatch[1]} Days`);
+  useEffect(() => {
+    if (isSelected) {
+      // Start the linear border animation when selected
+      borderAnimation.value = withRepeat(
+        withSequence(
+          withTiming(1, { duration: 1500, easing: Easing.linear }),
+          withTiming(0, { duration: 1500, easing: Easing.linear })
+        ),
+        -1, // Infinite repeat
+        true // Reverse
+      );
+      
+      // Pulse animation for background
+      animationProgress.value = withRepeat(
+        withSequence(
+          withTiming(1, { duration: 1000, easing: Easing.inOut(Easing.ease) }),
+          withTiming(0, { duration: 1000, easing: Easing.inOut(Easing.ease) })
+        ),
+        -1,
+        true
+      );
     } else {
-      features.push('30 Days');
+      // Stop animations when not selected
+      cancelAnimation(borderAnimation);
+      cancelAnimation(animationProgress);
+      borderAnimation.value = 0;
+      animationProgress.value = 0;
     }
-  }
+    
+    return () => {
+      cancelAnimation(borderAnimation);
+      cancelAnimation(animationProgress);
+    };
+  }, [isSelected]);
   
-  if (desc.includes('4g') || desc.includes('lte')) {
-    features.push('4G LTE');
-  } else if (desc.includes('3g')) {
-    features.push('3G');
-  }
+  const animatedBorderStyle = useAnimatedStyle(() => {
+    const borderColors = interpolateColor(
+      borderAnimation.value,
+      [0, 0.5, 1],
+      [Colors.primary, '#FFA500', Colors.primary]
+    );
+    
+    return {
+      borderColor: borderColors,
+      borderWidth: isSelected ? 2 : 1,
+      shadowColor: borderColors,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: borderAnimation.value * 0.3,
+      shadowRadius: 8,
+      elevation: isSelected ? 5 + borderAnimation.value * 3 : 1,
+      transform: [
+        {
+          scale: isSelected ? 1 + animationProgress.value * 0.02 : 1,
+        },
+      ],
+    };
+  });
   
-  if (desc.includes('high speed') || desc.includes('fast')) {
-    features.push('High Speed');
-  }
+  const animatedBackgroundStyle = useAnimatedStyle(() => {
+    return {
+      backgroundColor: isSelected 
+        ? interpolateColor(
+            animationProgress.value,
+            [0, 1],
+            ['#FFF5F5', '#FFE5E5']
+          )
+        : '#FFFFFF',
+    };
+  });
   
-  if (features.length === 0) {
-    features.push('Internet Bundle', 'Mobile Data');
-  }
-  
-  return features.slice(0, 3); 
+  return (
+    <Animated.View style={[
+      TopUpStyles.quickAmountItem,
+      animatedBorderStyle,
+      animatedBackgroundStyle
+    ]}>
+      <TouchableOpacity
+        style={TopUpStyles.quickAmountTouchable}
+        onPress={() => onPress(amount)}
+        activeOpacity={0.7}
+      >
+        <View style={TopUpStyles.amountInfo}>
+          <Text style={[
+            TopUpStyles.amountValue,
+            isSelected && TopUpStyles.amountValueSelected
+          ]}>
+            {amount.afn} AFN
+          </Text>
+          
+          <Animated.Text style={[
+            TopUpStyles.amountSubtext,
+            isSelected && TopUpStyles.amountSubtextSelected
+          ]}>
+            ${amount.totalAmountInUSD.toFixed(2)} USD
+          </Animated.Text>
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
+  );
 };
 
 function BundleProductSelection({
@@ -511,7 +555,6 @@ function BundleProductSelection({
         <Image 
           source={{ uri: item.image }} 
           style={ProductStyles.productImage}
-          defaultSource={OPERATOR_LOGOS.default}
           onError={() => console.log('Image load failed for:', item.productName)}
         />
       );
@@ -528,7 +571,6 @@ function BundleProductSelection({
 
   const renderProductItem = ({ item }) => {
     const active = product?.id === item.id;
-    const features = extractFeatures(item.description);
 
     return (
       <TouchableOpacity
@@ -543,15 +585,11 @@ function BundleProductSelection({
             <Text style={[ProductStyles.bundleName, active && { color: Colors.primary }]}>
               {item.productName?.en || item.productName}
             </Text>
-           <Text style={[ProductStyles.bundlePrice, active && { color: Colors.primary }]}>
+            <Text style={[ProductStyles.bundlePrice, active && { color: Colors.primary }]}>
               {item.price} AFN
             </Text>
-            
-          
           </View>
         </View>
-        
-      
       </TouchableOpacity>
     );
   };
@@ -560,7 +598,6 @@ function BundleProductSelection({
     <View style={{ flex: 1 }}>
       {loadingCategories ? (
         <>
-         
           <SkeletonLoader type="category" />
         </>
       ) : bundleCategories.length > 0 && (
@@ -593,7 +630,6 @@ function BundleProductSelection({
           </ScrollView>
         </>
       )}
-
 
       {loadingTypes ? (
         <>
@@ -643,7 +679,6 @@ function BundleProductSelection({
         />
       </View>
 
- 
       {loading ? (
         <SkeletonLoader type="card" count={3} />
       ) : (
@@ -694,16 +729,47 @@ function StepAmount({
   country,
   localNumber,
   dial,
-  onBundleActivated
+  onBundleActivated,
+  goNext
 }) {
   const { t } = useTranslation();
   const [isFocused, setIsFocused] = useState(false);
-  const [rechargeProducts, setRechargeProducts] = useState([]);
-  const [loadingRechargeProducts, setLoadingRechargeProducts] = useState(false);
-  const [customProduct, setCustomProduct] = useState(null);
   const [selectedPopularAmount, setSelectedPopularAmount] = useState(null);
   const [localCustomAfn, setLocalCustomAfn] = useState(customAfn || "");
+  const [amountValidationError, setAmountValidationError] = useState("");
 
+
+  const { 
+    data: rechargeProductsData, 
+    isLoading: loadingRechargeProducts,
+    error: rechargeProductsError 
+  } = useQuery({
+    queryKey: ['topupProducts', country?.id, serviceType],
+    queryFn: async () => {
+      if (!country?.id || serviceType !== 'recharge') {
+        return { data: [] };
+      }
+      
+      try {
+        const filter = { 
+          countryId: country.id,
+        };
+        
+        console.log("Fetching topup products for country:", country.id);
+        const res = await getTopupProductsCustomer(filter);
+        console.log("Topup products response:", res);
+        
+        return res || { data: [] };
+      } catch (error) {
+        console.error("Error in queryFn:", error);
+        return { data: [] };
+      }
+    },
+    enabled: serviceType === 'recharge' && !!country?.id,
+    staleTime: 60000, 
+    cacheTime: 120000, 
+  });
+ console.log("Recharge products data:", rechargeProductsData);
   useEffect(() => {
     setLocalCustomAfn(customAfn || "");
   }, [customAfn]);
@@ -715,117 +781,85 @@ function StepAmount({
     }
   }, [localCustomAfn]);
 
-  const calculateTotalAmount = (baseAmount, productItem = null) => {
-    const amount = parseFloat(baseAmount) || 0;
-    const targetProduct = productItem || product || customProduct;
-    
-    if (!targetProduct) {
-      return amount; 
-    }
+  const rechargeProducts = rechargeProductsData?.data || [];
+  
 
-    let totalAmount = amount;
-    
-    if (targetProduct.slabDetails?.percentage) {
-      totalAmount += amount * (targetProduct.slabDetails.percentage / 100);
-    }
-    
-    if (targetProduct.serviceSlabDetails?.percentage) {
-      totalAmount += amount * (targetProduct.serviceSlabDetails.percentage / 100);
-    }
-    
-    return totalAmount;
-  };
+  const customProduct = rechargeProducts.find(p => 
+    p.basePrice === 0 && 
+    (p.productName?.toLowerCase().includes('custom') || 
+     p.productName?.toLowerCase().includes('topup'))
+  );
 
-  const calculateUsdFromTotalAfn = (totalAfn) => {
-    if (!exchangeRate) return 0;
-    const usdAmount = totalAfn * exchangeRate;
-    return parseFloat(usdAmount.toFixed(2));
-  };
-
-  useEffect(() => {
-    const fetchRechargeProducts = async () => {
-      if (!country?.id) return;
-      
-      try {
-        setLoadingRechargeProducts(true);
-        
-        const filter = { 
-          countryId: country.id,
-        };
-        
-        const res = await getProductsCustomer(filter);
-        
-        if (res?.data) {
-          const rechargeProds = res.data.filter(product => {
-            const isDataBundle = 
-              product.productName?.toLowerCase().includes('data') ||
-              product.productName?.toLowerCase().includes('bundle') ||
-              (product.productTypeDetails?.productType?.en?.toLowerCase().includes('data') ||
-               product.productTypeDetails?.productType?.en?.toLowerCase().includes('bundle'));
-               
-            return !isDataBundle && parseFloat(product.price) > 0;
-          });
-          
-          console.log(`Loaded ${rechargeProds.length} recharge products`);
-          setRechargeProducts(rechargeProds);
-
-          const customTopupProduct = res.data.find(p => 
-            (p.productName?.toLowerCase().includes('custom') || 
-             p.productName?.toLowerCase().includes('topup')) && 
-            parseFloat(p.price) === 0
-          );
-          
-          if (customTopupProduct) {
-            setCustomProduct(customTopupProduct);
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching recharge products:", error);
-      } finally {
-        setLoadingRechargeProducts(false);
-      }
-    };
-
-    if (serviceType === 'recharge' && country?.id) {
-      fetchRechargeProducts();
-    }
-  }, [country, serviceType]);
+  console.log("Recharge products count:", rechargeProducts.length);
+  console.log("Custom product found:", customProduct);
 
   const rechargeAmounts = React.useMemo(() => {
     if (rechargeProducts.length > 0) {
       return rechargeProducts
-        .filter(product => parseFloat(product.price) > 0)
+        .filter(product => product.basePrice > 0)
         .map(product => {
-          const basePrice = parseFloat(product.price);
-          const totalAfn = calculateTotalAmount(basePrice, product);
-          const totalUsd = calculateUsdFromTotalAfn(totalAfn);
+          const basePrice = parseFloat(product.basePrice);
+          const basePriceInUSD = parseFloat(product.basePriceInUSD) || 0;
+          const totalAmountInUSD = parseFloat(product.totalAmountInUSD) || 0;
+          const serviceSlabPercentage = parseFloat(product.serviceSlabPercentage) || 0;
           
           return {
             id: product.id,
             afn: basePrice,
-            totalAfn: totalAfn,
-            usd: totalUsd,
-            productName: product.productName,
+            basePrice: basePrice,
+            basePriceInUSD: basePriceInUSD,
+            totalAmountInUSD: totalAmountInUSD,
+            serviceSlabPercentage: serviceSlabPercentage,
+            productName: product.productName?.en || product.productName,
             product: product,
-            slabPercentage: product.slabDetails?.percentage || 0,
-            serviceSlabPercentage: product.serviceSlabDetails?.percentage || 0
+            slabPercentage: product.slabPercentage || 0,
+            serviceSlabPercentage: product.serviceSlabPercentage || 0,
+            totalAmountInProductCurrency: product.totalAmountInProductCurrency || basePrice
           };
         })
         .sort((a, b) => a.afn - b.afn);
     }
     
+
     const defaultAmounts = [50, 100, 150, 250, 500, 1000];
     return defaultAmounts.map(amount => ({
       id: amount.toString(),
       afn: amount,
-      totalAfn: amount,
-      usd: calculateUsdAmount(amount),
+      basePrice: amount,
+      basePriceInUSD: calculateBaseAmount(amount),
+      totalAmountInUSD: calculateUsdAmount(amount),
+      serviceSlabPercentage: slabPercentage,
       productName: `${amount} AFN Topup`,
       product: null,
-      slabPercentage: 0,
-      serviceSlabPercentage: 0
+      slabPercentage: slabPercentage,
+      serviceSlabPercentage: 0,
+      totalAmountInProductCurrency: amount
     }));
-  }, [rechargeProducts, calculateTotalAmount, calculateUsdFromTotalAfn, calculateUsdAmount]);
+  }, [rechargeProducts, calculateBaseAmount, calculateUsdAmount, slabPercentage]);
+
+  const calculateTotalForCustomAmount = (baseAmount) => {
+    if (!baseAmount || isNaN(baseAmount)) return 0;
+    
+    const amount = parseFloat(baseAmount);
+
+    let totalAmount = amount;
+    
+    if (product?.slabPercentage) {
+      totalAmount += amount * (product.slabPercentage / 100);
+    }
+    
+    if (product?.serviceSlabPercentage) {
+      totalAmount += amount * (product.serviceSlabPercentage / 100);
+    }
+    
+    return totalAmount;
+  };
+
+  const calculateUsdForCustomAmount = (totalAfn) => {
+    if (!exchangeRate) return 0;
+    const usdAmount = totalAfn * exchangeRate;
+    return parseFloat(usdAmount.toFixed(2));
+  };
 
   const customAmountTotal = React.useMemo(() => {
     if (!localCustomAfn || localCustomAfn.trim() === "") return 0;
@@ -833,16 +867,44 @@ function StepAmount({
     const baseAmount = parseFloat(localCustomAfn);
     if (isNaN(baseAmount)) return 0;
     
-    return calculateTotalAmount(baseAmount, customProduct);
-  }, [localCustomAfn, customProduct]);
+    return calculateTotalForCustomAmount(baseAmount);
+  }, [localCustomAfn, product]);
+
+  const customAmountUSD = React.useMemo(() => {
+    if (!localCustomAfn || localCustomAfn.trim() === "") return 0;
+    
+    const baseAmount = parseFloat(localCustomAfn);
+    if (isNaN(baseAmount)) return 0;
+    
+    const totalAfn = calculateTotalForCustomAmount(baseAmount);
+    return calculateUsdForCustomAmount(totalAfn);
+  }, [localCustomAfn, product, exchangeRate]);
 
   const hasCustomAmount = localCustomAfn && localCustomAfn.trim() !== "" && !isNaN(parseFloat(localCustomAfn));
+
+  // Function to validate custom amount
+  const validateCustomAmount = (amount) => {
+    const amountValue = parseFloat(amount);
+    if (isNaN(amountValue)) {
+      setAmountValidationError("");
+      return false;
+    }
+    
+    if (amountValue < MINIMUM_CUSTOM_AMOUNT) {
+      setAmountValidationError(`Minimum custom amount is ${MINIMUM_CUSTOM_AMOUNT} AFN`);
+      return false;
+    }
+    
+    setAmountValidationError("");
+    return true;
+  };
 
   const handleClearAmount = () => {
     setLocalCustomAfn("");
     setCustomAfn(""); 
     setProduct(null);
     setSelectedPopularAmount(null);
+    setAmountValidationError("");
   };
 
   const handleCustomAmountChange = (text) => {
@@ -851,12 +913,29 @@ function StepAmount({
     setCustomAfn(cleanedText);
     setSelectedPopularAmount(null);
     
+    // Validate the amount
+    validateCustomAmount(cleanedText);
+    
     if (cleanedText && customProduct) {
-      console.log("Setting custom product for amount:", cleanedText);
-      setProduct({
-        ...customProduct,
-        customAmount: parseFloat(cleanedText) || 0
-      });
+      const customAmount = parseFloat(cleanedText) || 0;
+      
+      // Only set product if amount meets minimum requirement
+      if (customAmount >= MINIMUM_CUSTOM_AMOUNT) {
+        console.log("Setting custom product for amount:", cleanedText);
+        const totalAfn = calculateTotalForCustomAmount(customAmount);
+        const totalUsd = calculateUsdForCustomAmount(totalAfn);
+        
+        setProduct({
+          ...customProduct,
+          customAmount: customAmount,
+          basePrice: customAmount,
+          price: customAmount,
+          totalAmountInProductCurrency: totalAfn,
+          totalAmountInUSD: totalUsd
+        });
+      } else {
+        setProduct(null);
+      }
     }
   };
 
@@ -865,33 +944,52 @@ function StepAmount({
     
     setLocalCustomAfn("");
     setCustomAfn("");
+    setAmountValidationError("");
     
     if (amount.product) {
       setProduct(amount.product);
     }
     setSelectedPopularAmount(amount);
     
-    onSelectPopularAmount(amount);
+    onSelectPopularAmount?.(amount);
+    
+
+    setTimeout(() => {
+      onContinue?.();
+    }, 300);
   };
 
   const handleCustomAmountContinue = () => {
+    // Check if amount meets minimum requirement
+    const amountValue = parseFloat(localCustomAfn);
+    if (isNaN(amountValue) || amountValue < MINIMUM_CUSTOM_AMOUNT) {
+      setAmountValidationError(`Minimum custom amount is ${MINIMUM_CUSTOM_AMOUNT} AFN`);
+      Alert.alert("Invalid Amount", `Minimum custom amount is ${MINIMUM_CUSTOM_AMOUNT} AFN`);
+      return;
+    }
+    
     if (hasCustomAmount && customProduct) {
       console.log("Continuing with custom amount:", {
         customAfn: localCustomAfn,
         customProduct: customProduct,
+        basePrice: parseFloat(localCustomAfn),
         totalAfn: customAmountTotal,
-        usd: calculateUsdFromTotalAfn(customAmountTotal)
+        totalUsd: customAmountUSD
       });
 
+      const customAmount = parseFloat(localCustomAfn) || 0;
       const customProductWithAmount = {
         ...customProduct,
-        customAmount: parseFloat(localCustomAfn) || 0,
-        price: localCustomAfn 
+        customAmount: customAmount,
+        basePrice: customAmount,
+        price: customAmount,
+        totalAmountInProductCurrency: customAmountTotal,
+        totalAmountInUSD: customAmountUSD
       };
       
       setProduct(customProductWithAmount);
       
-      onContinue();
+      onContinue?.();
     } else {
       console.log("Cannot continue - missing custom amount or product:", {
         hasCustomAmount,
@@ -905,43 +1003,12 @@ function StepAmount({
   const handleBundleContinue = () => {
     if (product && serviceType === 'bundle') {
       console.log("Proceeding to bundle payment:", product);
-      onContinue();
+      onContinue?.();
     }
   };
 
   return (
     <View style={{ flex: 1 }}>
-      {/* <View style={TopUpStyles.serviceTypeToggle}>
-        <TouchableOpacity
-          style={[
-            TopUpStyles.toggleOption,
-            serviceType === 'recharge' && TopUpStyles.toggleOptionActive
-          ]}
-          onPress={() => setServiceType('recharge')}
-        >
-          <Text style={[
-            TopUpStyles.toggleText,
-            serviceType === 'recharge' && TopUpStyles.toggleTextActive
-          ]}>
-            {t('recharge')}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            TopUpStyles.toggleOption,
-            serviceType === 'bundle' && TopUpStyles.toggleOptionActive
-          ]}
-          onPress={() => setServiceType('bundle')}
-        >
-          <Text style={[
-            TopUpStyles.toggleText,
-            serviceType === 'bundle' && TopUpStyles.toggleTextActive
-          ]}>
-            {t('bundle')}
-          </Text>
-        </TouchableOpacity>
-      </View> */}
-
       <ScrollView 
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: 100 }}
@@ -955,9 +1022,9 @@ function StepAmount({
             <View style={[
               TopUpStyles.customRow,
               {
-                borderColor: isFocused ? Colors.primary : '#2e2e2eff',
+                borderColor: amountValidationError ? '#EF4444' : (isFocused ? Colors.primary : '#2e2e2eff'),
                 backgroundColor: '#FFFFFF',
-                shadowColor: Colors.primary,
+                shadowColor: amountValidationError ? '#EF4444' : Colors.primary,
                 shadowOffset: { width: 0, height: 4 },
                 shadowOpacity: isFocused ? 0.15 : 0,
                 shadowRadius: isFocused ? 10 : 0,
@@ -975,10 +1042,10 @@ function StepAmount({
                 onBlur={() => setIsFocused(false)}
               />
               
-              {hasCustomAmount && !loadingData && (
+              {hasCustomAmount && !loadingData && !amountValidationError && (
                 <View style={TopUpStyles.usdEquivalentContainer}>
                   <Text style={[TopUpStyles.usdEquivalentText, { fontSize: 12, opacity: 0.7 }]}>
-                    ≈ ${calculateUsdFromTotalAfn(customAmountTotal).toFixed(2)} USD
+                    ≈ ${customAmountUSD.toFixed(2)} USD
                   </Text>
                 </View>
               )}
@@ -992,7 +1059,35 @@ function StepAmount({
               </TouchableOpacity>
             </View>
 
-            {hasCustomAmount && (
+            {/* Amount Validation Error Message */}
+            {amountValidationError ? (
+              <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center' }}>
+                <Ionicons name="warning-outline" size={16} color="#EF4444" />
+                <Text style={{ 
+                  color: '#EF4444', 
+                  fontSize: 12, 
+                  fontFamily: 'dmsansRegular',
+                  marginLeft: 4
+                }}>
+                  {amountValidationError}
+                </Text>
+              </View>
+            ) : null}
+
+            {/* Minimum Amount Info */}
+            {!amountValidationError && !hasCustomAmount && (
+              <View style={{ marginTop: 8 }}>
+                <Text style={{ 
+                  color: '#6B7280', 
+                  fontSize: 12, 
+                  fontFamily: 'dmsansRegular'
+                }}>
+                  Minimum custom amount: {MINIMUM_CUSTOM_AMOUNT} AFN
+                </Text>
+              </View>
+            )}
+
+            {hasCustomAmount && !amountValidationError && (
               <View style={{ marginTop: 24 }}>
                 <PrimaryButton
                   label={t('continue')}
@@ -1009,34 +1104,17 @@ function StepAmount({
                   <SkeletonLoader type="amount" />
                 ) : (
                   <View style={TopUpStyles.quickAmountsList}>
-                    {rechargeAmounts.map((amount) => {
+                    {rechargeAmounts.map((amount, index) => {
                       const isSelected = selectedPopularAmount?.id === amount.id;
                       
                       return (
-                        <TouchableOpacity
+                        <AnimatedAmountItem
                           key={amount.id}
-                          style={[
-                            TopUpStyles.quickAmountItem,
-                            isSelected && TopUpStyles.quickAmountItemSelected
-                          ]}
-                          onPress={() => handlePopularAmountSelect(amount)}
-                        >
-                          <View style={TopUpStyles.amountInfo}>
-                            <Text style={[
-                              TopUpStyles.amountValue,
-                              isSelected && TopUpStyles.amountValueSelected
-                            ]}>
-                              {amount.afn} AFN
-                            </Text>
-                           
-                            <Text style={[
-                              TopUpStyles.amountSubtext,
-                              isSelected && TopUpStyles.amountSubtextSelected
-                            ]}>
-                              ${amount.usd.toFixed(2)} USD
-                            </Text>
-                          </View>
-                        </TouchableOpacity>
+                          amount={amount}
+                          isSelected={isSelected}
+                          onPress={handlePopularAmountSelect}
+                          index={index}
+                        />
                       );
                     })}
                   </View>

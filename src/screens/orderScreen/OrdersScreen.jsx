@@ -36,7 +36,7 @@ import LottieView from 'lottie-react-native';
 
 const ITEMS_PER_PAGE = 10;
 
-// Skeleton Loader Component
+
 const ModernSkeletonLoader = () => (
   <SafeAreaView style={styles.container}>
     <View style={styles.skeletonHeader}>
@@ -351,7 +351,7 @@ const ModernFilterModal = ({ visible, onClose, filters, onFilterChange, t }) => 
           >
             <Text style={styles.filterTitle}>{t('filterOrders')}</Text>
             
-            <Text style={styles.filterSectionTitle}>{t('status')}</Text>
+            {/* <Text style={styles.filterSectionTitle}>{t('status')}</Text> */}
             <View style={styles.statusGrid}>
               {statusOptions.map((option) => (
                 <TouchableOpacity
@@ -1304,6 +1304,7 @@ const styles = StyleSheet.create({
   filterActions: {
     flexDirection: 'row',
     paddingHorizontal: 20,
+    marginBottom: 24,
     paddingTop: 8,
   },
   resetButton: {

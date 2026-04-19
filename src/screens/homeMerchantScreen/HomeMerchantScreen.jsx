@@ -17,6 +17,7 @@ import {
   Platform,
   Dimensions,
   Linking,
+  FlatList,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -25,7 +26,7 @@ import { Colors } from "../../theme/colors";
 import ServiceButton from "../../components/ServiceButton";
 import { useUser } from "../../context/userContext";
 import SocialIcon from '../../../assets/icons/social.png';
-import { getRecentOrdersOfAgent, getStockInOut } from "../../services/merchantApi";
+import { getRecentOrdersOfAgent, getStockInOut, getUserWallets } from "../../services/merchantApi";
 import { formatDateTime } from "../../utils/formatDate";
 import { capitalizeFirstLetter } from "../../utils/capitalizeFirstLetter";
 import HeaderBackgroundSVG from "../../../assets/top";
@@ -35,22 +36,24 @@ import GamesIcon from '../../../assets/icons/game.png';
 import StockTransferIcon from '../../../assets/icons/stock.png';
 import { useTranslation } from "react-i18next";
 import ReceiptModal1 from "../../components/ReceiptModal";
+import DotIndicators from "../../components/DotIndicators";
 import { scale } from "../../utils/normalizeSize";
 import { useFocusEffect } from "@react-navigation/native";
 import NetInfo from "@react-native-community/netinfo";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+const CARD_WIDTH = screenWidth - 48;
+const CARD_MARGIN = 16;
 
 const WELCOME_MODAL_SEEN_KEY = 'has_seen_welcome_modal';
 
-// Add a global event listener for real-time updates
+
 let refreshListeners = [];
 
 export const triggerHomeRefresh = () => {
   refreshListeners.forEach(listener => listener());
 };
 
-// Add this component at the top level
 const NetworkStatusIndicator = ({ isConnected }) => {
   if (isConnected) return null;
   
@@ -61,6 +64,113 @@ const NetworkStatusIndicator = ({ isConnected }) => {
     </View>
   );
 };
+
+
+const WalletCardSkeleton = () => {
+  return (
+    <View style={styles.skeletonWalletCard}>
+      <View style={styles.cardPattern}>
+        <View style={styles.patternCircle1} />
+        <View style={styles.patternCircle2} />
+      </View>
+      
+      <View style={styles.cardHeader}>
+        <View style={styles.balanceSection}>
+          <View style={[styles.skeletonBlock, { width: scale.wp(31.2), height: scale.hp(1.8), marginBottom: scale.hp(1.05) }]} />
+          <View style={[styles.skeletonBlock, { width: scale.wp(41.6), height: scale.hp(4.2), marginBottom: scale.hp(1.55) }]} />
+          <View style={[styles.skeletonBlock, { width: scale.wp(36.4), height: scale.hp(2.1) }]} />
+        </View>
+        
+        <View style={[styles.skeletonBlock, { width: scale.wp(12.4), height: scale.wp(12.4), borderRadius: scale.wp(6.2) }]} />
+      </View>
+      
+      <View style={[styles.skeletonBlock, { height: scale.hp(5.7), borderRadius: scale.hp(1.55), marginTop: scale.hp(2.1) }]} />
+    </View>
+  );
+};
+
+
+const WalletCard = ({ item, index, currentIndex, onTransferPress }) => {
+  const isActive = index === currentIndex;
+  const { t } = useTranslation();
+
+  return (
+    <Animated.View
+      style={[
+        styles.walletCardContainer,
+        !isActive && styles.walletCardInactive
+      ]}
+    >
+      <LinearGradient
+        colors={item?.key === "commission" ? ["#D70000", "#E52421", "#F0533F"] : ["#D70000", "#E52421", "#F0533F"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.walletCard}
+      >
+        <View style={styles.cardPattern}>
+          <View style={styles.patternCircle1} />
+          <View style={styles.patternCircle2} />
+        </View>
+
+        <View style={styles.cardHeader}>
+          <View style={styles.balanceSection}>
+            <Text style={styles.walletLabel}>{t('walletBalance')}</Text>
+            <Text style={styles.balanceText}>
+              {formatAF(item.balance)} {t('currency')}
+            </Text>
+            <View style={styles.walletInfoRow}>
+              <Text style={styles.walletName}>{item.label}</Text>
+              {item?.key === "commission" && (
+                <View style={styles.commissionBadge}>
+                  <Text style={styles.commissionBadgeText}>Commission</Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          <View style={styles.walletIcon}>
+            <LinearGradient
+              colors={["rgba(255,255,255,0.3)", "rgba(255,255,255,0.1)"]}
+              style={styles.walletIconGradient}
+            >
+              <Ionicons 
+                name={item?.key === "commission" ? "gift-outline" : "wallet-outline"} 
+                size={32} 
+                color="#fff" 
+              />
+            </LinearGradient>
+          </View>
+        </View>
+
+        {item?.key === "commission" && (
+          <TouchableOpacity
+            onPress={() => onTransferPress(item.balance)}
+            style={styles.transferButton}
+            activeOpacity={0.85}
+          >
+            <LinearGradient
+              colors={["rgba(255,255,255,0.3)", "rgba(255,255,255,0.2)"]}
+              style={styles.transferGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
+              <Text style={styles.transferButtonText}>
+                {t('wallet.transferToPrimary')}
+              </Text>
+              <Ionicons
+                name="arrow-forward"
+                size={16}
+                color="#fff"
+                style={{ marginLeft: 8 }}
+              />
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
+      </LinearGradient>
+    </Animated.View>
+  );
+};
+
 
 const SkeletonRect = ({ width, height, borderRadius = 4, style = {} }) => {
   const [animation] = useState(new Animated.Value(0));
@@ -181,6 +291,18 @@ const SkeletonHomeScreen = () => {
         contentContainerStyle={{ paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       >
+    
+        <View style={styles.walletsSection}>
+          <SkeletonRect 
+            width={scale.wp(30)} 
+            height={scale.hp(2.6)} 
+            style={{ marginLeft: scale.wp(4.9), marginBottom: scale.hp(2.1) }} 
+          />
+          <View style={styles.walletCarouselContainer}>
+            <WalletCardSkeleton />
+          </View>
+        </View>
+
         <View style={styles.servicesGrid}>
           {[1, 2, 3, 4, 5].map((item) => (
             <View key={item} style={styles.serviceSkeletonItem}>
@@ -254,6 +376,10 @@ export default function HomeMerchantScreen({ navigation }) {
   const { user, setUser } = useUser();
   const { t, i18n } = useTranslation();
   
+  const [wallets, setWallets] = useState([]);
+  const [activeWalletIndex, setActiveWalletIndex] = useState(0);
+  const [walletsLoading, setWalletsLoading] = useState(true);
+  
   const [recentTransaction, setRecentTransactions] = useState([]);
   const [stockTransactions, setStockTransactions] = useState([]); 
   const [refreshing, setRefreshing] = useState(false);
@@ -265,19 +391,26 @@ export default function HomeMerchantScreen({ navigation }) {
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isConnected, setIsConnected] = useState(true);
+  
+  const flatListRef = useRef(null);
   const lastRefreshTimeRef = useRef(null);
+  const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 60 }).current;
+  
+  const onViewableItemsChanged = useRef(({ viewableItems }) => {
+    if (viewableItems?.length) {
+      setActiveWalletIndex(viewableItems[0].index);
+    }
+  }).current;
 
-  // Add refresh listener on mount
   useEffect(() => {
     const refreshCallback = () => {
       console.log('Triggering home refresh...');
-      fetchData();
+      fetchAllData();
     };
 
     refreshListeners.push(refreshCallback);
 
     return () => {
-      // Remove listener on unmount
       const index = refreshListeners.indexOf(refreshCallback);
       if (index > -1) {
         refreshListeners.splice(index, 1);
@@ -285,34 +418,28 @@ export default function HomeMerchantScreen({ navigation }) {
     };
   }, []);
 
-  // Monitor network connectivity
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
       setIsConnected(state.isConnected);
-      
-      // Auto-refresh when connection is restored
       if (state.isConnected && !isConnected) {
-        fetchData();
+        fetchAllData();
       }
     });
 
     return () => unsubscribe();
   }, [isConnected]);
 
-  // Fetch data when screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
-      // Refresh if data is stale (older than 30 seconds)
       const now = Date.now();
       if (!lastRefreshTimeRef.current || (now - lastRefreshTimeRef.current > 30000)) {
         console.log('Screen focused, refreshing data...');
-        fetchData();
+        fetchAllData();
       }
       
-      // Poll for updates every 60 seconds while screen is focused
       const pollInterval = setInterval(() => {
         console.log('Auto-polling for updates...');
-        fetchData();
+        fetchAllData();
       }, 60000);
       
       return () => {
@@ -321,7 +448,7 @@ export default function HomeMerchantScreen({ navigation }) {
     }, [])
   );
 
-  const fetchData = async (showLoading = false) => {
+  const fetchAllData = async (showLoading = false) => {
     if (!isConnected) {
       Alert.alert(
         'No Internet Connection',
@@ -337,6 +464,7 @@ export default function HomeMerchantScreen({ navigation }) {
 
     try {
       await Promise.all([
+        fetchWallets(),
         getRecentTransactions(),
         getStockTransactions(),
       ]);
@@ -357,10 +485,35 @@ export default function HomeMerchantScreen({ navigation }) {
     }
   };
 
+  const fetchWallets = async () => {
+    try {
+      setWalletsLoading(true);
+      const res = await getUserWallets(user?.id);
+      
+      const commissionWallet = {
+        ...res?.comissionWallet,
+        key: "commission",
+        label: t('commissionWallet'),
+        balance: res?.comissionWallet?.balance || 0,
+      };
+      const primaryWallet = {
+        ...res?.primaryWallet,
+        key: "primary",
+        label: t('primaryWallet'),
+        balance: res?.primaryWallet?.balance || 0,
+      };
+      
+      setWallets([primaryWallet, commissionWallet].filter(w => w !== null));
+    } catch (error) {
+      console.error("Error fetching wallets:", error);
+    } finally {
+      setWalletsLoading(false);
+    }
+  };
+
   const getRecentTransactions = async () => {
     try {
       const res = await getRecentOrdersOfAgent();
-      console.log("Recent Transactions updated:", res?.data?.length || 0, "items");
       setRecentTransactions(res?.data || []);
     } catch (error) {
       console.error("Error fetching recent transactions:", error);
@@ -371,7 +524,6 @@ export default function HomeMerchantScreen({ navigation }) {
   const getStockTransactions = async () => {
     try {
       const res = await getStockInOut();
-      console.log("Stock transactions updated:", res?.data?.length || 0, "items");
       setStockTransactions(res?.data || []);
     } catch (error) {
       console.error("Error fetching stock transactions:", error);
@@ -394,8 +546,7 @@ export default function HomeMerchantScreen({ navigation }) {
       }
     };
 
-    // Initial data load
-    fetchData(true);
+    fetchAllData(true);
     checkWelcomeModal();
   }, []);
 
@@ -444,14 +595,13 @@ export default function HomeMerchantScreen({ navigation }) {
         icon: <Image source={GamesIcon} style={{ width: 80, height: 80 }} resizeMode="contain" />,
         onPress: () => navigation.navigate("GameCoinsMerchant"),
       },
-    
       {
         key: "Social",
         label: t('services.social'),
         icon: <Image source={SocialIcon} style={{ width: 90, height: 90 }} resizeMode="contain" />,
         onPress: () => navigation.navigate("SocialScreenMerchant"),
       },
-        {
+      {
         key: "StockRequest",
         label: t('services.stockRequest'),
         icon: <Image source={StockTransferIcon} style={{ width: 80, height: 80 }} resizeMode="contain" />,
@@ -463,12 +613,16 @@ export default function HomeMerchantScreen({ navigation }) {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchData();
+    await fetchAllData();
     setRefreshing(false);
   };
 
   const goToNotifications = () => navigation.navigate("Notifications");
   const goToProfile = () => navigation.navigate("ProfileMerchant");
+
+  const handleTransferPress = (balance) => {
+    navigation.navigate("TransferToPrimary", { balance });
+  };
 
   const getStatusText = (status) => {
     switch (status) {
@@ -556,7 +710,7 @@ export default function HomeMerchantScreen({ navigation }) {
                  item.status === 'failed' ? '#F44336' : 
                  item.status === 'processing' || item.status === 'queued' ? '#2196F3' : '#FFC107' }
         ]}>
-          {Number(item?.amount || 0).toFixed(2)} {item?.currency || 'USD'}
+          {Number(item?.amount || 0).toFixed(2)} {item?.currency || 'AF'}
         </Text>
         <View style={[
           styles.statusBadge,
@@ -603,7 +757,7 @@ export default function HomeMerchantScreen({ navigation }) {
           </Text>
           <Text style={styles.txPhone}>
             {item.type === "IN" 
-              ? `From ${item.from_wallet_id}` 
+              ? `From ${item.from_wallet_id || 'Wallet'}` 
               : `To ${item.to_wallet_id || "Activate Bundle"}`}
           </Text>
         </View>
@@ -672,7 +826,7 @@ export default function HomeMerchantScreen({ navigation }) {
         <View style={styles.welcomeModalOverlay}>
           <View style={styles.welcomeModalContent}>
             <View style={styles.welcomeModalHeader}>
-              <Text style={styles.welcomeModalTitle}>Welcome to Yes Charge!</Text>
+              <Text style={styles.welcomeModalTitle}>Welcome to YES Charge!</Text>
               <TouchableOpacity 
                 onPress={handleWelcomeModalClose}
                 style={styles.closeButton}
@@ -688,7 +842,7 @@ export default function HomeMerchantScreen({ navigation }) {
               
               <View style={styles.welcomeMessageContainer}>
                 <Text style={styles.welcomeMessageText}>
-                  Welcome to Yes Charge as a Reseller, Please try to purchase some amount and benefit from our services.
+                  Welcome to YES Charge as a Reseller, Please try to purchase some amount and benefit from our services.
                 </Text>
               </View>
 
@@ -760,6 +914,61 @@ export default function HomeMerchantScreen({ navigation }) {
     );
   };
 
+  const renderWalletCarousel = () => {
+    if (walletsLoading) {
+      return (
+        <View style={styles.walletCarouselContainer}>
+          <WalletCardSkeleton />
+        </View>
+      );
+    }
+
+    if (!wallets.length) {
+      return (
+        <View style={styles.noWalletsContainer}>
+          <Ionicons name="wallet-outline" size={40} color="#ccc" />
+          <Text style={styles.noWalletsText}>No wallets available</Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.walletCarouselContainer}>
+        <FlatList
+          ref={flatListRef}
+          data={wallets}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={(item) => item.key}
+          snapToInterval={CARD_WIDTH + CARD_MARGIN}
+          decelerationRate="fast"
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
+          renderItem={({ item, index }) => (
+            <WalletCard
+              item={item}
+              index={index}
+              currentIndex={activeWalletIndex}
+              onTransferPress={handleTransferPress}
+            />
+          )}
+        />
+        
+        {wallets.length > 1 && (
+          <View style={styles.walletIndicators}>
+            <DotIndicators 
+              total={wallets.length} 
+              activeIndex={activeWalletIndex} 
+            />
+          </View>
+        )}
+        
+    
+      </View>
+    );
+  };
+
   if (isLoading) {
     return <SkeletonHomeScreen />;
   }
@@ -768,7 +977,6 @@ export default function HomeMerchantScreen({ navigation }) {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" />
       
-      {/* Network Status Indicator */}
       <NetworkStatusIndicator isConnected={isConnected} />
 
       <View style={styles.header}>
@@ -812,7 +1020,7 @@ export default function HomeMerchantScreen({ navigation }) {
       </View>
 
       <ScrollView 
-        contentContainerStyle={{ paddingBottom: 40 }}
+        contentContainerStyle={styles.scrollContent}
         refreshControl={
           <RefreshControl 
             refreshing={refreshing} 
@@ -823,6 +1031,16 @@ export default function HomeMerchantScreen({ navigation }) {
         }
         showsVerticalScrollIndicator={false}
       >
+
+        <View style={styles.walletsSection}>
+          <View style={styles.sectionHeader}>
+          
+          </View>
+          
+          {renderWalletCarousel()}
+        </View>
+
+
         <View style={styles.servicesGrid}>
           {services.map((s) => (
             <ServiceButton
@@ -833,6 +1051,7 @@ export default function HomeMerchantScreen({ navigation }) {
             />
           ))}
         </View>
+
 
         <TouchableOpacity 
           style={styles.promoBanner}
@@ -863,12 +1082,13 @@ export default function HomeMerchantScreen({ navigation }) {
           </LinearGradient>
         </TouchableOpacity>
 
+        {/* Recent Transactions */}
         <View style={styles.recentContainer}>
           <View style={styles.recentHeader}>
             <Text style={styles.recentTitle}>{t('transactions.recent')}</Text>
             <View style={styles.recentHeaderRight}>
               <TouchableOpacity 
-                onPress={fetchData}
+                onPress={() => fetchAllData()}
                 style={styles.refreshButton}
               >
                 <Ionicons name="refresh" size={18} color={Colors.primary} />
@@ -906,7 +1126,6 @@ export default function HomeMerchantScreen({ navigation }) {
   );
 }
 
-// Add network status styles
 const networkStyles = StyleSheet.create({
   container: {
     backgroundColor: '#FF6B6B',
@@ -928,27 +1147,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.white,
   },
-  
-  // Skeleton Styles
-  serviceSkeletonItem: {
-    alignItems: 'center',
-    width: '33%',
-    marginBottom: scale.hp(2),
+  scrollContent: {
+    paddingBottom: scale.hp(10),
   },
   
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: Colors.white,
-  },
-  
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: Colors.primary,
-  },
-  
+
   header: {
     height: scale.hp(19.4),
     position: 'relative',
@@ -1022,6 +1225,216 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginLeft: scale.wp(2.4),
   },
+
+  walletsSection: {
+    marginTop: scale.hp(2.6),
+    marginBottom: scale.hp(2.1),
+    paddingHorizontal: scale.wp(4.9),
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: scale.hp(2.1),
+  },
+  sectionTitle: {
+    fontSize: scale.hp(2.35),
+    fontWeight: '700',
+    color: Colors.textPrimary,
+  },
+  seeAllLink: {
+    fontSize: scale.hp(1.8),
+    color: Colors.primary,
+    fontWeight: '600',
+  },
+  walletCarouselContainer: {
+    position: 'relative',
+    marginBottom: scale.hp(2.1),
+  },
+  walletCardContainer: {
+    width: CARD_WIDTH,
+    marginRight: CARD_MARGIN,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: scale.hp(1.05),
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: scale.hp(2.1),
+    elevation: 8,
+  },
+  walletCardInactive: {
+    opacity: 0.9,
+    transform: [{ scale: 0.95 }],
+  },
+  walletCard: {
+    height: scale.hp(24),
+    borderRadius: scale.hp(3.1),
+    padding: scale.hp(2.6),
+    overflow: "hidden",
+  },
+  skeletonWalletCard: {
+    height: scale.hp(24),
+    borderRadius: scale.hp(3.1),
+    padding: scale.hp(2.6),
+    overflow: "hidden",
+    backgroundColor: "#F0F0F0",
+    position: "relative",
+    width: CARD_WIDTH,
+  },
+  cardPattern: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  patternCircle1: {
+    position: "absolute",
+    top: scale.hp(-2.6),
+    right: scale.hp(-2.6),
+    width: scale.wp(31.2),
+    height: scale.wp(31.2),
+    borderRadius: scale.wp(15.6),
+    backgroundColor: "rgba(255,255,255,0.1)",
+  },
+  patternCircle2: {
+    position: "absolute",
+    bottom: scale.hp(-3.9),
+    right: scale.wp(10.4),
+    width: scale.wp(20.8),
+    height: scale.wp(20.8),
+    borderRadius: scale.wp(10.4),
+    backgroundColor: "rgba(255,255,255,0.1)",
+  },
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    flex: 1,
+  },
+  balanceSection: {
+    flex: 1,
+  },
+  walletLabel: {
+    color: "#fff",
+    opacity: 0.9,
+    fontSize: scale.hp(1.8),
+    fontWeight: "500",
+    marginBottom: scale.hp(0.5),
+  },
+  balanceText: {
+    color: "#fff",
+    fontSize: scale.hp(4.2),
+    fontWeight: "700",
+    marginBottom: scale.hp(1.05),
+  },
+  walletInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  walletName: {
+    color: "#fff",
+    fontSize: scale.hp(2.1),
+    opacity: 0.95,
+    fontWeight: "600",
+    marginRight: scale.wp(1.6),
+  },
+  commissionBadge: {
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    paddingHorizontal: scale.wp(2.1),
+    paddingVertical: scale.hp(0.5),
+    borderRadius: scale.hp(1.3),
+  },
+  commissionBadgeText: {
+    color: '#fff',
+    fontSize: scale.hp(1.4),
+    fontWeight: '600',
+  },
+  walletIcon: {
+    marginLeft: scale.wp(3.1),
+  },
+  walletIconGradient: {
+    width: scale.wp(12.4),
+    height: scale.wp(12.4),
+    borderRadius: scale.wp(6.2),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  transferButton: {
+    marginTop: scale.hp(2.1),
+    borderRadius: scale.hp(1.55),
+    overflow: "hidden",
+  },
+  transferGradient: {
+    paddingHorizontal: scale.wp(4.2),
+    paddingVertical: scale.hp(1.55),
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  transferButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: scale.hp(1.8),
+  },
+  walletIndicators: {
+    alignItems: 'center',
+    marginTop: scale.hp(1.6),
+  },
+  totalBalanceContainer: {
+    backgroundColor: '#F5F5F5',
+    borderRadius: scale.hp(1.6),
+    padding: scale.hp(1.6),
+    marginTop: scale.hp(1.6),
+    alignItems: 'center',
+  },
+  totalBalanceLabel: {
+    fontSize: scale.hp(1.6),
+    color: '#666',
+    marginBottom: scale.hp(0.3),
+  },
+  totalBalanceValue: {
+    fontSize: scale.hp(2.1),
+    fontWeight: '700',
+    color: Colors.primary,
+  },
+  noWalletsContainer: {
+    height: scale.hp(20),
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F9F9F9',
+    borderRadius: scale.hp(3.1),
+    padding: scale.hp(2.6),
+  },
+  noWalletsText: {
+    marginTop: scale.hp(1.6),
+    fontSize: scale.hp(1.8),
+    color: '#666',
+  },
+
+
+  serviceSkeletonItem: {
+    alignItems: 'center',
+    width: '33%',
+    marginBottom: scale.hp(2),
+  },
+  skeletonBlock: {
+    backgroundColor: '#E1E9EE',
+    borderRadius: 4,
+  },
+
+
+  servicesGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginHorizontal: scale.wp(4.9),
+    marginTop: scale.hp(2.6),
+    marginBottom: scale.hp(2.6),
+    justifyContent: "space-between",
+  },
+
+
   promoBanner: {
     marginHorizontal: scale.wp(4.9),
     marginBottom: scale.hp(3.2),
@@ -1078,22 +1491,14 @@ const styles = StyleSheet.create({
   promoIcon: {
     marginLeft: scale.wp(2.4),
   },
-  servicesGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    marginHorizontal: scale.wp(4.9),
-    marginTop: scale.hp(3.9),
-    justifyContent: "space-between",
-    marginBottom: scale.hp(1.3),
-  },
+
   recentContainer: {
     backgroundColor: "#fff",
     borderRadius: scale.hp(2.1),
     padding: scale.hp(2.6),
-    marginBottom: scale.hp(12.9),
-    borderLeftWidth: 2,
-    borderRightWidth: 2,
-    borderTopWidth: 2,
+    marginHorizontal: scale.wp(4.9),
+    marginBottom: scale.hp(5),
+    borderWidth: 1,
     borderColor: "#F3F3F3",
   },
   recentHeader: {
@@ -1115,7 +1520,7 @@ const styles = StyleSheet.create({
   recentTitle: {
     color: Colors.textPrimary,
     fontSize: scale.hp(2.35),
-    fontWeight: "500",
+    fontWeight: "700",
   },
   seeAll: {
     color: Colors.primary,
@@ -1135,6 +1540,69 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flex: 1,
   },
+  txIconWrap: {
+    width: scale.wp(11.7),
+    height: scale.wp(11.7),
+    borderRadius: scale.wp(5.85),
+    justifyContent: "center",
+    alignItems: "center",
+    marginEnd: scale.wp(2.9),
+  },
+  txInIcon: {
+    backgroundColor: "rgba(11, 163, 96, 0.1)",
+  },
+  txOutIcon: {
+    backgroundColor: "rgba(215, 0, 0, 0.1)",
+  },
+  txInfo: {
+    flex: 1,
+  },
+  txTitle: {
+    color: Colors.textPrimary,
+    fontSize: scale.hp(2.1),
+    fontWeight: "600",
+    textTransform: 'capitalize',
+    marginBottom: scale.hp(0.25),
+  },
+  txSub: {
+    color: "#9E9E9E",
+    fontSize: scale.hp(1.55),
+    marginTop: scale.hp(0.25),
+  },
+  txPhone: {
+    color: "#9E9E9E",
+    fontSize: scale.hp(1.55),
+    marginTop: scale.hp(0.25),
+  },
+  txRight: {
+    alignItems: "flex-end",
+  },
+  txAmount: {
+    fontSize: scale.hp(2.1),
+    fontWeight: "700",
+    marginBottom: scale.hp(0.5),
+  },
+  statusBadge: {
+    paddingHorizontal: scale.wp(2),
+    paddingVertical: scale.hp(0.5),
+    borderRadius: scale.hp(1.55),
+  },
+  statusText: {
+    fontSize: scale.hp(1.55),
+    fontWeight: "600",
+    textTransform: 'capitalize',
+  },
+  emptyState: {
+    alignItems: 'center',
+    padding: scale.hp(2.6),
+  },
+  emptyStateText: {
+    color: '#9E9E9E',
+    fontSize: scale.hp(1.8),
+    marginTop: scale.hp(1.05),
+  },
+
+
   welcomeModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
@@ -1285,64 +1753,7 @@ const styles = StyleSheet.create({
     fontSize: scale.hp(2),
     fontWeight: '600',
   },
-  txIconWrap: {
-    width: scale.wp(11.7),
-    height: scale.wp(11.7),
-    borderRadius: scale.wp(5.85),
-    justifyContent: "center",
-    alignItems: "center",
-    marginEnd: scale.wp(2.9),
-  },
-  txInIcon: {
-    backgroundColor: "rgba(11, 163, 96, 0.1)",
-  },
-  txOutIcon: {
-    backgroundColor: "rgba(215, 0, 0, 0.1)",
-  },
-  txInfo: {
-    flex: 1,
-  },
-  txTitle: {
-    color: Colors.textPrimary,
-    fontSize: scale.hp(2.1),
-    fontWeight: "600",
-    textTransform: 'capitalize',
-  },
-  txSub: {
-    color: "#9E9E9E",
-    fontSize: scale.hp(1.55),
-    marginTop: scale.hp(0.25),
-  },
-  txPhone: {
-    color: "#9E9E9E",
-    fontSize: scale.hp(1.55),
-    marginTop: scale.hp(0.25),
-  },
-  txRight: {
-    alignItems: "flex-end",
-  },
-  txAmount: {
-    fontSize: scale.hp(2.1),
-    fontWeight: "700",
-    marginBottom: scale.hp(0.5),
-  },
-  statusBadge: {
-    paddingHorizontal: scale.wp(2),
-    paddingVertical: scale.hp(0.5),
-    borderRadius: scale.hp(1.55),
-  },
-  statusText: {
-    fontSize: scale.hp(1.55),
-    fontWeight: "600",
-    textTransform: 'capitalize',
-  },
-  emptyState: {
-    alignItems: 'center',
-    padding: scale.hp(2.6),
-  },
-  emptyStateText: {
-    color: '#9E9E9E',
-    fontSize: scale.hp(1.8),
-    marginTop: scale.hp(1.05),
-  },
 });
+
+const formatAF = (n) =>
+  Number(n).toLocaleString("en-US", { maximumFractionDigits: 0 });

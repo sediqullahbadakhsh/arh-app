@@ -428,7 +428,7 @@ ${t('receipt.thankYou')}
         if (currentPermission?.canAskAgain !== false) {
           Alert.alert(
             t('receipt.permissionRequestTitle', 'Save to Photos'),
-            t('receipt.permissionRequestMessage', 'Allow Yes Charge to save receipt to your Photos?'),
+            t('receipt.permissionRequestMessage', 'Allow YES Charge to save receipt to your Photos?'),
             [
               {
                 text: t('common.cancel', 'Cancel'),

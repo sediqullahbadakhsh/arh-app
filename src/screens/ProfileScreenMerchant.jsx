@@ -35,10 +35,10 @@ export default function ProfileScreenMerchant({ navigation }) {
       if (response) {
         setMerchantData(response);
         
-        if (response.user?.profile_picture) {
-          const fullImageUrl = response.user.profile_picture.startsWith('http') 
-            ? response.user.profile_picture
-            : `http://3.67.144.22/uploads/profile_pictures/${response.user.profile_picture}`;
+        if (response.user?.profilePicture) {
+          const fullImageUrl = response.user.profilePicture.startsWith('http') 
+            ? response.user.profilePicture
+            : `http://3.67.144.22/uploads/profile_pictures/${response.user.profilePicture}`;
           setAvatar(fullImageUrl);
         }
       }
@@ -289,14 +289,14 @@ export default function ProfileScreenMerchant({ navigation }) {
                 subtitle={t('viewReverseStock')}
                 onPress={goReverseStockReport}
               />
-              <ProfileRow
+              {/* <ProfileRow
                 icon={
                   <Ionicons name="refresh-circle-outline" size={22} color={Colors.primary} />
                 }
                 title={t('aboutApp')}
                 subtitle={t('appFeaturesInfo')}
                 onPress={goAboutApp}
-              />
+              /> */}
               <ProfileRow
                 icon={
                   <Ionicons name="headset-outline" size={22} color={Colors.primary} />

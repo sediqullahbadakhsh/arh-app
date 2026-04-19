@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -20,10 +20,11 @@ import { useTranslation } from "react-i18next";
 import { scale } from "../../utils/normalizeSize";
 import { 
   activateSocialBundleByAgent,
-  checkGameOrderStatus 
+ getOrderStatus 
 } from "../../services/merchantApi";
 import { validatePromoCode } from "../../services/promoCodeApi";
 import LottieView from "lottie-react-native";
+import { useFocusEffect } from "@react-navigation/native";
 
 const { width } = Dimensions.get('window');
 
@@ -69,6 +70,18 @@ export default function SocialActivationMerchantScreen({ navigation, route }) {
       errorLottieRef.current.play();
     }
   }, [orderStatus]);
+
+  // Clean up on unmount
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        if (pollingRef.current) {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+        }
+      };
+    }, [])
+  );
 
   const handleApplyPromoCode = async () => {
     if (!promoCode.trim()) {
@@ -137,16 +150,21 @@ export default function SocialActivationMerchantScreen({ navigation, route }) {
     pollingRef.current = setInterval(async () => {
       try {
         pollCount++;
-        const statusResponse = await checkGameOrderStatus(orderId);
+        const statusResponse = await getOrderStatus (orderId);
         const currentStatus = statusResponse.data?.status;
         
         console.log(`Poll ${pollCount}: Order status:`, currentStatus);
         
+
         setOrderStatus(currentStatus);
         setOrderDetails(prev => ({
           ...prev,
-          ...statusResponse.data
+          ...statusResponse.data,
+          _updatedAt: Date.now() // Force update
         }));
+
+        console.log('Updated order status:', currentStatus);
+        console.log('Order details:', statusResponse.data);
 
         if (
           currentStatus === ORDER_STATUS.SUCCEEDED || 
@@ -159,6 +177,7 @@ export default function SocialActivationMerchantScreen({ navigation, route }) {
           
           if (pollCount >= maxPolls) {
             console.log("Max polling attempts reached");
+            setOrderStatus(ORDER_STATUS.FAILED);
           }
         }
       } catch (error) {
@@ -206,8 +225,7 @@ export default function SocialActivationMerchantScreen({ navigation, route }) {
       console.log("Social activation response:", response);
       
       if (response.success === true) {
-        setOrderStatus(ORDER_STATUS.PENDING);
-        setOrderDetails({
+        const orderData = {
           orderId: response.orderId,
           txnNumber: response.txnNumber,
           playerId: receiver,
@@ -218,7 +236,10 @@ export default function SocialActivationMerchantScreen({ navigation, route }) {
           date: new Date().toISOString(),
           productName: product?.productName || product?.name,
           productImage: product?.image,
-        });
+        };
+
+        setOrderStatus(ORDER_STATUS.PENDING);
+        setOrderDetails(orderData);
         
         if (response.orderId) {
           await startPollingOrderStatus(response.orderId);
@@ -311,7 +332,21 @@ export default function SocialActivationMerchantScreen({ navigation, route }) {
     }
   };
 
+  const getImageUrl = () => {
+    if (product?.image) {
+      if (product.image.startsWith('http')) {
+        return product.image;
+      } else {
+        const encodedImage = encodeURIComponent(product.image);
+        return `http://3.67.144.22/backend/uploads/product_images/${encodedImage}`;
+      }
+    }
+    return null;
+  };
+
   const OrderStatusScreen = () => {
+    console.log('Rendering OrderStatusScreen with status:', orderStatus);
+    
     return (
       <ScrollView
         contentContainerStyle={styles.statusContainer}
@@ -388,7 +423,7 @@ export default function SocialActivationMerchantScreen({ navigation, route }) {
               <Text style={styles.amountValue}>{finalAmount.toFixed(2)} AFN</Text>
               {appliedPromoCode && (
                 <Text style={[styles.detailValue, { fontSize: 14, textAlign: 'center', color: '#10B981' }]}>
-                  Saved: ${discountAmount.toFixed(2)}
+                  Saved: {discountAmount.toFixed(2)} AFN
                 </Text>
               )}
             </View>
@@ -447,19 +482,9 @@ export default function SocialActivationMerchantScreen({ navigation, route }) {
     );
   };
 
-  const getImageUrl = () => {
-    if (product?.image) {
-      if (product.image.startsWith('http')) {
-        return product.image;
-      } else {
-        const encodedImage = encodeURIComponent(product.image);
-        return `http://3.67.144.22/backend/uploads/product_images/${encodedImage}`;
-      }
-    }
-    return null;
-  };
-
-  if (orderStatus) {
+  // Show status screen when orderStatus is not null
+  if (orderStatus !== null) {
+    console.log('Showing status screen with orderStatus:', orderStatus);
     return (
       <SafeAreaView style={styles.container}>
         <ServiceHeader 
@@ -483,10 +508,9 @@ export default function SocialActivationMerchantScreen({ navigation, route }) {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Product Details */}
- 
+     
+      
 
-   
         <View style={styles.inputSection}>
           <Text style={styles.sectionTitle}>
             {t("socialId") || "Social ID/Username"}
@@ -501,14 +525,36 @@ export default function SocialActivationMerchantScreen({ navigation, route }) {
             autoCapitalize="none"
             autoCorrect={false}
           />
-          {/* <Text style={styles.inputHelp}>
-            {t("enterSocialAccountId") || "Enter the social media account ID or username"}
-          </Text> */}
         </View>
 
-    
-     
-  
+ 
+        <View style={styles.promoSection}>
+          {appliedPromoCode ? (
+            <View style={styles.appliedPromoContainer}>
+              <View style={styles.appliedPromoInfo}>
+                <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                <Text style={styles.appliedPromoText}>
+                  {t('promoCode.applied') || "Promo Applied"}: {appliedPromoCode.code}
+                </Text>
+                <Text style={styles.discountText}>
+                  -{appliedPromoCode.discount_amount?.toFixed(2) || discountAmount.toFixed(2)} AFN
+                </Text>
+              </View>
+              <TouchableOpacity onPress={handleRemovePromoCode} style={styles.removePromoButton}>
+                <Text style={styles.removePromoText}>{t('promoCode.remove') || "Remove"}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity 
+              style={styles.promoButton} 
+              onPress={() => setPromoModalVisible(true)}
+            >
+              <Ionicons name="pricetag-outline" size={20} color={Colors.primary} />
+              <Text style={styles.promoButtonText}>{t('promoCode.havePromoCode') || "Have a promo code?"}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
         <View style={styles.summaryCard}>
           <Text style={styles.summaryTitle}>
             {t("orderSummary") || "Order Summary"}
@@ -549,12 +595,12 @@ export default function SocialActivationMerchantScreen({ navigation, route }) {
         </View>
       </ScrollView>
 
-      {/* Activate Button */}
+
       <View style={styles.footer}>
         <TouchableOpacity
           style={[
             styles.activateButton,
-            !receiver.trim() && styles.activateButtonDisabled
+            (!receiver.trim() || loading) && styles.activateButtonDisabled
           ]}
           onPress={activateSocialProduct}
           disabled={!receiver.trim() || loading}
@@ -569,7 +615,7 @@ export default function SocialActivationMerchantScreen({ navigation, route }) {
         </TouchableOpacity>
       </View>
 
-      {/* Promo Code Modal */}
+    
       <Modal
         visible={promoModalVisible}
         transparent={true}
@@ -702,18 +748,6 @@ const styles = StyleSheet.create({
     fontSize: scale.hp(2.5),
     fontWeight: '700',
     color: Colors.primary,
-  },
-  originalPriceStriked: {
-    fontSize: scale.hp(2.2),
-    fontWeight: '600',
-    color: Colors.textSecondary,
-    textDecorationLine: 'line-through',
-    marginRight: scale.wp(2),
-  },
-  finalPrice: {
-    fontSize: scale.hp(2.5),
-    fontWeight: '700',
-    color: '#10B981',
   },
   inputSection: {
     marginTop: scale.hp(3),

@@ -27,10 +27,10 @@ const AuthCtx = createContext({
   loginPassword: async () => {},
   loginOtpSend: async () => {},
   loginOtpVerify: async () => {},
-  loginOtpResend: async () => {}, // Added to context
+  loginOtpResend: async () => {},
   signupCustomerSendOtp: async () => {},
   signupCustomerVerifyOtp: async () => {},
-  signupCustomerResendOtp: async () => {}, // Added to context
+  signupCustomerResendOtp: async () => {}, 
   setToken: async () => {},
   setRoleLocal: async () => {},
   logout: async () => {},
@@ -198,10 +198,9 @@ export function AuthProvider({ children }) {
     return data;
   };
 
-  // FIXED: Changed from recursive call to API call
   const loginOtpResend = async ({ identifier }) => {
     try {
-      const response = await loginOtpGenerate(identifier); // FIXED THIS LINE
+      const response = await loginOtpGenerate(identifier);
       return response;
     } catch (error) {
       console.error("Login OTP resend error:", error);
@@ -219,28 +218,50 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const loginPasswordFn = async ({ identifier, password }) => {
+const loginPasswordFn = async ({ identifier, password }) => {
+  try {
     const data = await loginWithPassword({ identifier, password });
     
     console.log("Login response:", data); 
     
-    const userId = data.id; 
-    const username = data.username; 
+
+    let merchantProfile = null;
+    try {
+      merchantProfile = await getCurrentMerchantProfile();
+      console.log("Merchant profile:", merchantProfile);
+    } catch (error) {
+      console.error("Error fetching merchant profile:", error);
+    }
     
-    console.log("User ID from login response:", userId);
-    console.log("Username from login response:", username);
+    const userFromMerchant = merchantProfile?.data?.user || {};
     
     await setRoleLocal("b2b");
-    await setToken(data.access_token, {
-      role: "b2b",
-      role_id: data.role_id,
-      id: userId, 
-      username: username, 
-    });
     
+    const userData = {
+      role: "b2b",
+      role_id: data.role_id || userFromMerchant.role_id || null,
+      id: userFromMerchant.uid || data.id || userFromMerchant.id,
+      username: userFromMerchant.username || data.username,
+      email: userFromMerchant.email || data.email || "",
+      mobileNumber: userFromMerchant.mobileNumber || data.mobileNumber || "",
+      profile_picture: userFromMerchant.profilePicture || data.profile_picture || null,
+      accountType: "merchant",
+      merchantData: merchantProfile?.data || null,
+      ...userFromMerchant,
+      ...data
+    };
+    
+    console.log("Setting token with complete user data:", userData);
+    
+    await setToken(data.access_token, userData);
     setPending(null);
+    
     return data;
-  };
+  } catch (error) {
+    console.error("Login error:", error);
+    throw error;
+  }
+};
 
   const loginOtpSendFn = async (identifier) => {
     const data = await loginOtpGenerate(identifier);
@@ -261,7 +282,7 @@ export function AuthProvider({ children }) {
       role: "b2c",
       role_id: data.role_id,
       username: data.fullName,
-      id: userProfile?.id || data.customer?.id || data.id,
+      id: userProfile?.id || data.customer?.id || data.id || data.customer?.uid || data.uid || userProfile?.uid,
       fullName: data.fullName || data.customer?.fullName,
       ...data.customer,
       ...data,
@@ -289,7 +310,7 @@ export function AuthProvider({ children }) {
     
     await setToken(data.access_token, {
       role: "b2c",
-      id: userProfile?.id,
+      id: userProfile?.id ||userProfile?.uid,
       username: userProfile?.username,
       ...userProfile
     });
@@ -315,10 +336,10 @@ export function AuthProvider({ children }) {
       loginPassword: loginPasswordFn,
       loginOtpSend: loginOtpSendFn,
       loginOtpVerify: loginOtpVerifyFn,
-      loginOtpResend, // Added to context
+      loginOtpResend,
       signupCustomerSendOtp: signupCustomerSendOtpFn,
       signupCustomerVerifyOtp: signupCustomerVerifyOtpFn,
-      signupCustomerResendOtp, // Added to context
+      signupCustomerResendOtp,
       setToken,
       setRoleLocal,
       logout,

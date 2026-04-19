@@ -32,7 +32,6 @@ const chunkArray = (array, chunkSize) => {
   return results;
 };
 
-
 const debounce = (func, wait) => {
   let timeout;
   return function executedFunction(...args) {
@@ -65,12 +64,10 @@ export default function SocialCustomerScreen({ navigation, route }) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [totalPages, setTotalPages] = useState(1);
   
-
   const [apiFilters, setApiFilters] = useState({
     search: '',
     productCategoryId: null,
   });
-
 
   const flatListRef = useRef(null);
   const isMountedRef = useRef(true);
@@ -85,7 +82,6 @@ export default function SocialCustomerScreen({ navigation, route }) {
     queryKey: ['socialCategories'],
     queryFn: getAllSocialCategories,
   });
-
 
   const { 
     data: productsData,
@@ -134,7 +130,6 @@ export default function SocialCustomerScreen({ navigation, route }) {
       setCategories(categoriesData?.data || []);
     }
   }, [categoriesData]);
-
 
   useEffect(() => {
     if (productsData?.data && isMountedRef.current) {
@@ -299,9 +294,9 @@ export default function SocialCustomerScreen({ navigation, route }) {
         styles.categoryText,
         selectedCategory?.id === item.id && styles.selectedCategoryText
       ]}>
-        {typeof item.category_name === 'object' 
-          ? item.category_name.en || item.category_name[Object.keys(item.category_name)[0]]
-          : item.category_name || item.name}
+        {typeof item.categoryName === 'object' 
+          ? item.categoryName.en || item.categoryName[Object.keys(item.categoryName)[0]]
+          : item.categoryName || item.name}
       </Text>
     </TouchableOpacity>
   );
@@ -389,7 +384,6 @@ export default function SocialCustomerScreen({ navigation, route }) {
       );
     }
     
- 
     if (hasMore && allProducts.length > 0 && !loadingMore) {
       return (
         <TouchableOpacity
@@ -518,7 +512,6 @@ export default function SocialCustomerScreen({ navigation, route }) {
         </View>
       )}
 
-  
       {hasActiveFilters && (
         <View style={styles.activeFiltersContainer}>
           <Text style={styles.activeFiltersText}>
@@ -557,8 +550,6 @@ export default function SocialCustomerScreen({ navigation, route }) {
         </View>
       )}
 
-    
-
       {isLoading && page === 1 ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors.primary} />
@@ -591,7 +582,6 @@ export default function SocialCustomerScreen({ navigation, route }) {
           maxToRenderPerBatch={10}
           initialNumToRender={10}
           windowSize={10}
-        
         />
       )}
     </SafeAreaView>
@@ -609,7 +599,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#fff",
     margin: scale.wp(4),
- 
     paddingHorizontal: scale.wp(3),
     paddingVertical: scale.hp(0.5),
     borderRadius: scale.wp(2.5),
@@ -693,18 +682,6 @@ const styles = StyleSheet.create({
   clearAllButtonText: {
     fontSize: scale.hp(1.4),
     color: "#fff",
-    fontWeight: "500",
-  },
-  resultsCountContainer: {
-    paddingHorizontal: scale.wp(4),
-    paddingVertical: scale.hp(1),
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e9ecef",
-  },
-  resultsCountText: {
-    fontSize: scale.hp(1.6),
-    color: Colors.textSecondary,
     fontWeight: "500",
   },
   loadingContainer: {
@@ -869,14 +846,5 @@ const styles = StyleSheet.create({
     fontSize: scale.hp(1.6),
     fontWeight: '600',
     textAlign: 'center',
-  },
-  noMoreContainer: {
-    paddingVertical: scale.hp(2),
-    alignItems: 'center',
-  },
-  noMoreText: {
-    fontSize: scale.hp(1.6),
-    color: Colors.textSecondary,
-    fontStyle: 'italic',
   },
 });

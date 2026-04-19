@@ -11,25 +11,49 @@
           "EXPO_USE_FCM": "false",
           "EXPO_ENABLE_NEW_ARCHITECTURE": "true",
           "NODE_ENV": "development",
-          "EXPO_PUBLIC_API_URL": "http://3.67.144.22/backend/v1"
+          "EXPO_PUBLIC_API_URL": "https://prod-admin.yes-charge.com/backend/v1"
         },
         "withoutCredentials": false
+      },
+      "ios": {
+        "simulator": true,
+        "distribution": "internal",
+        "credentialsSource": "remote",
+        "env": {
+          "NODE_ENV": "development",
+          "EXPO_PUBLIC_API_URL": "https://prod-admin.yes-charge.com/backend/v1"
+        }
       }
     },
     "production": {
-      "distribution": "internal",
+      "distribution": "store",
       "android": {
-        "buildType": "apk",
-        "gradleCommand": ":app:assembleRelease",
+        "buildType": "app-bundle",
+        "credentialsSource": "remote",
         "env": {
           "EXPO_PUSH_NOTIFICATIONS": "true",
           "EXPO_USE_FCM": "false",
           "EXPO_ENABLE_NEW_ARCHITECTURE": "true",
           "NODE_ENV": "production",
-          "EXPO_PUBLIC_API_URL": "http://3.67.144.22/backend/v1"
-        },
-        "withoutCredentials": false,
-        "credentialsSource": "remote"
+          "EXPO_PUBLIC_API_URL": "https://prod-admin.yes-charge.com/backend/v1"
+        }
+      },
+      "ios": {
+        "simulator": false,
+        "distribution": "store",
+        "credentialsSource": "remote",
+        "env": {
+          "NODE_ENV": "production",
+          "EXPO_PUBLIC_API_URL": "https://prod-admin.yes-charge.com/backend/v1"
+        }
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "mnomankohistani@gmail.com",
+        "ascAppId": "6762475877"
       }
     }
   },

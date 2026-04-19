@@ -9,13 +9,46 @@ import {
   TextInput,
   StyleSheet 
 } from "react-native";
-import { getMnoLogo } from "../../utils/getMnoLogo";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../theme/colors";
 import { getSetaraganMnoId } from "../../utils/getCompanyIdForSetaragan";
 import formatLocal from "../../utils/formatLocal";
 import { scale } from "../../utils/normalizeSize";
 import { useTranslation } from "react-i18next";
+
+const OPERATOR_NAMES = {
+  '70': 'AWCC',
+  '71': 'AWCC',
+  '72': 'MTN',
+  '73': 'Etisalat',
+  '74': 'Salaam',
+  '76': 'Roshan',
+  '77': 'Roshan',
+  '78': 'Etisalat',
+  '79': 'Salaam',
+  'default': 'All Operators'
+};
+
+const OPERATOR_LOGOS = {
+  '70': require('../../../assets/mnos/awcc.png'),
+  '71': require('../../../assets/mnos/awcc.png'),
+  '72': require('../../../assets/mnos/mtn.png'),
+  '73': require('../../../assets/mnos/etisalat.png'),
+  '74': require('../../../assets/mnos/salaam.png'),
+  '76': require('../../../assets/mnos/roshan.png'),
+  '77': require('../../../assets/mnos/roshan.png'),
+  '78': require('../../../assets/mnos/etisalat.png'),
+  '79': require('../../../assets/mnos/salaam.png'),
+  'default': require('../../../assets/mnos/awcc.png'),
+};
+
+const getOperatorFromPrefix = (prefix) => {
+  return OPERATOR_NAMES[prefix] || OPERATOR_NAMES.default;
+};
+
+const getOperatorLogoFromPrefix = (prefix) => {
+  return OPERATOR_LOGOS[prefix] || OPERATOR_LOGOS.default;
+};
 
 function StepProducts({
   country,
@@ -34,9 +67,10 @@ function StepProducts({
   summary,
   isLoading = false,
   isLoadingProducts = false,
+  mobilePrefix = null,
 }) {
   const { t } = useTranslation();
-  const operatorLogo = getMnoLogo(getSetaraganMnoId(summary.localNumber));
+  const operatorLogo = getOperatorLogoFromPrefix(getSetaraganMnoId(summary.localNumber));
 
   const CategorySkeleton = () => (
     <View style={styles.categoriesContainer}>
@@ -66,6 +100,14 @@ function StepProducts({
     </View>
   );
 
+  const handleProductSelect = (item) => {
+    if (product && product.id === item.id) {
+      setProduct(null);
+    } else {
+      setProduct(item);
+    }
+  };
+
   const renderItem = ({ item }) => {
     const active = product?.id === item.id;
     let IMAGE_URL = null;
@@ -77,6 +119,14 @@ function StepProducts({
         IMAGE_URL = `http://3.67.144.22/backend/uploads/product_images/${encodedImage}`;
       }
     }
+
+    const operatorName = item.prefix 
+      ? getOperatorFromPrefix(item.prefix.toString())
+      : OPERATOR_NAMES.default;
+    
+    const operatorLogo = item.prefix 
+      ? getOperatorLogoFromPrefix(item.prefix.toString())
+      : null;
 
     const hasDiscount = item.originalPrice && item.totalAmountInUSD;
     const discountPercentage = hasDiscount 
@@ -90,7 +140,7 @@ function StepProducts({
           active && styles.productCardActive,
           item.isPopular && styles.popularCard
         ]}
-        onPress={() => setProduct(item)}
+        onPress={() => handleProductSelect(item)}
         activeOpacity={0.7}
       >
         {item.isPopular && (
@@ -114,6 +164,12 @@ function StepProducts({
                 style={styles.operatorLogo}
                 resizeMode="contain"
               />
+            ) : operatorLogo ? (
+              <Image 
+                source={operatorLogo} 
+                style={styles.operatorLogo}
+                resizeMode="contain"
+              />
             ) : (
               <View style={styles.logoColorBackground}>
                 <Ionicons name="cube-outline" size={scale.hp(3.5)} color="#FFFFFF" />
@@ -125,7 +181,16 @@ function StepProducts({
             <Text style={[styles.productName, active && styles.productNameActive]}>
               {item.productName?.en || item.productName}
             </Text>
-            
+  
+            {/* <View style={styles.operatorInfoContainer}>
+              <View style={styles.operatorTag}>
+                <Ionicons name="phone-portrait-outline" size={scale.hp(1.5)} color="#CD0202" />
+                <Text style={styles.operatorTagText}>
+                  {operatorName} {item.prefix ? `(0${item.prefix})` : ''}
+                </Text>
+              </View>
+            </View> */}
+
             {item.description && (
               <Text style={styles.productDescription} numberOfLines={2}>
                 {item.description}
@@ -176,8 +241,139 @@ function StepProducts({
             </View>
           </View>
         </View>
+      </TouchableOpacity>
+    );
+  };
 
+  const renderSelectedProduct = () => {
+    const active = true;
+    const item = product;
+    let IMAGE_URL = null;
+    if (item.image) {
+      if (item.image.startsWith('http')) {
+        IMAGE_URL = item.image;
+      } else {
+        const encodedImage = encodeURIComponent(item.image);
+        IMAGE_URL = `http://3.67.144.22/backend/uploads/product_images/${encodedImage}`;
+      }
+    }
+
+    const operatorName = item.prefix 
+      ? getOperatorFromPrefix(item.prefix.toString())
+      : OPERATOR_NAMES.default;
     
+    const operatorLogo = item.prefix 
+      ? getOperatorLogoFromPrefix(item.prefix.toString())
+      : null;
+
+    const hasDiscount = item.originalPrice && item.totalAmountInUSD;
+    const discountPercentage = hasDiscount 
+      ? Math.round(((item.originalPrice - item.totalAmountInUSD) / item.originalPrice) * 100)
+      : 0;
+    
+    return (
+      <TouchableOpacity
+        style={[
+          styles.productCard,
+          styles.productCardActive,
+          item.isPopular && styles.popularCard
+        ]}
+        onPress={() => setProduct(null)}
+        activeOpacity={0.7}
+      >
+        {item.isPopular && (
+          <View style={styles.popularBadge}>
+            <Ionicons name="star" size={scale.hp(1.5)} color="#FFD700" />
+            <Text style={styles.popularBadgeText}>{t('popular')}</Text>
+          </View>
+        )}
+
+        {hasDiscount && discountPercentage > 0 && (
+          <View style={styles.discountBadge}>
+            <Text style={styles.discountBadgeText}>-{discountPercentage}%</Text>
+          </View>
+        )}
+
+        <View style={styles.cardContent}>
+          <View style={styles.logoContainer}>
+            {IMAGE_URL ? (
+              <Image 
+                source={{ uri: IMAGE_URL }} 
+                style={styles.operatorLogo}
+                resizeMode="contain"
+              />
+            ) : operatorLogo ? (
+              <Image 
+                source={operatorLogo} 
+                style={styles.operatorLogo}
+                resizeMode="contain"
+              />
+            ) : (
+              <View style={styles.logoColorBackground}>
+                <Ionicons name="cube-outline" size={scale.hp(3.5)} color="#FFFFFF" />
+              </View>
+            )}
+          </View>
+
+          <View style={styles.productDetails}>
+            <Text style={[styles.productName, styles.productNameActive]}>
+              {item.productName?.en || item.productName}
+            </Text>
+            
+
+            {/* <View style={styles.operatorInfoContainer}>
+              <View style={styles.operatorTag}>
+                <Ionicons name="phone-portrait-outline" size={scale.hp(1.5)} color="#CD0202" />
+                <Text style={styles.operatorTagText}>
+                  {operatorName} {item.prefix ? `(0${item.prefix})` : ''}
+                </Text>
+              </View>
+            </View> */}
+
+            {item.description && (
+              <Text style={styles.productDescription} numberOfLines={2}>
+                {item.description}
+              </Text>
+            )}
+
+            {(item.dataAmount || item.validity) && (
+              <View style={styles.featuresContainer}>
+                {item.dataAmount && (
+                  <View style={styles.featureTag}>
+                    <Ionicons name="wifi-outline" size={scale.hp(1.7)} color="#CD0202" />
+                    <Text style={styles.featureText}>{item.dataAmount}</Text>
+                  </View>
+                )}
+                {item.validity && (
+                  <View style={styles.featureTag}>
+                    <Ionicons name="calendar-outline" size={scale.hp(1.7)} color="#CD0202" />
+                    <Text style={styles.featureText}>{item.validity}</Text>
+                  </View>
+                )}
+              </View>
+            )}
+
+            <View style={styles.priceSection}>
+              <View style={styles.priceContainer}>
+                {hasDiscount && (
+                  <Text style={styles.originalPrice}>
+                    ${item.originalPrice}
+                  </Text>
+                )}
+                <Text style={[styles.price, styles.priceActive]}>
+                  ${item.totalAmountInUSD} {t('usd')}
+                </Text>
+                <Text style={styles.priceSubtext}>{t('oneTimePayment')}</Text>
+              </View>
+              
+              <View style={styles.selectionIndicator}>
+                <View style={styles.selectedIndicator}>
+                  <Ionicons name="checkmark" size={scale.hp(2.5)} color="#FFFFFF" />
+                </View>
+              </View>
+            </View>
+          </View>
+        </View>
       </TouchableOpacity>
     );
   };
@@ -206,7 +402,7 @@ function StepProducts({
                   styles.categoryText,
                   selectedCategory?.id === category.id && styles.categoryTextActive
                 ]}>
-                  {category.category_name?.en || category.category_name || t('unnamedCategory')}
+                  {category.categoryName?.en || category.categoryName || t('unnamedCategory')}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -238,7 +434,7 @@ function StepProducts({
                   styles.categoryText,
                   selectedType?.id === type.id && styles.categoryTextActive
                 ]}>
-                  {type.productType?.en || type.productType || t('unnamedType')}
+                  {type.typeName?.en || type.typeName || t('unnamedType')}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -269,80 +465,108 @@ function StepProducts({
           ))}
         </View>
       ) : (
-        <FlatList
-          data={products}
-          keyExtractor={(item) => item.id?.toString()}
-          renderItem={renderItem}
-          ItemSeparatorComponent={() => <View style={styles.cardSeparator} />}
-          contentContainerStyle={styles.listContainer}
-          showsVerticalScrollIndicator={false}
-          scrollEnabled={true}
-          ListEmptyComponent={
-            <View style={styles.emptyProducts}>
-              <View style={styles.emptyIconContainer}>
-                <Ionicons name="cube-outline" size={scale.hp(6)} color="#FFFFFF" />
-              </View>
-              <Text style={styles.emptyProductsTitle}>{t('noBundlesFound')}</Text>
-              <Text style={styles.emptyProductsText}>
-                {selectedCategory || selectedType 
-                  ? t('tryDifferentFilters') 
-                  : t('noBundlesAvailable')
-                }
-              </Text>
-              {(selectedCategory || selectedType) && (
-                <TouchableOpacity
-                  style={styles.clearFiltersButton}
-                  onPress={() => {
-                    setSelectedCategory(null);
-                    setSelectedType(null);
-                    setSearch('');
-                  }}
-                >
-                  <Text style={styles.clearFiltersText}>{t('clearAllFilters')}</Text>
-                </TouchableOpacity>
-              )}
+        <>
+          {!product ? (
+            <FlatList
+              data={products}
+              keyExtractor={(item) => item.id?.toString()}
+              renderItem={renderItem}
+              ItemSeparatorComponent={() => <View style={styles.cardSeparator} />}
+              contentContainerStyle={styles.listContainer}
+              showsVerticalScrollIndicator={false}
+              scrollEnabled={true}
+              ListEmptyComponent={
+                <View style={styles.emptyProducts}>
+                  <View style={styles.emptyIconContainer}>
+                    <Ionicons name="cube-outline" size={scale.hp(6)} color="#FFFFFF" />
+                  </View>
+                  <Text style={styles.emptyProductsTitle}>
+                    {mobilePrefix 
+                      ? t('noBundlesForPrefix', { prefix: mobilePrefix, operator: getOperatorFromPrefix(mobilePrefix) })
+                      : t('noBundlesFound')
+                    }
+                  </Text>
+                  <Text style={styles.emptyProductsText}>
+                    {selectedCategory || selectedType 
+                      ? t('tryDifferentFilters') 
+                      : mobilePrefix
+                        ? t('tryDifferentNumberPrefix')
+                        : t('noBundlesAvailable')
+                    }
+                  </Text>
+                  {(selectedCategory || selectedType || mobilePrefix) && (
+                    <TouchableOpacity
+                      style={styles.clearFiltersButton}
+                      onPress={() => {
+                        setSelectedCategory(null);
+                        setSelectedType(null);
+                        setSearch('');
+                      }}
+                    >
+                      <Text style={styles.clearFiltersText}>{t('clearAllFilters')}</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              }
+            />
+          ) : (
+            <View style={styles.selectedProductContainer}>
+              {renderSelectedProduct()}
             </View>
-          }
-        />
-      )}
-
-      {product && (
-        <View style={styles.summaryCard}>
-          <View style={styles.summaryContent}>
-            <View style={styles.summaryRow}>
-              <View style={styles.summaryIcon}>
-                <Ionicons name="phone-portrait-outline" size={scale.hp(2.5)} color="#FFFFFF" />
+          )}
+          
+          {product && (
+            <View style={styles.summaryCard}>
+              <View style={styles.summaryContent}>
+                <View style={styles.summaryRow}>
+                  <View style={styles.summaryIcon}>
+                    <Ionicons name="phone-portrait-outline" size={scale.hp(2.5)} color="#FFFFFF" />
+                  </View>
+                  <View style={styles.summaryTextContainer}>
+                    <Text style={styles.summaryLabel}>{t('mobileNumber')}</Text>
+                    <Text style={styles.summaryValue}>
+                      {formatLocal(summary.localNumber)}
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={onEditNumber}>
+                    <Ionicons name="create-outline" size={scale.hp(2.5)} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </View>
+                
+                <View style={styles.summaryRow}>
+                  <View style={styles.summaryIcon}>
+                    <Ionicons name="cube-outline" size={scale.hp(2.5)} color="#FFFFFF" />
+                  </View>
+                  <View style={styles.summaryTextContainer}>
+                    <Text style={styles.summaryLabel}>{t('selectedPlan')}</Text>
+                    <Text style={styles.summaryValue}>
+                      {product.productName?.en || product.productName}
+                    </Text>
+                  </View>
+                </View>
+                
+                {/* {product.prefix && (
+                  <View style={styles.summaryRow}>
+                    <View style={styles.summaryIcon}>
+                      <Ionicons name="cellular-outline" size={scale.hp(2.5)} color="#FFFFFF" />
+                    </View>
+                    <View style={styles.summaryTextContainer}>
+                      <Text style={styles.summaryLabel}>{t('operator')}</Text>
+                      <Text style={styles.summaryValue}>
+                        {getOperatorFromPrefix(product.prefix.toString())}
+                      </Text>
+                    </View>
+                  </View>
+                )} */}
+                
+                <View style={styles.totalRow}>
+                  <Text style={styles.totalLabel}>{t('totalAmount')}</Text>
+                  <Text style={styles.totalAmount}>${product.totalAmountInUSD} {t('usd')}</Text>
+                </View>
               </View>
-              <View style={styles.summaryTextContainer}>
-                <Text style={styles.summaryLabel}>{t('mobileNumber')}</Text>
-                <Text style={styles.summaryValue}>
-                  {/* {summary.dial}  */}
-                  {formatLocal(summary.localNumber)}
-                </Text>
-              </View>
-              <TouchableOpacity onPress={onEditNumber}>
-                <Ionicons name="create-outline" size={scale.hp(2.5)} color="#FFFFFF" />
-              </TouchableOpacity>
             </View>
-            
-            <View style={styles.summaryRow}>
-              <View style={styles.summaryIcon}>
-                <Ionicons name="cube-outline" size={scale.hp(2.5)} color="#FFFFFF" />
-              </View>
-              <View style={styles.summaryTextContainer}>
-                <Text style={styles.summaryLabel}>{t('selectedPlan')}</Text>
-                <Text style={styles.summaryValue}>
-                  {product.productName?.en || product.productName}
-                </Text>
-              </View>
-            </View>
-            
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>{t('totalAmount')}</Text>
-              <Text style={styles.totalAmount}>${product.totalAmountInUSD} {t('usd')}</Text>
-            </View>
-          </View>
-        </View>
+          )}
+        </>
       )}
     </View>
   );
@@ -394,6 +618,42 @@ const styles = StyleSheet.create({
     marginTop: scale.hp(2.5),
     marginBottom: scale.hp(1.5),
     marginLeft: scale.wp(4),
+  },
+  
+  prefixIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E3F2FD',
+    marginHorizontal: scale.wp(4),
+    marginTop: scale.hp(1),
+    marginBottom: scale.hp(1),
+    padding: scale.wp(3),
+    borderRadius: scale.hp(1.5),
+    borderWidth: 1,
+    borderColor: '#BBDEFB',
+  },
+  prefixIconContainer: {
+    width: scale.wp(10),
+    height: scale.wp(10),
+    borderRadius: scale.wp(5),
+    backgroundColor: '#2196F3',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: scale.wp(3),
+  },
+  prefixTextContainer: {
+    flex: 1,
+  },
+  prefixLabel: {
+    fontSize: scale.hp(1.5),
+    color: '#1976D2',
+    fontWeight: '500',
+    marginBottom: scale.hp(0.5),
+  },
+  prefixValue: {
+    fontSize: scale.hp(1.8),
+    color: '#0D47A1',
+    fontWeight: '600',
   },
   
   searchContainer: {
@@ -510,6 +770,26 @@ const styles = StyleSheet.create({
   productNameActive: {
     color: '#CD0202',
   },
+  
+  operatorInfoContainer: {
+    marginBottom: scale.hp(1),
+  },
+  operatorTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(205, 2, 2, 0.1)',
+    paddingHorizontal: scale.wp(2.5),
+    paddingVertical: scale.hp(0.6),
+    borderRadius: scale.hp(1),
+    alignSelf: 'flex-start',
+  },
+  operatorTagText: {
+    fontSize: scale.hp(1.5),
+    color: '#CD0202',
+    fontWeight: '500',
+    marginLeft: scale.wp(1),
+  },
+  
   productDescription: {
     fontSize: scale.hp(1.7),
     color: '#666',
@@ -601,6 +881,10 @@ const styles = StyleSheet.create({
   listContainer: {
     paddingVertical: scale.hp(1),
     paddingBottom: scale.hp(5),
+  },
+  
+  selectedProductContainer: {
+    marginTop: scale.hp(1),
   },
   
   skeletonList: {

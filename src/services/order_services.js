@@ -28,11 +28,11 @@ export const activateBundleByCustomer = async (payload = {}) => {
     console.log("🔄 Activating bundle for customer with payload:", payload);
     
     const response = await api.post(`/bundle/customer`, payload);
-    console.log("✅ Bundle activation response:", response.data);
+    console.log("Bundle activation response:", response.data);
     
     return response.data;
   } catch (error) {
-    console.error("❌ Bundle activation error:", error);
+    console.error("Bundle activation error:", error);
     
 
     if (error.response) {
@@ -67,7 +67,6 @@ export const getCountries = () => {
   return api.get('/countries/customer').then((r) => r.data);
 };
 
-// Get Products for Customer
 export const getDataProductsCustomer = async (filters = {}) => {
   try {
     const params = new URLSearchParams();
@@ -86,12 +85,10 @@ export const getDataProductsCustomer = async (filters = {}) => {
   }
 };
 
-// Get Bundle Categories for Customer
 export const getBundleCategories = () => {
   return api.get('/product-categories/customer').then((r) => r.data);
 };
 
-// Get Bundle Types for Customer
 export const getBundleTypes = () => {
   return api.get('/product-types/customer').then((r) => r.data);
 };

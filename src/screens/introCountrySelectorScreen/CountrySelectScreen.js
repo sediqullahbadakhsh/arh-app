@@ -67,7 +67,6 @@ export default function CountrySelectScreen({ navigation }) {
     
     try {
       await changeLanguage(lang);
-      // Close modal after successful language change
       setTimeout(() => {
         setLanguageModalVisible(false);
       }, 500);
@@ -369,8 +368,23 @@ export default function CountrySelectScreen({ navigation }) {
         style={styles.full}
       >
         <View style={styles.mainContainer}>
-          <View style={styles.lottieContainer}>
+          {/* <View style={styles.lottieContainer}>
             <LottieView
+              ref={lottieRef}
+              source={require('../../../assets/lotties/logo6.json')}
+              autoPlay={true}
+              loop={true}
+              style={styles.lottieAnimation}
+              resizeMode="contain"
+            />
+          </View> */}
+         <View style={styles.lottieContainer}>
+           {/* <Image 
+                    source={require('../../../assets/images/logo3.png')} 
+                    style={styles.lottieAnimation}
+                    resizeMode="contain"
+                  /> */}
+           <LottieView
               ref={lottieRef}
               source={require('../../../assets/lotties/logo6.json')}
               autoPlay={true}
@@ -473,6 +487,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignSelf: 'center',
   },
+  //   lottieContainer: {
+  //   width: scale.wp(80),
+  //   marginTop: scale.hp(11),
+  //   marginBottom: scale.hp(5),
+  //   height: scale.hp(30),
+  //   alignItems: 'center',
+  //   justifyContent: 'center',
+  //   alignSelf: 'center',
+  // },
   lottieAnimation: {
     width: '100%',
     height: '100%',

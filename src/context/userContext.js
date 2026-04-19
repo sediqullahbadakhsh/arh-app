@@ -20,14 +20,14 @@ export const UserProvider = ({ children }) => {
 
          
           const freshUser = await profile(); 
- const userInfo = {
-      token: parsed.token,   // ✅ save token
-      role: freshUser?.data?.Role?.name,
-      roleId: parsed?.roleId,
-      id: freshUser?.data?.id,
-      username: freshUser?.data?.username,
-      language: freshUser?.data?.messageLanguage
-    };
+          const userInfo = {
+                token: parsed.token,   
+                role: freshUser?.data?.Role?.name,
+                roleId: parsed?.roleId,
+                id: freshUser?.data?.uid,
+                username: freshUser?.data?.username,
+                language: freshUser?.data?.messageLanguage
+              };
           console.log("this is user profile: ❤❤❤", freshUser)
 
           setUser(userInfo);

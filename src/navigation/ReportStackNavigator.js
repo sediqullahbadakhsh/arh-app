@@ -1,4 +1,3 @@
-// src/navigation/ReportStackNavigator.tsx
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import ReportsHome from "../screens/reports/ReportsHome";
@@ -14,7 +13,6 @@ export default function ReportStackNavigator() {
       <Stack.Screen name="ReportsHome" component={ReportsHome} />
       <Stack.Screen name="StatementReport" component={StatementReportScreen} />
 <Stack.Screen name="StatementDetail" component={StatementDetailScreen} />
-      {/* Reuse one generic list screen; pass type via params */}
       <Stack.Screen name="ReportList" component={ReportListScreen} />
     </Stack.Navigator>
   );

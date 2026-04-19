@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -42,38 +42,66 @@ const NotificationsScreen = () => {
     deleteNotification,
     isConnected,
     hasNotifications,
-    hasUnreadNotifications
+    hasUnreadNotifications,
+    syncNow
   } = useNotifications();
 
-  const goBack = () => {
+  useEffect(() => {
+    console.log('📱 NotificationsScreen - Current state:', {
+      notificationsCount: notifications.length,
+      unreadCount,
+      loading,
+      error: error?.substring(0, 50),
+      isConnected
+    });
+    
+    if (notifications.length > 0) {
+      console.log('First notification sample:', {
+        id: notifications[0].id,
+        title: notifications[0].title,
+        description: notifications[0].description,
+        isRead: notifications[0].isRead,
+        createdAt: notifications[0].createdAt
+      });
+    }
+  }, [notifications, unreadCount, loading, error, isConnected]);
+
+  const goBack = useCallback(() => {
     navigation.goBack();
-  };
+  }, [navigation]);
 
   const onRefresh = useCallback(async () => {
+    console.log('Manual refresh triggered');
     setRefreshing(true);
-    await refreshNotifications();
-    setRefreshing(false);
-  }, [refreshNotifications]);
+    try {
+      await refreshNotifications();
+    } catch (err) {
+      console.error('❌ Refresh error:', err);
+      Alert.alert(t('error'), t('failedToRefresh'));
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refreshNotifications, t]);
 
   const handleNotificationPress = useCallback(async (notification) => {
     try {
-      // Store the notification first
+      const notificationId = notification.id || notification.data?.id;
+      
+      console.log('Notification pressed:', notificationId, notification.title);
+      
       setSelectedNotification(notification);
       setDetailModalVisible(true);
-
-      // Mark as read if needed (but don't wait for it)
-      if (!notification.isRead) {
+      if (!notification.isRead && notificationId) {
         setTimeout(async () => {
           try {
-            await markAsRead(notification.id);
+            await markAsRead(notificationId);
           } catch (err) {
-            console.error('Error marking as read in background:', err);
+            console.error('Error marking as read:', err);
           }
-        }, 100); // Small delay to ensure modal opens first
+        }, 100);
       }
     } catch (error) {
       console.error('Error handling notification press:', error);
-      // Still show the modal
       setSelectedNotification(notification);
       setDetailModalVisible(true);
     }
@@ -96,7 +124,7 @@ const NotificationsScreen = () => {
           onPress: async () => {
             const success = await markAllAsRead();
             if (success) {
-              Alert.alert(t('success'), t('allNotificationsMarkedRead'));
+              console.log('All notifications marked as read');
             } else {
               Alert.alert(t('error'), t('failedToMarkAllRead'));
             }
@@ -109,6 +137,8 @@ const NotificationsScreen = () => {
   const handleDeleteNotification = useCallback(async (notification, event) => {
     event?.stopPropagation?.();
     
+    const notificationId = notification.id || notification.data?.id;
+    
     Alert.alert(
       t('deleteNotification'),
       t('deleteNotificationConfirm'),
@@ -118,11 +148,13 @@ const NotificationsScreen = () => {
           text: t('delete'), 
           style: 'destructive',
           onPress: async () => {
-            const success = await deleteNotification(notification.id);
-            if (success) {
-              console.log('Notification deleted successfully:', notification.id);
-            } else {
-              Alert.alert(t('error'), t('failedToDeleteNotification'));
+            if (notificationId) {
+              const success = await deleteNotification(notificationId);
+              if (success) {
+                console.log('✅ Notification deleted:', notificationId);
+              } else {
+                Alert.alert(t('error'), t('failedToDeleteNotification'));
+              }
             }
           }
         }
@@ -130,7 +162,7 @@ const NotificationsScreen = () => {
     );
   }, [deleteNotification, t]);
 
-  const handleDeleteAllNotifications = () => {
+  const handleDeleteAllNotifications = useCallback(() => {
     if (!hasNotifications) {
       Alert.alert(t('info'), t('noNotificationsToDelete'));
       return;
@@ -144,26 +176,38 @@ const NotificationsScreen = () => {
         { 
           text: t('deleteAll'), 
           style: 'destructive',
-          onPress: () => {
-            Alert.alert(t('info'), t('deleteAllFunctionalityComing'));
+          onPress: async () => {
+            try {
+              Alert.alert(t('info'), t('deleteAllFunctionalityComing'));
+            } catch (error) {
+              Alert.alert(t('error'), t('failedToDeleteAll'));
+            }
           }
         }
       ]
     );
-  };
+  }, [hasNotifications, t]);
 
   const getNotificationTypeName = useCallback((notification) => {
     try {
       if (!notification) return 'system';
       
-      const notiType = notification.notificationType?.name || 
-                      notification.notiType ||
+      if (notification.notificationType?.name) {
+        const typeName = notification.notificationType.name;
+        if (typeof typeName === 'string') {
+          return typeName.toLowerCase();
+        } else if (typeof typeName === 'object' && typeName !== null) {
+          return (typeName.en || typeName.dr || typeName.ps || 'system').toLowerCase();
+        }
+      }
+      
+      const notiType = notification.notiType || 
+                      notification.notificationType?.id ||
+                      notification.type ||
                       'system';
 
       if (typeof notiType === 'string') {
         return notiType.toLowerCase();
-      } else if (typeof notiType === 'object' && notiType !== null) {
-        return (notiType.en || notiType.ar || 'system').toLowerCase();
       }
       
       return 'system';
@@ -180,6 +224,7 @@ const NotificationsScreen = () => {
       case 'success':
       case 'transaction_success':
       case 'payment_success':
+      case 'order successful':
         return { name: 'checkmark-circle', color: '#4CAF50' };
       
       case 'security':
@@ -195,6 +240,8 @@ const NotificationsScreen = () => {
       case 'system':
       case 'system_update':
       case 'maintenance':
+      case 'stock transferred to your wallet':
+      case 'loan stock request accepted':
         return { name: 'construct', color: '#9C27B0' };
       
       case 'transaction':
@@ -213,6 +260,7 @@ const NotificationsScreen = () => {
       
       case 'error':
       case 'failure':
+      case 'order failed':
         return { name: 'close-circle', color: '#f44336' };
       
       default:
@@ -238,6 +286,7 @@ const NotificationsScreen = () => {
       
       return time.toLocaleDateString();
     } catch (error) {
+      console.log('Error formatting time:', error);
       return t('recently');
     }
   }, [t]);
@@ -246,15 +295,15 @@ const NotificationsScreen = () => {
     try {
       if (!notification) return t('notification');
       
+      if (notification.title && typeof notification.title === 'object') {
+        return notification.title.en || notification.title.dr || notification.title.ps || t('notification');
+      }
+      
       if (typeof notification.title === 'string') {
         return notification.title;
       }
       
-      if (notification.title && typeof notification.title === 'object') {
-        return notification.title.en || notification.title.ar || t('notification');
-      }
-      
-      return notification.title || t('notification');
+      return t('notification');
     } catch (error) {
       console.log('Error getting notification title:', error);
       return t('notification');
@@ -264,16 +313,15 @@ const NotificationsScreen = () => {
   const getNotificationDescription = useCallback((notification) => {
     try {
       if (!notification) return '';
+      if (notification.description && typeof notification.description === 'object') {
+        return notification.description.en || notification.description.dr || notification.description.ps || '';
+      }
       
       if (typeof notification.description === 'string') {
         return notification.description;
       }
       
-      if (notification.description && typeof notification.description === 'object') {
-        return notification.description.en || notification.description.ar || '';
-      }
-      
-      return notification.description || '';
+      return '';
     } catch (error) {
       console.log('Error getting notification description:', error);
       return '';
@@ -281,15 +329,24 @@ const NotificationsScreen = () => {
   }, []);
 
   const renderNotificationItem = useCallback(({ item, index }) => {
-    const icon = getNotificationIcon(item);
-    const title = getNotificationTitle(item);
-    const description = getNotificationDescription(item);
+    const notification = {
+      id: item.id || item.data?.id,
+      title: getNotificationTitle(item),
+      description: getNotificationDescription(item),
+      isRead: item.isRead === true,
+      createdAt: item.createdAt || item.data?.createdAt,
+      notiType: item.notiType || item.notificationType?.name,
+      notificationType: item.notificationType,
+      from: item.from || item.data?.from || 'YES Charge',
+    };
+    
+    const icon = getNotificationIcon(notification);
     
     return (
       <TouchableOpacity 
         style={[
           notificationStyles.notificationItem, 
-          !item.isRead && notificationStyles.unreadItem,
+          !notification.isRead && notificationStyles.unreadItem,
           index === 0 && notificationStyles.firstItem
         ]}
         onPress={() => handleNotificationPress(item)}
@@ -303,22 +360,22 @@ const NotificationsScreen = () => {
           <View style={notificationStyles.notificationText}>
             <Text style={[
               notificationStyles.notificationTitle,
-              !item.isRead && notificationStyles.unreadTitle
-            ]}>
-              {title}
+              !notification.isRead && notificationStyles.unreadTitle
+            ]} numberOfLines={2}>
+              {notification.title}
             </Text>
-            {description ? (
+            {notification.description ? (
               <Text style={notificationStyles.notificationMessage} numberOfLines={2}>
-                {description}
+                {notification.description}
               </Text>
             ) : null}
             <Text style={notificationStyles.notificationTime}>
-              {formatTime(item.createdAt)}
+              {formatTime(notification.createdAt)}
             </Text>
           </View>
           
           <View style={notificationStyles.notificationActions}>
-            {!item.isRead && (
+            {!notification.isRead && (
               <View style={notificationStyles.unreadIndicator}>
                 <View style={notificationStyles.unreadDot} />
               </View>
@@ -335,7 +392,7 @@ const NotificationsScreen = () => {
         </View>
       </TouchableOpacity>
     );
-  }, [getNotificationIcon, getNotificationTitle, getNotificationDescription, formatTime, handleNotificationPress, handleDeleteNotification]);
+  }, [getNotificationTitle, getNotificationDescription, getNotificationIcon, formatTime, handleNotificationPress, handleDeleteNotification]);
 
   const renderEmptyState = useCallback(() => (
     <View style={notificationStyles.emptyState}>
@@ -363,7 +420,7 @@ const NotificationsScreen = () => {
       <Ionicons name="alert-circle-outline" size={64} color="#f44336" />
       <Text style={notificationStyles.errorStateText}>{t('failedToLoadNotifications')}</Text>
       <Text style={notificationStyles.errorStateSubText}>
-        {error || t('checkConnectionAndTryAgain')}
+        {error?.substring(0, 100) || t('checkConnectionAndTryAgain')}
       </Text>
       <TouchableOpacity 
         style={notificationStyles.retryButton} 
@@ -383,13 +440,17 @@ const NotificationsScreen = () => {
 
   const handleNotificationAction = useCallback((notification) => {
     setDetailModalVisible(false);
+    setSelectedNotification(null);
     
     const notiType = getNotificationTypeName(notification);
+    
+    console.log('📍 Navigating for notification type:', notiType);
     
     switch (notiType) {
       case 'transaction':
       case 'payment':
       case 'transaction_success':
+      case 'order successful':
         navigation.navigate('TransactionHistory');
         break;
       case 'promotion':
@@ -406,6 +467,15 @@ const NotificationsScreen = () => {
       case 'warning':
         navigation.navigate('Topup');
         break;
+      case 'stock transferred to your wallet':
+      case 'loan stock request accepted':
+        navigation.navigate('Wallet');
+        break;
+      case 'order failed':
+      case 'error':
+      case 'failure':
+        navigation.navigate('TransactionHistory');
+        break;
       default:
         console.log('No specific action for notification type:', notiType);
         break;
@@ -416,9 +486,73 @@ const NotificationsScreen = () => {
     setSettingsModalVisible(true);
   }, []);
 
+  const handleSyncPress = useCallback(async () => {
+    if (!isConnected) {
+      Alert.alert(t('offline'), t('connectToSyncNotifications'));
+      return;
+    }
+    
+    setRefreshing(true);
+    try {
+      const success = await syncNow();
+      if (success) {
+        console.log('✅ Sync completed successfully');
+      } else {
+        Alert.alert(t('error'), t('syncFailed'));
+      }
+    } catch (err) {
+      console.error('❌ Sync error:', err);
+      Alert.alert(t('error'), t('syncFailed'));
+    } finally {
+      setRefreshing(false);
+    }
+  }, [isConnected, syncNow, t]);
+
+  const renderContent = () => {
+    if (error && !loading) {
+      return renderErrorState();
+    }
+
+    if (loading && !refreshing) {
+      return renderLoadingState();
+    }
+
+    if (!error && !loading && notifications.length === 0) {
+      return renderEmptyState();
+    }
+
+    return (
+      <FlatList
+        data={notifications}
+        renderItem={renderNotificationItem}
+        keyExtractor={(item, index) => {
+          const id = item.id || item.data?.id || `notification-${index}`;
+          return id.toString();
+        }}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh} 
+            colors={[Colors.primary]}
+            tintColor={Colors.primary}
+          />
+        }
+        contentContainerStyle={
+          notifications.length === 0 
+            ? notificationStyles.emptyList 
+            : notificationStyles.listContainer
+        }
+        showsVerticalScrollIndicator={false}
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+      />
+    );
+  };
+
   return (
     <SafeAreaView style={notificationStyles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      <StatusBar barStyle="light-content" backgroundColor="#9F0901" />
       
       <NotificationsHeader 
         title={t('notifications')} 
@@ -427,9 +561,10 @@ const NotificationsScreen = () => {
         unreadCount={unreadCount}
         onMarkAllAsRead={handleMarkAllAsRead}
         hasUnreadNotifications={hasUnreadNotifications}
+        onSync={handleSyncPress}
       />
       
-      {!isConnected && (
+      {/* {!isConnected && (
         <View style={notificationStyles.connectionStatus}>
           <Ionicons name="cloud-offline" size={16} color="#fff" />
           <Text style={notificationStyles.connectionStatusText}>{t('offline')}</Text>
@@ -437,38 +572,9 @@ const NotificationsScreen = () => {
             {t('showingCachedNotifications')}
           </Text>
         </View>
-      )}
+      )} */}
 
-      {error && !loading && renderErrorState()}
-
-      {loading && !refreshing && renderLoadingState()}
-
-      {!error && !loading && (
-        <FlatList
-          data={notifications}
-          renderItem={renderNotificationItem}
-          keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
-          refreshControl={
-            <RefreshControl 
-              refreshing={refreshing} 
-              onRefresh={onRefresh} 
-              colors={[Colors.primary]}
-              tintColor={Colors.primary}
-            />
-          }
-          ListEmptyComponent={!loading ? renderEmptyState() : null}
-          contentContainerStyle={
-            notifications.length === 0 
-              ? notificationStyles.emptyList 
-              : notificationStyles.listContainer
-          }
-          showsVerticalScrollIndicator={false}
-          initialNumToRender={10}
-          maxToRenderPerBatch={10}
-          windowSize={5}
-          extraData={notifications} // This ensures re-render when notifications change
-        />
-      )}
+      {renderContent()}
 
       <SettingModal 
         visible={settingsModalVisible} 

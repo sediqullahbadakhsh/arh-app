@@ -66,7 +66,10 @@ export default function ReverseStockScreen({ navigation }) {
     const fetchDownlineAgents = async () => {
       try {
         const res = await getDownlineAgents(user?.id);
-        setAgents(res?.data || []);
+        const agentsData = Array.isArray(res?.data) ? res.data : [];
+        console.log("Fetched agents:", agentsData.length, "items");
+        console.log("First agent sample:", agentsData[0]);
+        setAgents(agentsData);
       } catch (error) {
         console.error("Error fetching downline agents:", error);
         Alert.alert(t('common.error'), t('reverseStock.failedToLoadAgents'));
@@ -139,7 +142,7 @@ export default function ReverseStockScreen({ navigation }) {
       setLoading(true);
       
       const formData = new FormData();
-      formData.append("reversedFrom", agent.id);
+      formData.append("reversedFrom", agent.id || agent.uid);
       formData.append("amount", amountText);
       formData.append("comment", commentText);
       formData.append("type", "downline");
@@ -185,6 +188,37 @@ export default function ReverseStockScreen({ navigation }) {
   const AgentPickerModal = () => {
     const { t } = useTranslation();
     
+    // Safe key extractor function
+    const getAgentKey = (item, index) => {
+      return item?.uid || item?.id || `agent-${index}`;
+    };
+
+    const renderAgentItem = ({ item, index }) => (
+      <TouchableOpacity
+        style={styles.agentItem}
+        onPress={() => {
+          setAgent(item);
+          setAgentPickerOpen(false);
+          setSearchQuery("");
+        }}
+        activeOpacity={0.7}
+      >
+        <View style={styles.agentAvatar}>
+          <Ionicons name="person-circle-outline" size={24} color={Colors.primary} />
+        </View>
+        <View style={styles.agentInfo}>
+          <Text style={styles.agentName}>{item.user?.username || 'Unknown Agent'}</Text>
+          <Text style={styles.agentPhone}>{item.user?.mobileNumber || 'No phone'}</Text>
+          <Text style={styles.agentCommission}>
+            {t('reverseStock.commission')}: {item.commissionRateDetails?.percentage || item.commission_rate || 0}%
+          </Text>
+        </View>
+        {(item.uid === agent?.uid || item.id === agent?.id) && (
+          <Ionicons name="checkmark-circle" size={24} color={Colors.primary} />
+        )}
+      </TouchableOpacity>
+    );
+
     return (
       <Modal
         visible={agentPickerOpen}
@@ -237,32 +271,8 @@ export default function ReverseStockScreen({ navigation }) {
 
             <FlatList
               data={filteredAgents}
-              keyExtractor={(item) => item.id.toString()}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.agentItem}
-                  onPress={() => {
-                    setAgent(item);
-                    setAgentPickerOpen(false);
-                    setSearchQuery("");
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.agentAvatar}>
-                    <Ionicons name="person-circle-outline" size={24} color={Colors.primary} />
-                  </View>
-                  <View style={styles.agentInfo}>
-                    <Text style={styles.agentName}>{item.user?.username}</Text>
-                    <Text style={styles.agentPhone}>{item.user?.mobileNumber}</Text>
-                    <Text style={styles.agentCommission}>
-                      {t('reverseStock.commission')}: {item.commissionRateDetails?.percentage || item.commission_rate || 0}%
-                    </Text>
-                  </View>
-                  {item.id === agent?.id && (
-                    <Ionicons name="checkmark-circle" size={24} color={Colors.primary} />
-                  )}
-                </TouchableOpacity>
-              )}
+              keyExtractor={getAgentKey}
+              renderItem={renderAgentItem}
               ItemSeparatorComponent={() => <View style={styles.agentSeparator} />}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.modalContent}
@@ -298,7 +308,7 @@ export default function ReverseStockScreen({ navigation }) {
           <Text style={styles.title}>{t('reverseStock.requestSubmittedTitle')}</Text>
 
           <View style={styles.successDetails}>
-            <DetailRow label={`${t('agent')}:`} value={`${agent?.user?.username} (${agent?.user?.mobileNumber})`} />
+            <DetailRow label={`${t('agent')}:`} value={`${agent?.user?.username || 'Unknown'} (${agent?.user?.mobileNumber || 'No phone'})`} />
             <DetailRow label={`${t('date')}:`} value={new Date().toLocaleString()} />
             <DetailRow label={`${t('reverseStock.requestId')}:`} value={txId} />
             <DetailRow label={`${t('amount')}:`} value={fmtAFN(amount)} />
@@ -357,8 +367,8 @@ export default function ReverseStockScreen({ navigation }) {
                             <Ionicons name="person-circle-outline" size={20} color={Colors.primary} />
                           </View>
                           <View style={{ flex: 1 }}>
-                            <Text style={styles.dropdownText}>{agent.user?.username}</Text>
-                            <Text style={styles.dropdownSubtext}>{agent.user?.mobileNumber}</Text>
+                            <Text style={styles.dropdownText}>{agent.user?.username || 'Unknown Agent'}</Text>
+                            <Text style={styles.dropdownSubtext}>{agent.user?.mobileNumber || 'No phone'}</Text>
                             <Text style={styles.dropdownCommission}>
                               {t('reverseStock.commission')}: {agent.commissionRateDetails?.percentage || agent.commission_rate || 0}%
                             </Text>
@@ -446,8 +456,8 @@ export default function ReverseStockScreen({ navigation }) {
                 </Text>
 
                 <View style={styles.confirmCard}>
-                  <DetailRow label={t('agent')} value={`${agent?.user?.username}`} />
-                  <DetailRow label={t('mobileNumber')} value={agent?.user?.mobileNumber} />
+                  <DetailRow label={t('agent')} value={`${agent?.user?.username || 'Unknown Agent'}`} />
+                  <DetailRow label={t('mobileNumber')} value={agent?.user?.mobileNumber || 'No phone'} />
                   <DetailRow label={t('reverseStock.reverseAmount')} value={fmtAFN(amount)} />
                   {commentText && (
                     <DetailRow label={t('reverseStock.comment')} value={commentText} />

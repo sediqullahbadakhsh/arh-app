@@ -214,7 +214,7 @@ export default function WalletScreen({ navigation }) {
           {item.key === "commission" && (
             <TouchableOpacity
               onPress={() =>
-                navigation.navigate("TransferToPrimary1", {
+                navigation.navigate("TransferToPrimary", {
                   balance: item.balance,
                 })
               }
@@ -228,7 +228,7 @@ export default function WalletScreen({ navigation }) {
                 end={{ x: 1, y: 0 }}
               >
                 <Text style={styles.transferButtonText}>
-                  {t('transferToPrimary')}
+                  {t('wallet.transferToPrimary')}
                 </Text>
                 <Ionicons
                   name="arrow-forward"

@@ -25,6 +25,8 @@ import SocialMerchantScreen from "../screens/socialScreenMerchant/SocialScreen";
 import SocialActivationMerchantScreen from "../screens/socialScreenMerchant/SocialActivationScreen";
 import ProfileScreenMerchant from "../screens/ProfileScreenMerchant";
 import PurchaseStockScreen from "../screens/stockRequest/stockRequestScreen";
+import TransferToPrimaryScreen from "../screens/TransferToPrimaryScreen";
+import TransferToPrimarySuccess from "../screens/TransferToPrimarySuccess";
 
 
 
@@ -46,6 +48,14 @@ export default function HomeStackNavigator() {
       <Stack.Screen name="TopupProducts" component={ProductSelectScreen} />
       <Stack.Screen name="Data" component={DataFlowScreen} />
       <Stack.Screen name="DataMerchant" component={DataFlowScreenMerchant} />
+        <Stack.Screen
+              name="TransferToPrimary"
+              component={TransferToPrimaryScreen}
+            />
+            <Stack.Screen
+              name="TransferToPrimarySuccess"
+              component={TransferToPrimarySuccess}
+            />
                  <Stack.Screen 
               name="AllTransactions" 
               component={AllTransactionsScreen} 

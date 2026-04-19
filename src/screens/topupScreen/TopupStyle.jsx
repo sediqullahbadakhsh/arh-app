@@ -1,4 +1,4 @@
-
+//topupScreen/TopupStyle.jsx
 import { StyleSheet } from 'react-native';
 import { Colors } from "../../theme/colors";
 import { scale } from '../../utils/normalizeSize';
@@ -18,6 +18,93 @@ const TopUpStyles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: scale.hp(1.5),
   },
+  amountsGrid: {
+  marginTop: 8,
+  marginBottom: 20,
+},
+amountRow: {
+  backgroundColor: '#FFFFFF',
+  borderRadius: 16,
+  padding: 16,
+  marginBottom: 12,
+  borderWidth: 2,
+  borderColor: '#F0F0F0',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.04,
+  shadowRadius: 4,
+  elevation: 1,
+  transform: [{ scale: 1 }],
+},
+amountRowSelected: {
+  borderColor: Colors.primary,
+  backgroundColor: '#FFFBF9',
+  shadowColor: Colors.primary,
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.12,
+  shadowRadius: 8,
+  elevation: 3,
+},
+amountRowContent: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+},
+amountMainInfo: {
+  flex: 1,
+},
+amountValue: {
+  fontSize: 18,
+  fontWeight: '700',
+  color: Colors.textPrimary,
+  marginBottom: 8,
+},
+amountValueSelected: {
+  color: Colors.primary,
+},
+amountBadges: {
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  gap: 6,
+},
+amountBadge: {
+  backgroundColor: '#F0F7FF',
+  paddingHorizontal: 8,
+  paddingVertical: 4,
+  borderRadius: 8,
+},
+amountBadgeText: {
+  fontSize: 11,
+  color: '#0066CC',
+  fontWeight: '600',
+},
+amountDetails: {
+  alignItems: 'flex-end',
+  marginLeft: 12,
+},
+amountDetailItem: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginBottom: 4,
+},
+amountDetailLabel: {
+  fontSize: 12,
+  color: Colors.textSecondary,
+  marginRight: 4,
+  fontWeight: '500',
+},
+amountDetailValue: {
+  fontSize: 14,
+  fontWeight: '600',
+  color: Colors.textPrimary,
+},
+amountDetailValueSelected: {
+  color: Colors.primary,
+  fontWeight: '700',
+},
+selectedIndicator: {
+  marginLeft: 12,
+},
   statusIcon: {
     width: scale.wp(20),
     height: scale.wp(20),
@@ -371,41 +458,79 @@ const TopUpStyles = StyleSheet.create({
     color: Colors.white,
   },
   quickAmountsList: {
-    marginTop: scale.hp(1.5),
-  },
-  quickAmountItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: scale.hp(2),
-    borderRadius: scale.hp(1.5),
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E8E8E8',
-    marginBottom: scale.hp(1.25),
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: scale.hp(0.125) },
-    shadowOpacity: 0.05,
-    shadowRadius: scale.hp(0.25),
-    elevation: 1,
-  },
-  quickAmountItemSelected: {
-    backgroundColor: '#FFF5F5',
-    borderColor: Colors.primary,
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: scale.hp(0.25) },
-    shadowOpacity: 0.1,
-    shadowRadius: scale.hp(0.5),
-    elevation: 2,
-  },
+  marginTop: scale.hp(1.5),
+},
 
-   amountInfo: {
-    display: 'flex',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    width: '100%',
-  },
+quickAmountItem: {
+  width: "100%",
+  marginBottom: scale.hp(1.25),
+  borderRadius: scale.hp(1.5),
+  overflow: 'hidden',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: scale.hp(0.125) },
+  shadowOpacity: 0.05,
+  shadowRadius: scale.hp(0.25),
+  elevation: 1,
+},
+
+quickAmountTouchable: {
+  width: '100%',
+  padding: scale.hp(2),
+},
+
+amountInfo: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  width: '100%',
+},
+
+amountValue: {
+  fontSize: scale.hp(2.25),
+  fontWeight: '600',
+  color: Colors.textPrimary,
+  fontFamily: 'dmsansRegular',
+},
+
+amountValueSelected: {
+  color: Colors.primary,
+},
+
+amountSubtext: {
+  fontSize: scale.hp(2),
+  color: Colors.white,
+  fontFamily: 'dmsansRegular',
+  padding: scale.hp(1.5),
+  backgroundColor: '#E48D08',
+  borderRadius: scale.hp(6.25),
+},
+
+amountSubtextSelected: {
+  color: Colors.primaryLight,
+},
+
+usdEquivalentContainer: {
+  marginRight: scale.wp(2),
+},
+
+usdEquivalentText: {
+  fontSize: scale.hp(1.75),
+  color: Colors.textSecondary,
+},
+
+skeletonAmountItem: {
+  width: "100%",
+  height: scale.hp(8),
+  borderRadius: scale.hp(1.5),
+  backgroundColor: '#F5F5F5',
+  marginBottom: scale.hp(1.25),
+},
+ amountInfo: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  width: '100%',
+},
   amountValue: {
     fontSize: scale.hp(2.25),
     fontWeight: '600',
@@ -439,7 +564,7 @@ const TopUpStyles = StyleSheet.create({
     marginBottom: scale.hp(1.5),
   },
   quickAmountsGrid: {
-    flexDirection: 'row',
+    flexDirection: 'col',
     flexWrap: 'wrap',
     gap: scale.wp(2.5),
     marginBottom: scale.hp(2.5),
@@ -586,6 +711,13 @@ const TopUpStyles = StyleSheet.create({
   contactInfo: {
     flex: 1,
   },
+   quickAmountsContainer: {
+    marginTop: 20,
+  },
+  
+
+ 
+  
   contactName: {
     fontSize: scale.hp(2),
     fontWeight: '500',

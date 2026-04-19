@@ -62,27 +62,25 @@ const ORDER_STATUS = {
   PENDING: 'pending'
 };
 
-// Create Query Client
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      cacheTime: 10 * 60 * 1000, // 10 minutes
+      staleTime: 5 * 60 * 1000,
+      cacheTime: 10 * 60 * 1000,
       retry: 1,
     },
   },
 });
 
-
 const QUERY_KEYS = {
   COUNTRIES: ['countries'],
   BUNDLE_CATEGORIES: ['bundle-categories'],
   BUNDLE_TYPES: ['bundle-types'],
-  DATA_PRODUCTS: (countryId, categoryId, typeId) => ['data-products', countryId, categoryId, typeId],
+  DATA_PRODUCTS: (countryId, categoryId, typeId, prefix) => ['data-products', countryId, categoryId, typeId, prefix],
   ORDER_STATUS: (orderId) => ['order-status', orderId],
   CONTACTS: ['contacts'],
 };
-
 
 const useCountries = () => {
   const { t } = useTranslation();
@@ -93,7 +91,7 @@ const useCountries = () => {
       const response = await getCountries();
       return response?.data || [];
     },
-    staleTime: 30 * 60 * 1000, // 30 minutes
+    staleTime: 30 * 60 * 1000,
     onError: (error) => {
       console.error('Error fetching countries:', error);
       Alert.alert(t('common.error'), t('failedToLoadCountries'));
@@ -123,26 +121,51 @@ const useBundleTypes = () => {
   });
 };
 
-const useDataProducts = (countryId, categoryId, typeId, enabled = false) => {
+const useDataProducts = (countryId, categoryId, typeId, prefix, enabled = false) => {
   const { t } = useTranslation();
   
   return useQuery({
-    queryKey: QUERY_KEYS.DATA_PRODUCTS(countryId, categoryId, typeId),
+    queryKey: QUERY_KEYS.DATA_PRODUCTS(countryId, categoryId, typeId, prefix),
     queryFn: async () => {
       if (!countryId) return [];
-      
+
+      console.log('useDataProducts - Building filter with:', { 
+        countryId, 
+        categoryId, 
+        typeId, 
+        prefix,
+        prefixType: typeof prefix,
+        prefixValue: prefix
+      });
+
       const filter = {
         countryId,
-        productCategoryId: categoryId,
-        productTypeId: typeId,
         productFor: "BUNDLE"
       };
+      
+      if (categoryId) {
+        filter.productCategoryId = categoryId;
+      }
+      
+      if (typeId) {
+        filter.productTypeId = typeId;
+      }
+      
+      // Make sure prefix is included
+      if (prefix) {
+        filter.prefix = prefix;
+        console.log('✅ Added prefix to filter:', prefix);
+      } else {
+        console.log('⚠️ No prefix in filter');
+      }
+      
+      console.log('📦 Final filter being sent to getDataProducts:', filter); 
       
       const response = await getDataProducts(filter);
       return response?.data || [];
     },
     enabled: !!countryId && enabled,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
     onError: (error) => {
       console.error('Error fetching data products:', error);
       Alert.alert(t('common.error'), t('failedToLoadProducts'));
@@ -389,6 +412,7 @@ const ContactsModal = ({
                   style={styles.contactItem}
                   onPress={() => {
                     if (item.phoneNumbers && item.phoneNumbers.length > 0) {
+                      // Pass the phone number to handleContactSelect
                       handleContactSelect(item.phoneNumbers[0].number);
                     }
                   }}
@@ -526,6 +550,236 @@ const CountriesModal = ({
   );
 };
 
+
+const normalizePhoneNumber = (phoneNumber, countryDialCode) => {
+  if (!phoneNumber) return "";
+  
+  let normalized = phoneNumber.replace(/\D/g, "");
+  
+
+  const countryCodes = [
+    '+1', '1',  
+    '+44', '44', 
+    '+91', '91', 
+    '+92', '92', 
+    '+93', '93',
+    '+94', '94',
+    '+95', '95', 
+    '+96', '96', 
+    '+97', '97', 
+    '+98', '98', 
+    '+99', '99',
+    '+20', '20', 
+    '+30', '30', 
+    '+31', '31', 
+    '+32', '32',
+    '+33', '33', 
+    '+34', '34', 
+    '+39', '39', 
+    '+40', '40', 
+    '+41', '41', 
+    '+43', '43', 
+    '+45', '45', 
+    '+46', '46', 
+    '+47', '47', 
+    '+48', '48', 
+    '+49', '49', 
+    '+51', '51', 
+    '+52', '52', 
+    '+53', '53', 
+    '+54', '54', 
+    '+55', '55', 
+    '+56', '56', 
+    '+57', '57', 
+    '+58', '58', 
+    '+60', '60', 
+    '+61', '61', 
+    '+62', '62', 
+    '+63', '63', 
+    '+64', '64', 
+    '+65', '65', 
+    '+66', '66', 
+    '+81', '81', 
+    '+82', '82', 
+    '+84', '84', 
+    '+86', '86', 
+    '+90', '90', 
+    '+212', '212', 
+    '+213', '213', 
+    '+216', '216', 
+    '+218', '218', 
+    '+220', '220', 
+    '+221', '221', 
+    '+222', '222', 
+    '+223', '223', 
+    '+224', '224', 
+    '+225', '225', 
+    '+226', '226', 
+    '+227', '227', 
+    '+228', '228', 
+    '+229', '229', 
+    '+230', '230', 
+    '+231', '231', 
+    '+232', '232', 
+    '+233', '233', 
+    '+234', '234', 
+    '+235', '235', 
+    '+236', '236', 
+    '+237', '237', 
+    '+238', '238', 
+    '+239', '239', 
+    '+240', '240', 
+    '+241', '241', 
+    '+242', '242', 
+    '+243', '243', 
+    '+244', '244', 
+    '+245', '245', 
+    '+246', '246', 
+    '+247', '247', 
+    '+248', '248',
+    '+249', '249',
+    '+250', '250',
+    '+251', '251',
+    '+252', '252',
+    '+253', '253',
+    '+254', '254',
+    '+255', '255',
+    '+256', '256',
+    '+257', '257',
+    '+258', '258',
+    '+260', '260', // Zambia
+    '+261', '261', // Madagascar
+    '+262', '262', // Reunion
+    '+263', '263', // Zimbabwe
+    '+264', '264', // Namibia
+    '+265', '265', // Malawi
+    '+266', '266', // Lesotho
+    '+267', '267', // Botswana
+    '+268', '268', // Eswatini
+    '+269', '269', // Comoros
+    '+290', '290', // Saint Helena
+    '+291', '291', // Eritrea
+    '+297', '297', // Aruba
+    '+298', '298', // Faroe Islands
+    '+299', '299', // Greenland
+    '+350', '350', // Gibraltar
+    '+351', '351', // Portugal
+    '+352', '352', // Luxembourg
+    '+353', '353', // Ireland
+    '+354', '354', // Iceland
+    '+355', '355', // Albania
+    '+356', '356', // Malta
+    '+357', '357', // Cyprus
+    '+358', '358', // Finland
+    '+359', '359', // Bulgaria
+    '+370', '370', // Lithuania
+    '+371', '371', // Latvia
+    '+372', '372', // Estonia
+    '+373', '373', // Moldova
+    '+374', '374', // Armenia
+    '+375', '375', // Belarus
+    '+376', '376', // Andorra
+    '+377', '377', // Monaco
+    '+378', '378', // San Marino
+    '+379', '379', // Vatican City
+    '+380', '380', // Ukraine
+    '+381', '381', // Serbia
+    '+382', '382', // Montenegro
+    '+383', '383', // Kosovo
+    '+385', '385', // Croatia
+    '+386', '386', // Slovenia
+    '+387', '387', // Bosnia and Herzegovina
+    '+389', '389', // North Macedonia
+    '+420', '420', // Czech Republic
+    '+421', '421', // Slovakia
+    '+423', '423', // Liechtenstein
+    '+500', '500', // Falkland Islands
+    '+501', '501', // Belize
+    '+502', '502', // Guatemala
+    '+503', '503', // El Salvador
+    '+504', '504', // Honduras
+    '+505', '505', // Nicaragua
+    '+506', '506', // Costa Rica
+    '+507', '507', // Panama
+    '+508', '508', // Saint Pierre and Miquelon
+    '+509', '509', // Haiti
+    '+590', '590', // Guadeloupe
+    '+591', '591', // Bolivia
+    '+592', '592', // Guyana
+    '+593', '593', // Ecuador
+    '+594', '594', // French Guiana
+    '+595', '595', // Paraguay
+    '+596', '596', // Martinique
+    '+597', '597', // Suriname
+    '+598', '598', // Uruguay
+    '+599', '599', // Caribbean Netherlands
+    '+670', '670', // East Timor
+    '+672', '672', // Australian External Territories
+    '+673', '673', // Brunei
+    '+674', '674', // Nauru
+    '+675', '675', // Papua New Guinea
+    '+676', '676', // Tonga
+    '+677', '677', // Solomon Islands
+    '+678', '678', // Vanuatu
+    '+679', '679', // Fiji
+    '+680', '680', // Palau
+    '+681', '681', // Wallis and Futuna
+    '+682', '682', // Cook Islands
+    '+683', '683', // Niue
+    '+685', '685', // Samoa
+    '+686', '686', // Kiribati
+    '+687', '687', // New Caledonia
+    '+688', '688', // Tuvalu
+    '+689', '689', // French Polynesia
+    '+690', '690', // Tokelau
+    '+691', '691', // Micronesia
+    '+692', '692', // Marshall Islands
+    '+850', '850', // North Korea
+    '+852', '852', // Hong Kong
+    '+853', '853', // Macau
+    '+855', '855', // Cambodia
+    '+856', '856', // Laos
+    '+880', '880', // Bangladesh
+    '+886', '886', // Taiwan
+    '+960', '960', // Maldives
+    '+961', '961', // Lebanon
+    '+962', '962', // Jordan
+    '+963', '963', // Syria
+    '+964', '964', // Iraq
+    '+965', '965', // Kuwait
+    '+966', '966', // Saudi Arabia
+    '+967', '967', // Yemen
+    '+968', '968', // Oman
+    '+970', '970', // Palestine
+    '+971', '971', // United Arab Emirates
+    '+972', '972', // Israel
+    '+973', '973', // Bahrain
+    '+974', '974', // Qatar
+    '+975', '975', // Bhutan
+    '+976', '976', // Mongolia
+    '+977', '977', // Nepal
+    '+992', '992', // Tajikistan
+    '+993', '993', // Turkmenistan
+    '+994', '994', // Azerbaijan
+    '+995', '995', // Georgia
+    '+996', '996', // Kyrgyzstan
+    '+998', '998', // Uzbekistan
+  ];
+  
+  const sortedCountryCodes = [...countryCodes].sort((a, b) => b.length - a.length);
+  
+  for (const code of sortedCountryCodes) {
+    if (normalized.startsWith(code)) {
+      normalized = normalized.substring(code.length);
+      break;
+    }
+  }
+  
+  normalized = normalized.replace(/^0+/, '');
+  
+  return normalized;
+};
+
 function DataFlowScreenMerchant({ navigation }) {
   const { t } = useTranslation();
   const { user } = useAuth?.() || { user: null };
@@ -541,6 +795,7 @@ function DataFlowScreenMerchant({ navigation }) {
   const [countryOpen, setCountryOpen] = useState(false);
   const [countrySearch, setCountrySearch] = useState('');
   const [localNumber, setLocalNumber] = useState("");
+  const [mobilePrefix, setMobilePrefix] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedType, setSelectedType] = useState(null);
   const [product, setProduct] = useState(null);
@@ -557,7 +812,6 @@ function DataFlowScreenMerchant({ navigation }) {
   const dial = DIAL_CODES[country?.countryCode] || "";
   const operator = guessOperator(country?.countryCode, localNumber.replace(/\D/g, ""));
 
-
   const { data: countries = [], isLoading: loadingCountries } = useCountries();
   const { data: bundleCategories = [], isLoading: loadingCategories } = useBundleCategories();
   const { data: bundleTypes = [], isLoading: loadingTypes } = useBundleTypes();
@@ -568,19 +822,69 @@ function DataFlowScreenMerchant({ navigation }) {
   } = useContacts();
   const activateBundleMutation = useActivateBundle();
   
-  // Enable products query only when country is selected and we're on PRODUCT step
-  const shouldFetchProducts = step >= BASE_STEPS.PRODUCT && !!country?.id;
+
+ const shouldFetchProducts = step >= BASE_STEPS.PRODUCT && !!country?.id;
   const { 
     data: products = [], 
-    isLoading: loadingProducts 
+    isLoading: loadingProducts,
+    refetch: refetchProducts 
   } = useDataProducts(
     country?.id, 
     selectedCategory?.id, 
     selectedType?.id, 
+    mobilePrefix,
     shouldFetchProducts
   );
 
-  // Clean up polling on unmount
+const handleNumberChange = (number) => {
+  console.log('📱 Number changed to:', number);
+  setLocalNumber(number);
+  
+  if (number.length >= 2) {
+    const prefix = number.substring(0, 2);
+    console.log('📞 Setting prefix to:', prefix);
+    setMobilePrefix(prefix);
+  } else {
+    console.log('❌ Clearing prefix');
+    setMobilePrefix(null);
+  }
+};
+
+
+  const filteredProducts = useMemo(() => {
+    if (!products || products.length === 0) return [];
+    
+    let filtered = products;
+    
+
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      filtered = filtered.filter((p) =>
+        p.productName?.toLowerCase().includes(q) ||
+        p.description?.toLowerCase().includes(q) ||
+        p.price?.toString().includes(q)
+      );
+    }
+    
+
+    if (mobilePrefix) {
+      filtered = filtered.filter((p) => {
+
+        
+        if (!p.prefix && p.prefix !== 0) return true;
+        
+        if (Array.isArray(p.prefix)) {
+          return p.prefix.includes(parseInt(mobilePrefix));
+        }
+        
+        return p.prefix.toString() === mobilePrefix;
+      });
+    }
+    
+    return filtered;
+  }, [products, search, mobilePrefix]);
+
+
   useEffect(() => {
     return () => {
       if (pollingRef.current) {
@@ -589,7 +893,7 @@ function DataFlowScreenMerchant({ navigation }) {
     };
   }, []);
 
-  // Set initial country from cached data
+
   useEffect(() => {
     if (countries.length > 0 && !country) {
       const afgCountry = countries.find((c) => c.countryCode === "AF") || countries[0];
@@ -597,24 +901,24 @@ function DataFlowScreenMerchant({ navigation }) {
     }
   }, [countries]);
 
-  // Set initial category and type from cached data
-  useEffect(() => {
-    if (bundleCategories.length > 0 && !selectedCategory) {
-      setSelectedCategory(bundleCategories[0]);
-    }
-    if (bundleTypes.length > 0 && !selectedType) {
-      setSelectedType(bundleTypes[0]);
-    }
-  }, [bundleCategories, bundleTypes]);
 
-  // Lottie animation
+
+
+  useEffect(() => {
+    if (mobilePrefix && product) {
+      if (product.prefix && product.prefix.toString() !== mobilePrefix) {
+        setProduct(null);
+      }
+    }
+  }, [mobilePrefix, product]);
+
+
   useEffect(() => {
     if (lottieRef.current && (orderStatus === ORDER_STATUS.SUCCEEDED || orderStatus === ORDER_STATUS.FAILED)) {
       lottieRef.current.play();
     }
   }, [orderStatus]);
 
-  // Animation effects
   useEffect(() => {
     if (contactsModalVisible) {
       Animated.timing(contactsSlideAnim, {
@@ -652,7 +956,6 @@ function DataFlowScreenMerchant({ navigation }) {
     }
   }, [countryOpen]);
 
-  // Filter contacts locally
   const filteredContacts = useMemo(() => {
     if (!searchQuery) return contacts;
     return contacts.filter(contact =>
@@ -662,17 +965,6 @@ function DataFlowScreenMerchant({ navigation }) {
       )
     );
   }, [searchQuery, contacts]);
-
-  // Filter products locally
-  const filteredProducts = useMemo(() => {
-    if (!search.trim()) return products;
-    const q = search.trim().toLowerCase();
-    return products.filter((p) =>
-      p.productName?.toLowerCase().includes(q) ||
-      p.description?.toLowerCase().includes(q) ||
-      p.price?.toString().includes(q)
-    );
-  }, [products, search]);
 
   const canNext =
     (step === BASE_STEPS.COUNTRY && !!country) ||
@@ -700,13 +992,12 @@ function DataFlowScreenMerchant({ navigation }) {
 
   const jumpTo = (i) => setStep(i);
 
-  // Reset local number and product when country changes
   useEffect(() => {
     setLocalNumber("");
+    setMobilePrefix(null);
     setProduct(null);
   }, [country?.countryCode]);
 
-  // Polling function for order status (same as TopUpFlow)
   const startPollingOrderStatus = async (orderId) => {
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
@@ -781,7 +1072,6 @@ function DataFlowScreenMerchant({ navigation }) {
           message: res.message || t('bundleActivationInitiated'),
         });
         
-        // Start polling for status updates (same as TopUpFlow)
         if (res.orderId) {
           await startPollingOrderStatus(res.orderId);
         }
@@ -817,17 +1107,40 @@ function DataFlowScreenMerchant({ navigation }) {
       return;
     }
 
-    let number = phoneNumber.replace(/\D/g, "");
-
-    const countryDialCode = country?.dialCode?.replace('+', '') || DIAL_CODES[country?.countryCode]?.replace('+', '') || '';
-    if (countryDialCode && number.startsWith(countryDialCode)) {
-      number = number.substring(countryDialCode.length);
+    console.log("Selected contact phone number:", phoneNumber);
+    
+    let normalizedNumber = normalizePhoneNumber(phoneNumber, dial.replace('+', ''));
+    
+    console.log("Normalized number after removing country codes:", normalizedNumber);
+    
+    normalizedNumber = normalizedNumber.replace(/^0+/, '');
+    
+    console.log("Final normalized number:", normalizedNumber);
+    
+    if (normalizedNumber.length < 7) {
+      Alert.alert(t('error'), t('invalidPhoneNumberLength'));
+      return;
     }
-    number = number.replace(/^0+/, '');
-    setLocalNumber(number);
+    
+    setLocalNumber(normalizedNumber);
+    
+    if (normalizedNumber.length >= 2) {
+      const prefix = normalizedNumber.substring(0, 2);
+      setMobilePrefix(prefix);
+      console.log("Extracted prefix:", prefix);
+    } else {
+      setMobilePrefix(null);
+    }
+    
     setContactsModalVisible(false);
     setSearchQuery('');
-  }, [country]);
+    
+    Alert.alert(
+      t('success'),
+      t('contactNumberImportedSuccessfully', { number: normalizedNumber }),
+      [{ text: t('ok') }]
+    );
+  }, [dial, t]);
 
   const resetFlow = () => {
     setOrderStatus(null);
@@ -835,6 +1148,8 @@ function DataFlowScreenMerchant({ navigation }) {
     setStep(0);
     setProduct(null);
     setLocalNumber("");
+    setMobilePrefix(null);
+    setSearch("");
     
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
@@ -846,7 +1161,6 @@ function DataFlowScreenMerchant({ navigation }) {
     }
   };
 
-  // Status Helper Functions
   const getStatusMessage = useCallback(() => {
     switch (orderStatus) {
       case ORDER_STATUS.QUEUED:
@@ -981,11 +1295,12 @@ function DataFlowScreenMerchant({ navigation }) {
                 dial={dial}
                 country={country}
                 value={localNumber}
-                onChange={setLocalNumber}
+                onChange={handleNumberChange}
                 localNumber={localNumber}
                 operator={operator}
                 onEditCountry={() => jumpTo(BASE_STEPS.COUNTRY)}
                 openContacts={() => setContactsModalVisible(true)}
+                onPrefixChange={setMobilePrefix}
               />
             )}
 
@@ -1006,6 +1321,7 @@ function DataFlowScreenMerchant({ navigation }) {
                 onEditNumber={() => jumpTo(BASE_STEPS.NUMBER)}
                 summary={{ dial, localNumber, product }}
                 loading={loadingProducts}
+                mobilePrefix={mobilePrefix}
               />
             )}
 
@@ -1070,7 +1386,6 @@ function DataFlowScreenMerchant({ navigation }) {
     </SafeAreaView>
   );
 }
-
 
 export default function DataFlowScreenMerchantWrapper({ navigation }) {
   return (

@@ -1,4 +1,3 @@
-// services/slabType.js
 import apiClient from "./apiClient";
 
 export const getAllSlabTypesForMerchant = async (params = {}) => {

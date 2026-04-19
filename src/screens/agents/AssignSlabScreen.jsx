@@ -12,6 +12,7 @@ import {
   RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Colors } from "../../theme/colors";
 import ServiceHeader from "../../components/ServiceHeader";
 import { getAllSlabsForMerchant, setComission } from "../../services/merchantApi";
@@ -19,21 +20,69 @@ import CreateSlabModal from "../../components/modals/CreateSlabModal";
 import SlabListModal from "../../components/modals/SlabListModal";
 import { scale } from "../../utils/normalizeSize";
 import { useTranslation } from "react-i18next";
+import { useFocusEffect } from "@react-navigation/native";
 
 export default function AssignCommissionSlabScreen({ navigation, route }) {
   const { t } = useTranslation();
-  const { agent, refreshAgentList } = route.params || {};
-  const [slabs, setSlabs] = useState([]);
+  const queryClient = useQueryClient();
+  const { agent } = route.params || {};
   const [selectedSlab, setSelectedSlab] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [loadingSlabs, setLoadingSlabs] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [listModalVisible, setListModalVisible] = useState(false);
 
-  useEffect(() => {
-    fetchSlabs();
-  }, []);
+  const {
+    data: slabs = [],
+    isLoading: loadingSlabs,
+    isError: slabsError,
+    refetch: refetchSlabs,
+    isRefetching: isRefetchingSlabs,
+  } = useQuery({
+    queryKey: ['slabs', 'agent'],
+    queryFn: async () => {
+      const res = await getAllSlabsForMerchant({ 
+        slabFor: "agent",
+        limit: 100 
+      });
+      return res?.data || [];
+    },
+    staleTime: 5 * 60 * 1000,
+    cacheTime: 10 * 60 * 1000,
+  });
+
+  const assignSlabMutation = useMutation({
+    mutationFn: async (slabId) => {
+      return await setComission(agent.user.uid, { slabId });
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries(['agents']);
+      queryClient.invalidateQueries(['agent', agent?.user?.uid]);
+      
+      Alert.alert(
+        t('success'), 
+        t('slabAssignedSuccessfully'),
+        [
+          {
+            text: t('ok'),
+            onPress: () => navigation.goBack()
+          }
+        ]
+      );
+    },
+    onError: (error) => {
+      console.error("Assign slab error:", error);
+      Alert.alert(
+        t('error'), 
+        error.response?.data?.error || t('failedToAssignSlab')
+      );
+    },
+  });
+
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log("AssignCommissionSlabScreen focused, refetching slabs...");
+      refetchSlabs();
+    }, [refetchSlabs])
+  );
 
   useEffect(() => {
     if (agent?.commissionRateDetails) {
@@ -41,26 +90,8 @@ export default function AssignCommissionSlabScreen({ navigation, route }) {
     }
   }, [agent]);
 
-  const fetchSlabs = async () => {
-    try {
-      setLoadingSlabs(true);
-      const res = await getAllSlabsForMerchant({ 
-        slabFor: "agent",
-        limit: 100 
-      });
-      setSlabs(res?.data || []);
-    } catch (error) {
-      console.error("Fetch slabs error:", error);
-      Alert.alert(t('error'), t('failedToLoadSlabs'));
-    } finally {
-      setLoadingSlabs(false);
-      setRefreshing(false);
-    }
-  };
-
   const handleRefresh = () => {
-    setRefreshing(true);
-    fetchSlabs();
+    refetchSlabs();
   };
 
   const handleAssignSlab = async () => {
@@ -69,32 +100,16 @@ export default function AssignCommissionSlabScreen({ navigation, route }) {
       return;
     }
 
-    try {
-      setLoading(true);
-      await setComission(agent.user.id, { slabId: selectedSlab.id });
-      
-      Alert.alert(
-        t('success'), 
-        t('slabAssignedSuccessfully'),
-        [
-          {
-            text: t('ok'),
-            onPress: () => {
-              refreshAgentList?.();
-              navigation.goBack();
-            }
-          }
-        ]
-      );
-    } catch (error) {
-      console.error("Assign slab error:", error);
-      Alert.alert(
-        t('error'), 
-        error.response?.data?.error || t('failedToAssignSlab')
-      );
-    } finally {
-      setLoading(false);
-    }
+    assignSlabMutation.mutate(selectedSlab.id);
+  };
+
+  const handleSlabCreated = () => {
+    setCreateModalVisible(false);
+    refetchSlabs();
+  };
+
+  const handleSlabUpdated = () => {
+    refetchSlabs();
   };
 
   const isCurrentlyAssignedSlab = (slab) => {
@@ -146,21 +161,19 @@ export default function AssignCommissionSlabScreen({ navigation, route }) {
     );
   };
 
-  const handleSlabCreated = () => {
-    setCreateModalVisible(false);
-    fetchSlabs();
-  };
-
-  const handleSlabUpdated = () => {
-    fetchSlabs();
-  };
-
   if (!agent) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
         <ServiceHeader title={t('assignSlab')} onBack={() => navigation.goBack()} />
         <View style={styles.errorContainer}>
-          <Text>{t('agentInfoNotAvailable')}</Text>
+          <Ionicons name="alert-circle-outline" size={48} color="#DC2626" />
+          <Text style={styles.errorText}>{t('agentInfoNotAvailable')}</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.retryButtonText}>{t('goBack')}</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
@@ -174,7 +187,7 @@ export default function AssignCommissionSlabScreen({ navigation, route }) {
         style={styles.container}
         refreshControl={
           <RefreshControl
-            refreshing={refreshing}
+            refreshing={isRefetchingSlabs}
             onRefresh={handleRefresh}
             colors={[Colors.primary]}
           />
@@ -184,6 +197,7 @@ export default function AssignCommissionSlabScreen({ navigation, route }) {
           <TouchableOpacity
             style={[styles.actionButton, styles.createButton]}
             onPress={() => setCreateModalVisible(true)}
+            disabled={assignSlabMutation.isLoading}
           >
             <Ionicons name="add-circle-outline" size={20} color="#fff" />
             <Text style={styles.actionButtonText}>{t('createSlab')}</Text>
@@ -192,6 +206,7 @@ export default function AssignCommissionSlabScreen({ navigation, route }) {
           <TouchableOpacity
             style={[styles.actionButton, styles.listButton]}
             onPress={() => setListModalVisible(true)}
+            disabled={assignSlabMutation.isLoading}
           >
             <Ionicons name="list-outline" size={20} color="#fff" />
             <Text style={styles.actionButtonText}>{t('slabList')}</Text>
@@ -247,7 +262,18 @@ export default function AssignCommissionSlabScreen({ navigation, route }) {
             </Text>
           </View>
           
-          {loadingSlabs ? (
+          {slabsError ? (
+            <View style={styles.errorState}>
+              <Ionicons name="alert-circle-outline" size={48} color="#DC2626" />
+              <Text style={styles.errorText}>{t('failedToLoadSlabs')}</Text>
+              <TouchableOpacity
+                style={styles.retryButton}
+                onPress={() => refetchSlabs()}
+              >
+                <Text style={styles.retryButtonText}>{t('retry')}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : loadingSlabs ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={Colors.primary} />
               <Text style={styles.loadingText}>{t('loadingCommissionSlabs')}</Text>
@@ -283,12 +309,12 @@ export default function AssignCommissionSlabScreen({ navigation, route }) {
         <TouchableOpacity
           style={[
             styles.assignButton,
-            (!selectedSlab || loading) && styles.assignButtonDisabled,
+            (!selectedSlab || assignSlabMutation.isLoading) && styles.assignButtonDisabled,
           ]}
           onPress={handleAssignSlab}
-          disabled={!selectedSlab || loading}
+          disabled={!selectedSlab || assignSlabMutation.isLoading}
         >
-          {loading ? (
+          {assignSlabMutation.isLoading ? (
             <View style={styles.loadingButton}>
               <ActivityIndicator size="small" color="#fff" />
               <Text style={styles.assignButtonText}>{t('assigning')}</Text>
@@ -328,8 +354,30 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    padding: scale.hp(5.2),
   },
-  marginBottom: scale.hp(38.7),
+  errorState: {
+    alignItems: "center",
+    padding: scale.hp(5.2),
+  },
+  errorText: {
+    fontSize: scale.hp(1.8),
+    color: Colors.textSecondary,
+    marginTop: scale.hp(1.55),
+    textAlign: "center",
+  },
+  retryButton: {
+    marginTop: scale.hp(2.1),
+    backgroundColor: Colors.primary,
+    paddingHorizontal: scale.wp(4.9),
+    paddingVertical: scale.hp(1.3),
+    borderRadius: scale.hp(1.05),
+  },
+  retryButtonText: {
+    color: "#fff",
+    fontSize: scale.hp(1.8),
+    fontWeight: "600",
+  },
   actionButtons: {
     flexDirection: "row",
     gap: scale.wp(2.9),
@@ -493,19 +541,6 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: scale.hp(1.55),
     fontWeight: "600",
-  },
-  slabDescription: {
-    fontSize: scale.hp(1.55),
-    color: Colors.textSecondary,
-    marginBottom: scale.hp(1.05),
-    lineHeight: scale.hp(2.1),
-  },
-  slabMeta: {
-    gap: scale.hp(0.25),
-  },
-  metaText: {
-    fontSize: scale.hp(1.4),
-    color: Colors.textSecondary,
   },
   currentBadge: {
     flexDirection: "row",

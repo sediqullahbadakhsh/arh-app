@@ -614,6 +614,8 @@
     "to": "ته",
     "thankYou": "د yes Charge د کارولو لپاره مننه",
     "transactionId": "د معاملې پېژند",
+    "minimumAmountIs": "د دې آپریټر لپاره لږ تر لږه چارج {{amount}} افغانۍ دی",
+    "minimumAmountNote": "د دې آپریټر لپاره لږ تر لږه چارج {{amount}} افغانۍ دی",
     "dateTime": "نېټه او وخت",
     "receiver": "ترلاسه کوونکی",
     "service": "خدمت",

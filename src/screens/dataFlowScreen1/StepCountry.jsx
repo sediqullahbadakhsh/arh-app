@@ -6,9 +6,18 @@ import { DIAL_CODES } from "../../constants/dialing";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../theme/colors";
 import { useTranslation } from "react-i18next";
-function StepCountry({ country, onOpen }) {
+function StepCountry({ country, onOpen, loading }) {
   const [isFocused, setIsFocused] = useState(false);
   const {t} = useTranslation();
+  
+  if (loading) {
+    return (
+      <View style={{ marginTop: 16, alignItems: 'center', justifyContent: 'center', height: 60 }}>
+        <Text style={DataStyles.sectionTitle}>{t('loadingCountries')}</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={{ marginTop: 16 }}>
       <Text style={DataStyles.sectionTitle}>{t('selectCountryYouWantToSend')}</Text>

@@ -63,8 +63,8 @@ export const getAllGamesProductsForUser = (filters = {}) => {
   }
   
  
-  params.append('page', filters.page || 1);
-  params.append('limit', filters.limit || 10);
+  params.append('page', filters.page || 2);
+  params.append('limit', filters.limit || 50);
   
   return api.get(`/product/customer/games?${params.toString()}`)
     .then((response) => {
@@ -87,8 +87,9 @@ export const getAllSocailProductsForUser = (filters = {}) => {
   }
   
  
-  params.append('page', filters.page || 1);
-  params.append('limit', filters.limit || 10);
+  params.append('page', filters.page || 2);
+  params.append('limit', filters.limit || 50);
+
   
   return api.get(`/product/customer/social?${params.toString()}`)
     .then((response) => {
@@ -295,7 +296,6 @@ export const getDataProducts = (filters = {}) => {
   const params = new URLSearchParams();
   params.append('lang', 'en');
   
-
   if (filters.countryId) {
     params.append('countryId', filters.countryId);
   }
@@ -308,12 +308,61 @@ export const getDataProducts = (filters = {}) => {
   if (filters.search) {
     params.append('search', filters.search);
   }
+
+  if (filters.prefix) {
+    params.append('prefix', filters.prefix);  
+  }
   
+  params.append('_t', Date.now());
+  params.append('fresh', 'true');
+    if (options.page) {
+    params.append('page', options.page || 2);
+  }
+  params.append('limit', options.limit || 50);
+
+  
+  return api.get(`/product/agent/data?${params.toString()}`).then((r) => r?.data);
+};
+
+export const getTopupProductsCustomer = (filters = {}, options = {}) => {
+  const params = new URLSearchParams();
+  params.append('lang', 'en');
 
   params.append('_t', Date.now());
   params.append('fresh', 'true');
+  params.append('nocache', '1');
   
-  return api.get(`/product/agent/data?${params.toString()}`).then((r) => r?.data);
+
+  if (filters.countryId) {
+    params.append('countryId', filters.countryId);
+  }
+  if (filters.productCategoryId) {
+    params.append('productCategoryId', filters.productCategoryId);
+  }
+  if (filters.search) {
+    params.append('search', filters.search);
+  }
+  if (filters.productTypeId) {
+    params.append('productTypeId', filters.productTypeId);
+  }
+  
+
+  params.append('real_time', 'true');
+  params.append('skip_cache', 'true');
+    if (options.page) {
+    params.append('page', options.page || 2);
+  }
+  params.append('limit', options.limit || 50);
+
+  
+  const url = `/product/customer/topup?${params.toString()}`;
+  
+  console.log(`Fetching fresh products from: ${url}`);
+  
+  return api.get(url).then((r) => {
+    console.log(`Products fetched: ${r?.data?.data?.length || 0} items`);
+    return r?.data;
+  });
 };
 
 export const getDataProductsCustomer = (filters = {}, options = {}) => {
@@ -341,6 +390,11 @@ export const getDataProductsCustomer = (filters = {}, options = {}) => {
 
   params.append('real_time', 'true');
   params.append('skip_cache', 'true');
+   if (options.page) {
+    params.append('page', options.page || 2);
+  }
+  params.append('limit', options.limit || 50);
+
   
   const url = `/product/customer/data?${params.toString()}`;
   
@@ -430,13 +484,10 @@ export const getStockInOut = ()=>{
 export const getChildUsers = (parentUserId, filterParams = {}) => {
 
   console.log("this is filte robject form getCHildUsers: ", filterParams)
-  // Create query params dynamically
   const params = new URLSearchParams();
 
-  // Always add lang
   params.append("lang", "en");
 
-  // Add filters only if they exist
   if (filterParams.status) {
     params.append("status", filterParams.status);
   }
@@ -444,9 +495,6 @@ export const getChildUsers = (parentUserId, filterParams = {}) => {
   if (filterParams.search) {
     params.append("search", filterParams.search);
   }
-  // params.append("status", "inactive")
-
-  // Build final URL
   const queryString = params.toString();
   const url = `/merchant-downlineAgent/${parentUserId}?${queryString}`;
 

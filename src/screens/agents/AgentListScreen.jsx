@@ -11,6 +11,7 @@ import {
   Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Colors } from "../../theme/colors";
 import ServiceHeader from "../../components/ServiceHeader";
 import { useUser } from "../../context/userContext";
@@ -20,12 +21,13 @@ import SuccessModal from "../../components/modals/SuccessModal";
 import ErrorModal from "../../components/modals/ErrorModal";
 import { scale } from "../../utils/normalizeSize";
 import { useTranslation } from "react-i18next";
+import { useFocusEffect } from "@react-navigation/native";
 
 const FILTERS = ["All", "Active", "Inactive"];
 
-// Skeleton Loader Component
 const AgentListSkeleton = () => {
   const [animation] = useState(new Animated.Value(0));
+  const skeletonItems = useMemo(() => Array(5).fill(null), []);
 
   useEffect(() => {
     const animate = () => {
@@ -53,35 +55,16 @@ const AgentListSkeleton = () => {
   });
 
   return (
-    <View style={styles.skeletonContainer}>
-      {/* Filter Pills Skeleton */}
-      <View style={styles.skeletonPillsRow}>
-        {[...Array(3)].map((_, index) => (
-          <View key={`pill-${index}`} style={styles.skeletonPill} />
-        ))}
-      </View>
-
-      {/* Search Row Skeleton */}
-      <View style={styles.skeletonSearchRow}>
-        <View style={styles.skeletonSearchBox} />
-        <View style={styles.skeletonAddButton} />
-      </View>
-
-      {/* Results Info Skeleton */}
-      <View style={styles.skeletonResultsInfo}>
-        <View style={styles.skeletonResultsText} />
-      </View>
-
-      {/* Agent Cards Skeleton */}
-      {[...Array(5)].map((_, index) => (
+    <FlatList
+      data={skeletonItems}
+      keyExtractor={(_, index) => `skeleton-${index}`}
+      renderItem={({ index }) => (
         <Animated.View 
-          key={`agent-${index}`} 
           style={[
             styles.skeletonCard,
             { backgroundColor: backgroundColorInterpolate }
           ]}
         >
-          {/* Card Header */}
           <View style={styles.skeletonCardHeader}>
             <View style={styles.skeletonAgentInfo}>
               <View style={styles.skeletonName} />
@@ -91,7 +74,6 @@ const AgentListSkeleton = () => {
             <View style={styles.skeletonStatusPill} />
           </View>
 
-          {/* Card Body */}
           <View style={styles.skeletonCardBody}>
             <View style={styles.skeletonDetailRow}>
               <View style={styles.skeletonDetailLabel} />
@@ -111,7 +93,6 @@ const AgentListSkeleton = () => {
             </View>
           </View>
 
-          {/* Card Actions */}
           <View style={styles.skeletonCardActions}>
             <View style={styles.skeletonActionButton} />
             <View style={styles.skeletonActionButton} />
@@ -119,20 +100,38 @@ const AgentListSkeleton = () => {
             <View style={styles.skeletonActionButton} />
           </View>
         </Animated.View>
-      ))}
-    </View>
+      )}
+      ListHeaderComponent={
+        <View style={styles.skeletonContainer}>
+          <View style={styles.skeletonPillsRow}>
+            {[...Array(3)].map((_, index) => (
+              <View key={`pill-${index}`} style={styles.skeletonPill} />
+            ))}
+          </View>
+
+          <View style={styles.skeletonSearchRow}>
+            <View style={styles.skeletonSearchBox} />
+            <View style={styles.skeletonAddButton} />
+          </View>
+
+          <View style={styles.skeletonResultsInfo}>
+            <View style={styles.skeletonResultsText} />
+          </View>
+        </View>
+      }
+      ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ paddingBottom: 24 }}
+    />
   );
 };
 
 export default function AgentListScreen({ navigation }) {
   const { user } = useUser();
   const { t } = useTranslation();
-  
+  const queryClient = useQueryClient();
   const [filter, setFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
-  const [childUsers, setChildUsers] = useState([]);
-  const [refreshing, setRefreshing] = useState(false);
-  const [loading, setLoading] = useState(true);
   
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -140,42 +139,73 @@ export default function AgentListScreen({ navigation }) {
   const [agentToDelete, setAgentToDelete] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  const refreshAgentList = async () => {
-    try {
-      setRefreshing(true);
-      await loadAgents();
-    } catch (error) {
-      console.error("Refresh error:", error);
-    } finally {
-      setRefreshing(false);
-    }
-  };
+  // Fetch agents using TanStack Query
+  const {
+    data: agentsData = [],
+    isLoading,
+    isError,
+    error,
+    refetch,
+    isRefetching,
+  } = useQuery({
+    queryKey: ['agents', user?.uid, filter, searchQuery],
+    queryFn: async () => {
+      if (!user?.id) {
+        console.log("User ID not available, skipping fetch");
+        return [];
+      }
 
-  const loadAgents = async () => {
-    try {
-      setLoading(true);
       const filterParams = {};
-
       if (filter !== "All") {
         filterParams.status = filter.toLowerCase();
       }
-
       if (searchQuery) {
         filterParams.search = searchQuery;
       }
 
-      const res = await getChildUsers(user?.id, filterParams);
-      setChildUsers(res?.data || []);
-    } catch (error) {
-      console.error("Load agents error:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+      console.log("Fetching agents with params:", { userId: user.id, filterParams });
+      const response = await getChildUsers(user.id, filterParams);
+      return response?.data || [];
+    },
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+    cacheTime: 10 * 60 * 1000,
+    retry: 2,
+    refetchOnWindowFocus: false,
+  });
 
-  useEffect(() => {
-    loadAgents();
-  }, [filter, searchQuery]);
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log("AgentListScreen focused, refetching data...");
+      if (user?.id) {
+        refetch();
+      }
+      return () => {
+        console.log("AgentListScreen unfocused");
+      };
+    }, [user?.id, refetch])
+  );
+
+  const deleteMutation = useMutation({
+    mutationFn: async (agentId) => {
+      return await deleteDownlineAgent(agentId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['agents']);
+      setShowDeleteModal(false);
+      setShowSuccessModal(true);
+      setAgentToDelete(null);
+    },
+    onError: (error) => {
+      console.error("Delete mutation error:", error);
+      setShowDeleteModal(false);
+      setShowErrorModal(true);
+      setAgentToDelete(null);
+    },
+    onSettled: () => {
+      setDeleteLoading(false);
+    },
+  });
 
   const handleDeleteAgent = (agent) => {
     setAgentToDelete(agent);
@@ -185,20 +215,8 @@ export default function AgentListScreen({ navigation }) {
   const confirmDelete = async () => {
     if (!agentToDelete) return;
     
-    try {
-      setDeleteLoading(true);
-      await deleteDownlineAgent(agentToDelete.user.id);
-      setShowDeleteModal(false);
-      setShowSuccessModal(true);
-      refreshAgentList();
-    } catch (error) {
-      console.error("Delete error:", error);
-      setShowDeleteModal(false);
-      setShowErrorModal(true);
-    } finally {
-      setDeleteLoading(false);
-      setAgentToDelete(null);
-    }
+    setDeleteLoading(true);
+    deleteMutation.mutate(agentToDelete.user.uid);
   };
 
   const cancelDelete = () => {
@@ -215,11 +233,18 @@ export default function AgentListScreen({ navigation }) {
   };
 
   const handleAssignSlab = (agent) => {
-    navigation.navigate("AssignSlab", { agent, refreshAgentList });
+    navigation.navigate("AssignSlab", { 
+      agent, 
+      onSuccess: () => {
+        queryClient.invalidateQueries(['agents']);
+      }
+    });
   };
 
   const filteredData = useMemo(() => {
-    return childUsers.filter(agent => {
+    if (!agentsData || agentsData.length === 0) return [];
+    
+    return agentsData.filter(agent => {
       const matchesSearch = searchQuery ? 
         agent.user?.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         agent.user?.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -231,24 +256,16 @@ export default function AgentListScreen({ navigation }) {
       
       return matchesSearch && matchesFilter;
     });
-  }, [childUsers, searchQuery, filter]);
-
-  const getStatusLabel = (status) => {
-    switch (status) {
-      case 'active': return t('active');
-      case 'inactive': return t('inactive');
-      default: return status;
-    }
-  };
+  }, [agentsData, searchQuery, filter]);
 
   const renderItem = ({ item }) => {
     return (
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <View style={styles.agentInfo}>
-            <Text style={styles.name}>{item?.user?.username}</Text>
-            <Text style={styles.email}>{item?.user?.email}</Text>
-            <Text style={styles.phone}>{item?.user?.mobileNumber}</Text>
+            <Text style={styles.name}>{item?.user?.username || t('noName')}</Text>
+            <Text style={styles.email}>{item?.user?.email || t('noEmail')}</Text>
+            <Text style={styles.phone}>{item?.user?.mobileNumber || t('noPhone')}</Text>
           </View>
           <StatusPill status={item?.user?.status} />
         </View>
@@ -285,7 +302,10 @@ export default function AgentListScreen({ navigation }) {
         <View style={styles.cardActions}>
           <TouchableOpacity
             style={[styles.actionBtn, styles.viewBtn]}
-            onPress={() => navigation.navigate("AgentView", { agent: item, refreshAgentList })}
+            onPress={() => navigation.navigate("AgentView", { 
+              agent: item, 
+              onSuccess: () => queryClient.invalidateQueries(['agents'])
+            })}
           >
             <Ionicons name="eye-outline" size={16} color={Colors.primary} />
             <Text style={[styles.actionText, styles.viewText]}>{t('view')}</Text>
@@ -293,7 +313,10 @@ export default function AgentListScreen({ navigation }) {
 
           <TouchableOpacity
             style={[styles.actionBtn, styles.editBtn]}
-            onPress={() => navigation.navigate("AgentEdit", { agent: item, refreshAgentList })}
+            onPress={() => navigation.navigate("AgentEdit", { 
+              agent: item, 
+              onSuccess: () => queryClient.invalidateQueries(['agents'])
+            })}
           >
             <Ionicons name="create-outline" size={16} color="#16A34A" />
             <Text style={[styles.actionText, styles.editText]}>{t('edit')}</Text>
@@ -310,7 +333,7 @@ export default function AgentListScreen({ navigation }) {
           <TouchableOpacity
             style={[styles.actionBtn, styles.deleteBtn]}
             onPress={() => handleDeleteAgent(item)}
-            disabled={deleteLoading}
+            disabled={deleteMutation.isLoading}
           >
             <Ionicons name="trash-outline" size={16} color="#DC2626" />
             <Text style={[styles.actionText, styles.deleteText]}>{t('delete')}</Text>
@@ -319,6 +342,43 @@ export default function AgentListScreen({ navigation }) {
       </View>
     );
   };
+
+  if (isLoading && !isRefetching) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
+        <ServiceHeader title={t('manageAgents')} />
+        <View style={styles.container}>
+          <AgentListSkeleton />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (isError) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
+        <ServiceHeader title={t('manageAgents')} />
+        <View style={styles.container}>
+          <View style={styles.emptyContainer}>
+            <Ionicons name="alert-circle-outline" size={48} color="#DC2626" />
+            <Text style={[styles.emptyText, { color: '#DC2626' }]}>
+              {t('errorLoadingAgents')}
+            </Text>
+            <Text style={styles.emptySubtext}>
+              {error?.message || t('unknownError')}
+            </Text>
+            <TouchableOpacity
+              style={[styles.addBtn, { marginTop: 20 }]}
+              onPress={() => refetch()}
+            >
+              <Ionicons name="refresh" size={20} color="#fff" />
+              <Text style={styles.addBtnText}>{t('retry')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white, paddingBottom: 90 }}>
@@ -346,7 +406,7 @@ export default function AgentListScreen({ navigation }) {
                 key={f}
                 onPress={() => setFilter(f)}
                 style={[styles.filterPill, btnStyle]}
-                disabled={loading}
+                disabled={isLoading}
               >
                 <Text style={[styles.filterPillText, textStyle]}>
                   {t(f.toLowerCase())}
@@ -366,7 +426,7 @@ export default function AgentListScreen({ navigation }) {
               placeholder={t('searchPlaceholder')}
               placeholderTextColor="#9E9E9E"
               autoCapitalize="none"
-              editable={!loading}
+              editable={!isLoading}
             />
             {searchQuery ? (
               <TouchableOpacity onPress={() => setSearchQuery("")}>
@@ -376,58 +436,54 @@ export default function AgentListScreen({ navigation }) {
           </View>
           <TouchableOpacity
             style={styles.addBtn}
-            onPress={() => navigation.navigate("AgentCreate", { refreshAgentList })}
-            disabled={loading}
+            onPress={() => navigation.navigate("AgentCreate", { 
+              onSuccess: () => queryClient.invalidateQueries(['agents'])
+            })}
+            disabled={isLoading}
           >
             <Ionicons name="add" size={20} color="#fff" />
             <Text style={styles.addBtnText}>{t('addAgent')}</Text>
           </TouchableOpacity>
         </View>
 
-        {loading && !refreshing ? (
-          <AgentListSkeleton />
-        ) : (
-          <>
-            <View style={styles.resultsInfo}>
-              <Text style={styles.resultsText}>
-                 {t('agentFound', { count: filteredData.length })}
-                {searchQuery ? ` ${t('for')} "${searchQuery}"` : ''}
-                {filter !== 'All' ? ` (${t(filter.toLowerCase())})` : ''}
+        <View style={styles.resultsInfo}>
+          <Text style={styles.resultsText}>
+            {t('agentFound', { count: filteredData.length })}
+            {searchQuery ? ` ${t('for')} "${searchQuery}"` : ''}
+            {filter !== 'All' ? ` (${t(filter.toLowerCase())})` : ''}
+          </Text>
+        </View>
+
+        <FlatList
+          data={filteredData}
+          keyExtractor={(item) => item.id || Math.random().toString()}
+          renderItem={renderItem}
+          ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 24 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefetching}
+              onRefresh={refetch}
+              colors={[Colors.primary]}
+            />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Ionicons name="people-outline" size={48} color="#9E9E9E" />
+              <Text style={styles.emptyText}>
+                {searchQuery 
+                  ? t('noAgentsFoundForSearch', { query: searchQuery })
+                  : t('noAgentsFound')}
+              </Text>
+              <Text style={styles.emptySubtext}>
+                {searchQuery 
+                  ? t('tryAdjustingSearch')
+                  : t('getStartedByCreatingAgent')}
               </Text>
             </View>
-
-            <FlatList
-              data={filteredData}
-              keyExtractor={(item) => item.id}
-              renderItem={renderItem}
-              ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: 24 }}
-              refreshControl={
-                <RefreshControl
-                  refreshing={refreshing}
-                  onRefresh={refreshAgentList}
-                  colors={[Colors.primary]}
-                />
-              }
-              ListEmptyComponent={
-                <View style={styles.emptyContainer}>
-                  <Ionicons name="people-outline" size={48} color="#9E9E9E" />
-                  <Text style={styles.emptyText}>
-                    {searchQuery 
-                      ? t('noAgentsFoundForSearch', { query: searchQuery })
-                      : t('noAgentsFound')}
-                  </Text>
-                  <Text style={styles.emptySubtext}>
-                    {searchQuery 
-                      ? t('tryAdjustingSearch')
-                      : t('getStartedByCreatingAgent')}
-                  </Text>
-                </View>
-              }
-            />
-          </>
-        )}
+          }
+        />
       </View>
 
       <DeleteConfirmationModal
@@ -437,7 +493,7 @@ export default function AgentListScreen({ navigation }) {
         title={t('deleteAgent')}
         message={t('deleteAgentConfirmation')}
         itemName={agentToDelete?.user?.username}
-        isLoading={deleteLoading}
+        isLoading={deleteMutation.isLoading}
         confirmText={t('deleteAgent')}
         cancelText={t('cancel')}
       />
@@ -460,7 +516,7 @@ export default function AgentListScreen({ navigation }) {
         showRetryButton={true}
       />
 
-      {deleteLoading && (
+      {deleteMutation.isLoading && (
         <View style={styles.loadingOverlay}>
           <Text style={styles.loadingText}>{t('deletingAgent')}</Text>
         </View>
@@ -749,7 +805,7 @@ const styles = StyleSheet.create({
   
   // Skeleton Styles
   skeletonContainer: {
-    flex: 1,
+    marginBottom: scale.hp(1.55),
   },
   skeletonPillsRow: {
     flexDirection: "row",
@@ -795,7 +851,6 @@ const styles = StyleSheet.create({
     borderRadius: scale.hp(1.55),
     padding: scale.hp(2.1),
     gap: scale.hp(1.55),
-    marginBottom: scale.hp(1.2),
   },
   skeletonCardHeader: {
     flexDirection: "row",

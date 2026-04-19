@@ -1,4 +1,5 @@
-import React, { useMemo, useState, useEffect, useRef } from "react";
+// screens/topupscreen/MerchantTopupFlowScreen.jsx
+import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import {
   SafeAreaView,
   View,
@@ -16,15 +17,28 @@ import {
   Dimensions,
   Image,
   ActivityIndicator,
+  StyleSheet,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import {
+  QueryClient,
+  QueryClientProvider,
+  useQuery,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query';
 import LottieView from 'lottie-react-native';
 import { Colors } from "../theme/colors";
 import ServiceHeader from "../components/ServiceHeader";
 import PrimaryButton from "../components/PrimaryButton";
 import { codeToFlag } from "../utils/flag";
 import { DIAL_CODES, guessOperator } from "../constants/dialing";
-import { getCountries, makeRechargeAgent, getOrderStatus } from "../services/merchantApi";
+import { 
+  getCountries, 
+  makeRechargeAgent, 
+  getOrderStatus,
+  getTopupProductsCustomer 
+} from "../services/merchantApi";
 import { getSetaraganMnoId } from "../utils/getCompanyIdForSetaragan";
 import { getMnoLogo } from "../utils/getMnoLogo";
 import * as Contacts from 'expo-contacts';
@@ -33,6 +47,7 @@ import formatLocal from "../utils/formatLocal";
 import TopUpStyles from "./topupScreen/TopupStyle";
 import { useAuth } from "../auth/AuthProvider";
 import { useTranslation } from "react-i18next";
+import { useFocusEffect } from "@react-navigation/native";
 
 const { height: screenHeight } = Dimensions.get('window');
 const BASE_STEPS = { COUNTRY: 0, NUMBER: 1, PAY: 2 };
@@ -45,17 +60,410 @@ const ORDER_STATUS = {
   PENDING: 'pending'
 };
 
-export default function MerchantTopupFlowScreen({ navigation }) {
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 0,
+      cacheTime: 0,
+      retry: 1,
+      refetchOnMount: 'always', 
+      refetchOnWindowFocus: true, 
+    },
+  },
+});
+
+const QUERY_KEYS = {
+  COUNTRIES: ['countries'],
+  CONTACTS: ['contacts'],
+};
+
+const useCountries = () => {
   const { t } = useTranslation();
+  
+  return useQuery({
+    queryKey: QUERY_KEYS.COUNTRIES,
+    queryFn: async () => {
+      const response = await getCountries();
+      return response?.data || [];
+    },
+    staleTime: 0,
+    cacheTime: 0,
+    refetchOnMount: 'always',
+  });
+};
+
+const useContacts = () => {
+  const { t } = useTranslation();
+  
+  return useQuery({
+    queryKey: QUERY_KEYS.CONTACTS,
+    queryFn: async () => {
+      const { status } = await Contacts.requestPermissionsAsync();
+      if (status !== 'granted') {
+        throw new Error(t('permissionDenied'));
+      }
+      
+      const { data } = await Contacts.getContactsAsync({
+        fields: [Contacts.Fields.Name, Contacts.Fields.PhoneNumbers],
+      });
+      
+      return data || [];
+    },
+    staleTime: 0, // Force immediate refetch
+    cacheTime: 0, // No caching
+    refetchOnMount: 'always',
+    enabled: false, // Only fetch when explicitly called
+  });
+};
+
+// Function to normalize phone numbers by removing country codes
+const normalizePhoneNumber = (phoneNumber, countryDialCode) => {
+  if (!phoneNumber) return "";
+  
+  // Remove all non-digit characters
+  let normalized = phoneNumber.replace(/\D/g, "");
+  
+  // Common country codes to remove (including +)
+  const countryCodes = [
+    '+1', '1',  // USA/Canada
+    '+44', '44', // UK
+    '+91', '91', // India
+    '+92', '92', // Pakistan
+    '+93', '93', // Afghanistan
+    '+94', '94', // Sri Lanka
+    '+95', '95', // Myanmar
+    '+96', '96', // 
+    '+97', '97', // UAE
+    '+98', '98', // Iran
+    '+99', '99', // 
+    '+20', '20', // Egypt
+    '+30', '30', // Greece
+    '+31', '31', // Netherlands
+    '+32', '32', // Belgium
+    '+33', '33', // France
+    '+34', '34', // Spain
+    '+39', '39', // Italy
+    '+40', '40', // Romania
+    '+41', '41', // Switzerland
+    '+43', '43', // Austria
+    '+45', '45', // Denmark
+    '+46', '46', // Sweden
+    '+47', '47', // Norway
+    '+48', '48', // Poland
+    '+49', '49', // Germany
+    '+51', '51', // Peru
+    '+52', '52', // Mexico
+    '+53', '53', // Cuba
+    '+54', '54', // Argentina
+    '+55', '55', // Brazil
+    '+56', '56', // Chile
+    '+57', '57', // Colombia
+    '+58', '58', // Venezuela
+    '+60', '60', // Malaysia
+    '+61', '61', // Australia
+    '+62', '62', // Indonesia
+    '+63', '63', // Philippines
+    '+64', '64', // New Zealand
+    '+65', '65', // Singapore
+    '+66', '66', // Thailand
+    '+81', '81', // Japan
+    '+82', '82', // South Korea
+    '+84', '84', // Vietnam
+    '+86', '86', // China
+    '+90', '90', // Turkey
+    '+212', '212', // Morocco
+    '+213', '213', // Algeria
+    '+216', '216', // Tunisia
+    '+218', '218', // Libya
+    '+220', '220', // Gambia
+    '+221', '221', // Senegal
+    '+222', '222', // Mauritania
+    '+223', '223', // Mali
+    '+224', '224', // Guinea
+    '+225', '225', // Ivory Coast
+    '+226', '226', // Burkina Faso
+    '+227', '227', // Niger
+    '+228', '228', // Togo
+    '+229', '229', // Benin
+    '+230', '230', // Mauritius
+    '+231', '231', // Liberia
+    '+232', '232', // Sierra Leone
+    '+233', '233', // Ghana
+    '+234', '234', // Nigeria
+    '+235', '235', // Chad
+    '+236', '236', // Central African Republic
+    '+237', '237', // Cameroon
+    '+238', '238', // Cape Verde
+    '+239', '239', // Sao Tome and Principe
+    '+240', '240', // Equatorial Guinea
+    '+241', '241', // Gabon
+    '+242', '242', // Republic of the Congo
+    '+243', '243', // Democratic Republic of the Congo
+    '+244', '244', // Angola
+    '+245', '245', // Guinea-Bissau
+    '+246', '246', // Diego Garcia
+    '+247', '247', // Ascension Island
+    '+248', '248', // Seychelles
+    '+249', '249', // Sudan
+    '+250', '250', // Rwanda
+    '+251', '251', // Ethiopia
+    '+252', '252', // Somalia
+    '+253', '253', // Djibouti
+    '+254', '254', // Kenya
+    '+255', '255', // Tanzania
+    '+256', '256', // Uganda
+    '+257', '257', // Burundi
+    '+258', '258', // Mozambique
+    '+260', '260', // Zambia
+    '+261', '261', // Madagascar
+    '+262', '262', // Reunion
+    '+263', '263', // Zimbabwe
+    '+264', '264', // Namibia
+    '+265', '265', // Malawi
+    '+266', '266', // Lesotho
+    '+267', '267', // Botswana
+    '+268', '268', // Eswatini
+    '+269', '269', // Comoros
+    '+290', '290', // Saint Helena
+    '+291', '291', // Eritrea
+    '+297', '297', // Aruba
+    '+298', '298', // Faroe Islands
+    '+299', '299', // Greenland
+    '+350', '350', // Gibraltar
+    '+351', '351', // Portugal
+    '+352', '352', // Luxembourg
+    '+353', '353', // Ireland
+    '+354', '354', // Iceland
+    '+355', '355', // Albania
+    '+356', '356', // Malta
+    '+357', '357', // Cyprus
+    '+358', '358', // Finland
+    '+359', '359', // Bulgaria
+    '+370', '370', // Lithuania
+    '+371', '371', // Latvia
+    '+372', '372', // Estonia
+    '+373', '373', // Moldova
+    '+374', '374', // Armenia
+    '+375', '375', // Belarus
+    '+376', '376', // Andorra
+    '+377', '377', // Monaco
+    '+378', '378', // San Marino
+    '+379', '379', // Vatican City
+    '+380', '380', // Ukraine
+    '+381', '381', // Serbia
+    '+382', '382', // Montenegro
+    '+383', '383', // Kosovo
+    '+385', '385', // Croatia
+    '+386', '386', // Slovenia
+    '+387', '387', // Bosnia and Herzegovina
+    '+389', '389', // North Macedonia
+    '+420', '420', // Czech Republic
+    '+421', '421', // Slovakia
+    '+423', '423', // Liechtenstein
+    '+500', '500', // Falkland Islands
+    '+501', '501', // Belize
+    '+502', '502', // Guatemala
+    '+503', '503', // El Salvador
+    '+504', '504', // Honduras
+    '+505', '505', // Nicaragua
+    '+506', '506', // Costa Rica
+    '+507', '507', // Panama
+    '+508', '508', // Saint Pierre and Miquelon
+    '+509', '509', // Haiti
+    '+590', '590', // Guadeloupe
+    '+591', '591', // Bolivia
+    '+592', '592', // Guyana
+    '+593', '593', // Ecuador
+    '+594', '594', // French Guiana
+    '+595', '595', // Paraguay
+    '+596', '596', // Martinique
+    '+597', '597', // Suriname
+    '+598', '598', // Uruguay
+    '+599', '599', // Caribbean Netherlands
+    '+670', '670', // East Timor
+    '+672', '672', // Australian External Territories
+    '+673', '673', // Brunei
+    '+674', '674', // Nauru
+    '+675', '675', // Papua New Guinea
+    '+676', '676', // Tonga
+    '+677', '677', // Solomon Islands
+    '+678', '678', // Vanuatu
+    '+679', '679', // Fiji
+    '+680', '680', // Palau
+    '+681', '681', // Wallis and Futuna
+    '+682', '682', // Cook Islands
+    '+683', '683', // Niue
+    '+685', '685', // Samoa
+    '+686', '686', // Kiribati
+    '+687', '687', // New Caledonia
+    '+688', '688', // Tuvalu
+    '+689', '689', // French Polynesia
+    '+690', '690', // Tokelau
+    '+691', '691', // Micronesia
+    '+692', '692', // Marshall Islands
+    '+850', '850', // North Korea
+    '+852', '852', // Hong Kong
+    '+853', '853', // Macau
+    '+855', '855', // Cambodia
+    '+856', '856', // Laos
+    '+880', '880', // Bangladesh
+    '+886', '886', // Taiwan
+    '+960', '960', // Maldives
+    '+961', '961', // Lebanon
+    '+962', '962', // Jordan
+    '+963', '963', // Syria
+    '+964', '964', // Iraq
+    '+965', '965', // Kuwait
+    '+966', '966', // Saudi Arabia
+    '+967', '967', // Yemen
+    '+968', '968', // Oman
+    '+970', '970', // Palestine
+    '+971', '971', // United Arab Emirates
+    '+972', '972', // Israel
+    '+973', '973', // Bahrain
+    '+974', '974', // Qatar
+    '+975', '975', // Bhutan
+    '+976', '976', // Mongolia
+    '+977', '977', // Nepal
+    '+992', '992', // Tajikistan
+    '+993', '993', // Turkmenistan
+    '+994', '994', // Azerbaijan
+    '+995', '995', // Georgia
+    '+996', '996', // Kyrgyzstan
+    '+998', '998', // Uzbekistan
+  ];
+  
+  // Sort country codes by length (longest first) to avoid partial matches
+  const sortedCountryCodes = [...countryCodes].sort((a, b) => b.length - a.length);
+  
+  // Remove country codes
+  for (const code of sortedCountryCodes) {
+    if (normalized.startsWith(code)) {
+      normalized = normalized.substring(code.length);
+      break;
+    }
+  }
+  
+  // Remove leading zeros (common after country code removal)
+  normalized = normalized.replace(/^0+/, '');
+  
+  return normalized;
+};
+
+const ContactsModal = ({ 
+  contactsModalVisible, 
+  setContactsModalVisible, 
+  contactsSlideAnim, 
+  insets, 
+  searchQuery, 
+  setSearchQuery, 
+  filteredContacts, 
+  handleContactSelect,
+  loadingContacts
+}) => {
+  const { t } = useTranslation();
+  
+  return (
+    <Modal
+      visible={contactsModalVisible}
+      transparent={true}
+      animationType="none"
+      statusBarTranslucent={true}
+      onRequestClose={() => setContactsModalVisible(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <TouchableOpacity 
+          style={styles.modalBackdrop}
+          activeOpacity={1}
+          onPress={() => setContactsModalVisible(false)}
+        />
+        <Animated.View 
+          style={[
+            styles.modalCard,
+            { 
+              transform: [{ translateY: contactsSlideAnim }],
+              height: '80%',
+              marginBottom: -insets.bottom
+            }
+          ]}
+        >
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>{t("selectContact")}</Text>
+            <TouchableOpacity 
+              onPress={() => setContactsModalVisible(false)}
+              style={styles.closeButton}
+            >
+              <Ionicons name="close" size={24} color="#666" />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.searchContainer}>
+            <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
+            <TextInput
+              placeholder={t("searchContacts")}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              style={styles.searchInput}
+              placeholderTextColor="#999"
+            />
+          </View>
+
+          {loadingContacts ? (
+            <View style={styles.emptyContainer}>
+              <ActivityIndicator size="large" color={Colors.primary} />
+              <Text style={styles.emptyText}>{t("loadingContacts")}</Text>
+            </View>
+          ) : filteredContacts.length > 0 ? (
+            <FlatList
+              data={filteredContacts}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.contactItem}
+                  onPress={() => {
+                    if (item.phoneNumbers && item.phoneNumbers.length > 0) {
+                      // Pass the phone number to handleContactSelect
+                      handleContactSelect(item.phoneNumbers[0].number);
+                    }
+                  }}
+                >
+                  <View style={styles.contactAvatar}>
+                    <Text style={{ color: 'white', fontWeight: 'bold' }}>
+                      {item.name ? item.name.charAt(0).toUpperCase() : '?'}
+                    </Text>
+                  </View>
+                  <View style={styles.contactInfo}>
+                    <Text style={styles.contactName}>{item.name}</Text>
+                    {item.phoneNumbers && item.phoneNumbers.length > 0 && (
+                      <Text style={styles.contactPhone}>{item.phoneNumbers[0].number}</Text>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              )}
+              ItemSeparatorComponent={() => <View style={styles.contactSeparator} />}
+            />
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="people-outline" size={48} color="#999" />
+              <Text style={styles.emptyText}>{t("noContactsFound")}</Text>
+            </View>
+          )}
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+};
+
+function MerchantTopupFlowScreen({ navigation }) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const { user } = useAuth?.() || { user: null };
   const lastStep = BASE_STEPS.PAY;
-  const [countries, setCountries] = useState([]);
   const [step, setStep] = useState(0);
   const [orderStatus, setOrderStatus] = useState(null);
   const [orderDetails, setOrderDetails] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [contacts, setContacts] = useState([]);
-  const [filteredContacts, setFilteredContacts] = useState([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
   const [contactsModalVisible, setContactsModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [country, setCountry] = useState(null);
@@ -63,6 +471,11 @@ export default function MerchantTopupFlowScreen({ navigation }) {
   const [countrySearch, setCountrySearch] = useState('');
   const [localNumber, setLocalNumber] = useState("");
   const [amountAfn, setAmountAfn] = useState("");
+  const [product, setProduct] = useState(null);
+  const [rechargeProducts, setRechargeProducts] = useState([]);
+  const [selectedPopularAmount, setSelectedPopularAmount] = useState(null);
+  const [customProduct, setCustomProduct] = useState(null);
+  const [amountValidationError, setAmountValidationError] = useState("");
   const insets = useSafeAreaInsets();
   const pollingRef = useRef(null);
   const lottieRef = useRef(null);
@@ -74,6 +487,102 @@ export default function MerchantTopupFlowScreen({ navigation }) {
   const operator = guessOperator(country?.countryCode, localNumber.replace(/\D/g, ""));
   const operatorId = getSetaraganMnoId(localNumber);
   const operatorLogo = getMnoLogo(operatorId);
+
+  // Function to get minimum amount based on phone number prefix
+  const getMinimumAmount = useCallback((phoneNumber) => {
+    const cleanNumber = phoneNumber.replace(/\D/g, "");
+    if (cleanNumber.length >= 2) {
+      const prefix = cleanNumber.substring(0, 2);
+      // For prefixes 78 and 73, minimum amount is 1
+      if (prefix === '78' || prefix === '73') {
+        return 1;
+      }
+    }
+    // For all other prefixes (70,71,72,74,76,77,79), minimum amount is 25
+    return 25;
+  }, []);
+
+  // Function to validate amount based on phone number
+  const validateAmount = useCallback((amount, phoneNumber) => {
+    const amountValue = parseFloat(amount);
+    if (isNaN(amountValue) || amountValue <= 0) {
+      return { isValid: false, message: t('enterValidAmountGreaterThanZero') };
+    }
+    
+    const minimumAmount = getMinimumAmount(phoneNumber);
+    if (amountValue < minimumAmount) {
+      return { 
+        isValid: false, 
+        message: t('minimumAmountIs', { amount: minimumAmount }) 
+      };
+    }
+    
+    return { isValid: true, message: "" };
+  }, [getMinimumAmount, t]);
+
+  const { data: countries = [], isLoading: loadingCountries, refetch: refetchCountries } = useCountries();
+  const { 
+    data: contacts = [], 
+    isLoading: loadingContacts,
+    refetch: refetchContacts 
+  } = useContacts();
+
+  // Use focus effect to refetch data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      console.log('Screen focused, refetching all data...');
+      
+      // Invalidate and refetch all queries
+      queryClient.invalidateQueries(QUERY_KEYS.COUNTRIES);
+      queryClient.invalidateQueries(QUERY_KEYS.CONTACTS);
+      
+      // Reset all local state
+      resetState();
+      
+      return () => {
+        console.log('Screen unfocused, cleaning up...');
+        // Clean up polling interval
+        if (pollingRef.current) {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+        }
+      };
+    }, [])
+  );
+
+  // Function to reset all state
+  const resetState = () => {
+    setStep(0);
+    setOrderStatus(null);
+    setOrderDetails(null);
+    setLocalNumber("");
+    setAmountAfn("");
+    setProduct(null);
+    setSelectedPopularAmount(null);
+    setSearchQuery('');
+    setCountrySearch('');
+    setAmountValidationError("");
+    
+    // Reset animations
+    contactsSlideAnim.setValue(screenHeight);
+    countriesSlideAnim.setValue(screenHeight);
+    
+    // Reset Lottie animation
+    if (lottieRef.current) {
+      lottieRef.current.reset();
+    }
+  };
+
+  // Filter contacts locally
+  const filteredContacts = useMemo(() => {
+    if (!searchQuery) return contacts;
+    return contacts.filter(contact =>
+      contact.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      contact.phoneNumbers?.some(phone =>
+        phone.number?.includes(searchQuery)
+      )
+    );
+  }, [searchQuery, contacts]);
 
   useEffect(() => {
     return () => {
@@ -90,15 +599,125 @@ export default function MerchantTopupFlowScreen({ navigation }) {
   }, [orderStatus]);
 
   useEffect(() => {
-    const getAllCountries = async () => {
-      const res = await getCountries();
-      setCountries(res?.data);
-      const afgCountry = res.data.find((c) => c.countryCode === "AF");
+    // Always refetch countries when component mounts or screen focuses
+    if (!country) {
+      // Find Afghanistan first, then fallback to first country
+      const afgCountry = countries.find((c) => c.countryCode === "AF") || countries[0];
       setCountry(afgCountry);
+    }
+  }, [countries]);
+
+  useEffect(() => {
+    const fetchRechargeProducts = async () => {
+      if (!country?.id) return;
+      
+      try {
+        setLoadingProducts(true);
+        const filter = { 
+          countryId: country.id,
+          productFor: "TOPUP"
+        };
+        
+        console.log("Fetching topup products for merchant:", filter);
+        const res = await getTopupProductsCustomer(filter);
+        console.log("Merchant products response:", res);
+        
+        setRechargeProducts(res?.data || []);
+        
+        const customProd = res?.data?.find(p => 
+          p.basePrice === 0 && 
+          (p.productName?.toLowerCase().includes('custom') || 
+           p.productName?.toLowerCase().includes('topup'))
+        );
+        setCustomProduct(customProd || null);
+        
+      } catch (error) {
+        console.error("Error fetching merchant products:", error);
+        setRechargeProducts([]);
+      } finally {
+        setLoadingProducts(false);
+      }
     };
 
-    getAllCountries();
-  }, []);
+    if (country?.id) {
+      fetchRechargeProducts();
+    }
+  }, [country]);
+
+  const rechargeAmounts = React.useMemo(() => {
+    if (rechargeProducts.length > 0) {
+      return rechargeProducts
+        .filter(product => product.basePrice > 0)
+        .map(product => {
+          const basePrice = parseFloat(product.basePrice);
+          
+          return {
+            id: product.id,
+            afn: basePrice,
+            basePrice: basePrice,
+            productName: product.productName?.en || product.productName,
+            product: product,
+          };
+        })
+        .sort((a, b) => a.afn - b.afn);
+    }
+    
+    const defaultAmounts = [50, 100, 150, 250, 500, 1000];
+    return defaultAmounts.map(amount => ({
+      id: amount.toString(),
+      afn: amount,
+      basePrice: amount,
+      productName: `${amount} AFN Topup`,
+      product: null,
+    }));
+  }, [rechargeProducts]);
+
+  const handlePopularAmountSelect = (selectedAmount) => {
+    if (selectedAmount.product) {
+      setProduct(selectedAmount.product);
+      setAmountAfn(selectedAmount.afn.toString());
+    } else {
+      setAmountAfn(selectedAmount.afn.toString());
+      setProduct(null);
+    }
+    
+    setSelectedPopularAmount(selectedAmount);
+    
+    // Validate amount after selection
+    if (localNumber) {
+      const validation = validateAmount(selectedAmount.afn.toString(), localNumber);
+      setAmountValidationError(validation.isValid ? "" : validation.message);
+    }
+  };
+
+  const handleCustomAmountChange = (text) => {
+    const cleanedText = text.replace(/[^0-9.]/g, '');
+    setAmountAfn(cleanedText);
+    setSelectedPopularAmount(null);
+    setAmountValidationError("");
+    
+    // Validate amount when user types
+    if (cleanedText && localNumber) {
+      const validation = validateAmount(cleanedText, localNumber);
+      if (!validation.isValid) {
+        setAmountValidationError(validation.message);
+      }
+    }
+    
+    if (cleanedText && customProduct) {
+      console.log("Setting custom product for amount:", cleanedText);
+      const customAmount = parseFloat(cleanedText) || 0;
+      
+      setProduct({
+        ...customProduct,
+        customAmount: customAmount,
+        basePrice: customAmount,
+        price: customAmount,
+      });
+    } else {
+      setProduct(null);
+    }
+  };
 
   const startPollingOrderStatus = async (orderId) => {
     if (pollingRef.current) {
@@ -152,7 +771,7 @@ export default function MerchantTopupFlowScreen({ navigation }) {
         easing: Easing.out(Easing.back(1)),
         useNativeDriver: true,
       }).start();
-      loadContacts();
+      refetchContacts();
     } else {
       Animated.timing(contactsSlideAnim, {
         toValue: screenHeight,
@@ -181,62 +800,29 @@ export default function MerchantTopupFlowScreen({ navigation }) {
     }
   }, [countryOpen]);
 
-  useEffect(() => {
-    if (searchQuery) {
-      const filtered = contacts.filter(contact =>
-        contact.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        contact.phoneNumbers?.some(phone =>
-          phone.number?.includes(searchQuery)
-        )
-      );
-      setFilteredContacts(filtered);
-    } else {
-      setFilteredContacts(contacts);
-    }
-  }, [searchQuery, contacts]);
-
-  const loadContacts = async () => {
-    try {
-      const { status } = await Contacts.requestPermissionsAsync();
-      if (status === 'granted') {
-        const { data } = await Contacts.getContactsAsync({
-          fields: [Contacts.Fields.Name, Contacts.Fields.PhoneNumbers],
-        });
-
-        if (data.length > 0) {
-          setContacts(data);
-          setFilteredContacts(data);
-        }
-      } else {
-        Alert.alert(t('permissionDenied'), t('contactsPermissionDenied'));
-      }
-    } catch (error) {
-      console.error('Error loading contacts:', error);
-      Alert.alert(t('error'), t('failedToLoadContacts'));
-    }
-  };
-
-  const defaultAf = useMemo(
-    () => countries.find((c) => c.countryCode === "AF") || countries[0],
-    [countries]
-  );
-
-  const filteredCountries = countrySearch
-    ? countries.filter(c =>
-      c.countryName.toLowerCase().includes(countrySearch.toLowerCase()) ||
-      c.countryCode.toLowerCase().includes(countrySearch.toLowerCase())
-    )
-    : countries;
-
+  // Update canNext to include amount validation
   const canNext =
     (step === BASE_STEPS.COUNTRY && !!country) ||
-    (step === BASE_STEPS.NUMBER && localNumber.replace(/\D/g, "").length >= 7 && amountAfn > 0) ||
+    (step === BASE_STEPS.NUMBER && 
+     localNumber.replace(/\D/g, "").length >= 7 && 
+     amountAfn > 0 && 
+     !amountValidationError) ||
     (step === BASE_STEPS.PAY);
 
   const goBack = () => (step > 0 ? setStep(step - 1) : navigation.goBack());
 
   const goNext = () => {
     if (!canNext) return;
+    
+    // Additional validation before proceeding
+    if (step === BASE_STEPS.NUMBER) {
+      const validation = validateAmount(amountAfn, localNumber);
+      if (!validation.isValid) {
+        setAmountValidationError(validation.message);
+        return;
+      }
+    }
+    
     setStep(step + 1);
   };
 
@@ -244,25 +830,56 @@ export default function MerchantTopupFlowScreen({ navigation }) {
 
   useEffect(() => {
     setLocalNumber("");
+    setAmountAfn("");
+    setProduct(null);
+    setSelectedPopularAmount(null);
+    setAmountValidationError("");
   }, [country?.countryCode]);
 
-  const handleContactSelect = (phoneNumber) => {
+  const handleContactSelect = useCallback((phoneNumber) => {
     if (!phoneNumber) {
       Alert.alert(t('error'), t('invalidPhoneNumber'));
       return;
     }
 
-    let number = phoneNumber.replace(/\D/g, "");
-
-    const countryDialCode = country?.dialCode?.replace('+', '') || DIAL_CODES[country?.countryCode]?.replace('+', '') || '';
-    if (countryDialCode && number.startsWith(countryDialCode)) {
-      number = number.substring(countryDialCode.length);
+    console.log("Selected contact phone number:", phoneNumber);
+    
+    // Normalize the phone number by removing country codes
+    let normalizedNumber = normalizePhoneNumber(phoneNumber, dial.replace('+', ''));
+    
+    console.log("Normalized number after removing country codes:", normalizedNumber);
+    
+    // If the number starts with 0, remove it (common for local numbers)
+    normalizedNumber = normalizedNumber.replace(/^0+/, '');
+    
+    console.log("Final normalized number:", normalizedNumber);
+    
+    // Validate the number has at least 7 digits
+    if (normalizedNumber.length < 7) {
+      Alert.alert(t('error'), t('invalidPhoneNumberLength'));
+      return;
     }
-    number = number.replace(/^0+/, '');
-    setLocalNumber(number);
+    
+    // Set the local number
+    setLocalNumber(normalizedNumber);
+    
+    // Re-validate amount after phone number change
+    if (amountAfn) {
+      const validation = validateAmount(amountAfn, normalizedNumber);
+      setAmountValidationError(validation.isValid ? "" : validation.message);
+    }
+    
+    // Close contacts modal
     setContactsModalVisible(false);
     setSearchQuery('');
-  };
+    
+    // Show success message
+    Alert.alert(
+      t('success'),
+      t('contactNumberImportedSuccessfully', { number: normalizedNumber }),
+      [{ text: t('ok') }]
+    );
+  }, [dial, t, amountAfn, validateAmount]);
 
   const recharge = async () => {
     setLoading(true);
@@ -275,7 +892,6 @@ export default function MerchantTopupFlowScreen({ navigation }) {
         return;
       }
 
-      // Validate amount
       const amountValue = parseFloat(amountAfn);
       if (isNaN(amountValue) || amountValue <= 0) {
         Alert.alert(t('invalidNumber'), t('enterValidAmountGreaterThanZero'));
@@ -283,9 +899,41 @@ export default function MerchantTopupFlowScreen({ navigation }) {
         return;
       }
 
-      // Check minimum amount for Setaragan
-      if (amountValue < 10) {
-        Alert.alert(t('invalidNumber'), t('topup.minimumAmount'));
+      // Validate minimum amount based on phone number prefix
+      const minimumAmount = getMinimumAmount(localNumber);
+      if (amountValue < minimumAmount) {
+        Alert.alert(t('invalidNumber'), t('minimumAmountIs', { amount: minimumAmount }));
+        setLoading(false);
+        return;
+      }
+
+      let productId = null;
+      let customAmount = null;
+      
+      if (product) {
+        if (product.customAmount) {
+          productId = product.id;
+          customAmount = product.customAmount;
+        } else {
+          productId = product.id;
+          customAmount = product.basePrice || product.price;
+        }
+      } else if (amountAfn && !isNaN(parseFloat(amountAfn))) {
+        if (customProduct) {
+          productId = customProduct.id;
+          customAmount = parseFloat(amountAfn);
+        } else if (rechargeProducts.length > 0) {
+          const firstProduct = rechargeProducts[0];
+          productId = firstProduct.id;
+          customAmount = parseFloat(amountAfn);
+        } else {
+          productId = 1;
+          customAmount = parseFloat(amountAfn);
+        }
+      }
+
+      if (!productId || !customAmount || customAmount <= 0) {
+        Alert.alert(t('invalidNumber'), t('enterValidAmountGreaterThanZero'));
         setLoading(false);
         return;
       }
@@ -294,30 +942,33 @@ export default function MerchantTopupFlowScreen({ navigation }) {
         source: "agent_stock",
         receiver: localNumber,
         operator: operatorId,
-        customAmount: amountValue,
+        customAmount: customAmount,
         currency: "AFN",
         countryId: country?.id,
         companyId: "",
-        productId: 1,
+        productId: productId, // Use the determined product ID
       };
 
       console.log("Sending recharge payload:", payload);
 
       const res = await makeRechargeAgent(payload);
       
-      if (res.status === "queued") {
+      if (res.status === "queued" || res.success) {
         setOrderStatus(ORDER_STATUS.QUEUED);
         setOrderDetails({
           orderId: res.orderId,
-          txnNumber: res.txnNumber,
+          txnNumber: res.txnNumber || `TXN-${Date.now()}`,
           mobile: `${dial} ${formatLocal(localNumber)}`,
-          amountAfn: amountAfn,
+          amountAfn: customAmount,
           date: new Date().toISOString(),
           operator: operator?.name || t('common.unknown'),
         });
         
         // Start polling for status updates
-        await startPollingOrderStatus(res.orderId);
+        if (res.orderId) {
+          await startPollingOrderStatus(res.orderId);
+        }
+        
         goNext();
       } else {
         throw new Error(res.error || t('failedToRecharge'));
@@ -428,117 +1079,35 @@ export default function MerchantTopupFlowScreen({ navigation }) {
     }
   };
 
- const resetFlow = () => {
-  setOrderStatus(null);
-  setOrderDetails(null);
-  setStep(0);
-  setLocalNumber("");
-  setAmountAfn("");
-  
-  if (pollingRef.current) {
-    clearInterval(pollingRef.current);
-    pollingRef.current = null;
-  }
-
-  if (lottieRef.current) {
-    lottieRef.current.reset();
-  }
-
-  setTimeout(() => {
-    if (typeof triggerHomeRefresh === 'function') {
-      triggerHomeRefresh();
-    }
-    navigation.navigate('Home', { refresh: true });
-  }, 500);
-};
-
-  const ContactsModal = () => {
-    const { t } = useTranslation();
+  const resetFlow = () => {
+    setOrderStatus(null);
+    setOrderDetails(null);
+    setStep(0);
+    setLocalNumber("");
+    setAmountAfn("");
+    setProduct(null);
+    setSelectedPopularAmount(null);
     
-    return (
-      <Modal
-        visible={contactsModalVisible}
-        transparent={true}
-        animationType="none"
-        statusBarTranslucent={true}
-        onRequestClose={() => setContactsModalVisible(false)}
-      >
-        <View style={TopUpStyles.modalOverlay}>
-          <TouchableOpacity 
-            style={TopUpStyles.modalBackdrop}
-            activeOpacity={1}
-            onPress={() => setContactsModalVisible(false)}
-          />
-          <Animated.View 
-            style={[
-              TopUpStyles.modalCard,
-              { 
-                transform: [{ translateY: contactsSlideAnim }],
-                height: '80%',
-                marginBottom: -insets.bottom
-              }
-            ]}
-          >
-            <View style={TopUpStyles.modalHeader}>
-              <Text style={TopUpStyles.modalTitle}>{t('selectContact')}</Text>
-              <TouchableOpacity 
-                onPress={() => setContactsModalVisible(false)}
-                style={TopUpStyles.closeButton}
-              >
-                <Ionicons name="close" size={24} color="#666" />
-              </TouchableOpacity>
-            </View>
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
 
-            <View style={TopUpStyles.searchContainer}>
-              <Ionicons name="search" size={20} color="#999" style={TopUpStyles.searchIcon} />
-              <TextInput
-                placeholder={t('searchContacts')}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                style={TopUpStyles.searchInput}
-                placeholderTextColor="#999"
-              />
-            </View>
+    if (lottieRef.current) {
+      lottieRef.current.reset();
+    }
 
-            {filteredContacts.length > 0 ? (
-              <FlatList
-                data={filteredContacts}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={TopUpStyles.contactItem}
-                    onPress={() => {
-                      if (item.phoneNumbers && item.phoneNumbers.length > 0) {
-                        handleContactSelect(item.phoneNumbers[0].number);
-                      }
-                    }}
-                  >
-                    <View style={TopUpStyles.contactAvatar}>
-                      <Text style={{ color: 'white', fontWeight: 'bold' }}>
-                        {item.name ? item.name.charAt(0).toUpperCase() : '?'}
-                      </Text>
-                    </View>
-                    <View style={TopUpStyles.contactInfo}>
-                      <Text style={TopUpStyles.contactName}>{item.name}</Text>
-                      {item.phoneNumbers && item.phoneNumbers.length > 0 && (
-                        <Text style={TopUpStyles.contactPhone}>{item.phoneNumbers[0].number}</Text>
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                )}
-                ItemSeparatorComponent={() => <View style={TopUpStyles.contactSeparator} />}
-              />
-            ) : (
-              <View style={TopUpStyles.emptyContainer}>
-                <Ionicons name="people-outline" size={48} color="#999" />
-                <Text style={TopUpStyles.emptyText}>{t('noContactsFound')}</Text>
-              </View>
-            )}
-          </Animated.View>
-        </View>
-      </Modal>
-    );
+    setTimeout(() => {
+      navigation.navigate('Home', { refresh: true });
+    }, 500);
   };
+
+  const filteredCountries = countrySearch
+    ? countries.filter(c =>
+      c.countryName.toLowerCase().includes(countrySearch.toLowerCase()) ||
+      c.countryCode.toLowerCase().includes(countrySearch.toLowerCase())
+    )
+    : countries;
 
   const CountriesModal = () => {
     const { t } = useTranslation();
@@ -551,15 +1120,15 @@ export default function MerchantTopupFlowScreen({ navigation }) {
         statusBarTranslucent={true}
         onRequestClose={() => setCountryOpen(false)}
       >
-        <View style={TopUpStyles.modalOverlay}>
+        <View style={styles.modalOverlay}>
           <TouchableOpacity 
-            style={TopUpStyles.modalBackdrop}
+            style={styles.modalBackdrop}
             activeOpacity={1}
             onPress={() => setCountryOpen(false)}
           />
           <Animated.View 
             style={[
-              TopUpStyles.modalCard,
+              styles.modalCard,
               { 
                 transform: [{ translateY: countriesSlideAnim }],
                 height: '80%',
@@ -567,54 +1136,61 @@ export default function MerchantTopupFlowScreen({ navigation }) {
               }
             ]}
           >
-            <View style={TopUpStyles.modalHeader}>
-              <Text style={TopUpStyles.modalTitle}>{t('selectCountry')}</Text>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{t('selectCountry')}</Text>
               <TouchableOpacity 
                 onPress={() => setCountryOpen(false)}
-                style={TopUpStyles.closeButton}
+                style={styles.closeButton}
               >
                 <Ionicons name="close" size={24} color="#666" />
               </TouchableOpacity>
             </View>
 
-            <View style={TopUpStyles.searchContainer}>
-              <Ionicons name="search" size={20} color="#999" style={TopUpStyles.searchIcon} />
+            <View style={styles.searchContainer}>
+              <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
               <TextInput
                 placeholder={t('searchCountries')}
                 value={countrySearch}
                 onChangeText={setCountrySearch}
-                style={TopUpStyles.searchInput}
+                style={styles.searchInput}
                 placeholderTextColor="#999"
               />
             </View>
 
-            <FlatList
-              data={filteredCountries}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={TopUpStyles.modalRow}
-                  onPress={() => {
-                    setCountry(item);
-                    setCountryOpen(false);
-                    setCountrySearch('');
-                  }}
-                >
-                  <Text style={{ fontSize: 24, marginEnd: 12 }}>
-                    {codeToFlag(item.countryCode)}
-                  </Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: Colors.textPrimary, fontSize: 16, fontWeight: '500' }}>
-                      {item.countryName}
+            {loadingCountries ? (
+              <View style={styles.emptyContainer}>
+                <ActivityIndicator size="large" color={Colors.primary} />
+                <Text style={styles.emptyText}>{t("loadingCountries")}</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={filteredCountries}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.modalRow}
+                    onPress={() => {
+                      setCountry(item);
+                      setCountryOpen(false);
+                      setCountrySearch('');
+                    }}
+                  >
+                    <Text style={{ fontSize: 24, marginEnd: 12 }}>
+                      {codeToFlag(item.countryCode)}
                     </Text>
-                    <Text style={{ color: Colors.textSecondary, fontSize: 14 }}>
-                      {DIAL_CODES[item.countryCode] || ""}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              )}
-              ItemSeparatorComponent={() => <View style={TopUpStyles.contactSeparator} />}
-            />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: Colors.textPrimary, fontSize: 16, fontWeight: '500' }}>
+                        {item.countryName}
+                      </Text>
+                      <Text style={{ color: Colors.textSecondary, fontSize: 14 }}>
+                        {DIAL_CODES[item.countryCode] || ""}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                )}
+                ItemSeparatorComponent={() => <View style={styles.contactSeparator} />}
+              />
+            )}
           </Animated.View>
         </View>
       </Modal>
@@ -691,25 +1267,19 @@ export default function MerchantTopupFlowScreen({ navigation }) {
               </View>
             )}
 
-       {(orderStatus === ORDER_STATUS.SUCCEEDED || orderStatus === ORDER_STATUS.FAILED) && (
-  <PrimaryButton
-    label={t('done')}
-    onPress={() => {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-      }
-      
- 
-      if (typeof triggerHomeRefresh === 'function') {
-        triggerHomeRefresh();
-      }
-      
-      navigation.popToTop();
-      navigation.navigate('Home', { refresh: true });
-    }}
-    style={{ width: "100%", marginTop: 20 }}
-  />
-)}
+            {(orderStatus === ORDER_STATUS.SUCCEEDED || orderStatus === ORDER_STATUS.FAILED) && (
+              <PrimaryButton
+                label={t('done')}
+                onPress={() => {
+                  if (pollingRef.current) {
+                    clearInterval(pollingRef.current);
+                  }
+                  navigation.popToTop();
+                  navigation.navigate('Home', { refresh: true });
+                }}
+                style={{ width: "100%", marginTop: 20 }}
+              />
+            )}
 
             <TouchableOpacity onPress={resetFlow} style={TopUpStyles.moreButton}>
               <Text style={TopUpStyles.moreButtonText}>
@@ -750,10 +1320,64 @@ export default function MerchantTopupFlowScreen({ navigation }) {
                 />
 
                 <Text style={TopUpStyles.sectionTitle}>{t('enterAmount')}</Text>
-                <AmountInput
-                  value={amountAfn}
-                  onChangeText={setAmountAfn}
-                />
+                
+                {/* Custom Amount Input */}
+                <View style={[
+                  TopUpStyles.customRow,
+                  {
+                    borderColor: amountValidationError ? '#EF4444' : '#2e2e2eff',
+                    backgroundColor: '#FFFFFF',
+                  }
+                ]}>
+                  <Text style={TopUpStyles.currencyTag}>AFN</Text>
+                  <TextInput
+                    value={amountAfn}
+                    onChangeText={handleCustomAmountChange}
+                    placeholder="0"
+                    keyboardType="decimal-pad"
+                    style={TopUpStyles.customInput}
+                  />
+                  
+                  {amountAfn && (
+                    <TouchableOpacity
+                      style={[TopUpStyles.clearBtn, { opacity: amountAfn ? 1 : 0.5 }]}
+                      disabled={!amountAfn}
+                      onPress={() => {
+                        setAmountAfn("");
+                        setProduct(null);
+                        setSelectedPopularAmount(null);
+                        setAmountValidationError("");
+                      }}
+                    >
+                      <Ionicons name="close-circle" size={18} color="#A3A3A3" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {/* Amount Validation Error Message */}
+                {amountValidationError ? (
+                  <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center' }}>
+                    <Ionicons name="warning-outline" size={16} color="#EF4444" />
+                    <Text style={{ 
+                      color: '#EF4444', 
+                      fontSize: 12, 
+                      fontFamily: 'dmsansRegular',
+                      marginLeft: 4
+                    }}>
+                      {amountValidationError}
+                    </Text>
+                  </View>
+                ) : localNumber && amountAfn && (
+                  <View style={{ marginTop: 8 }}>
+                    <Text style={{ 
+                      color: '#6B7280', 
+                      fontSize: 12, 
+                      fontFamily: 'dmsansRegular'
+                    }}>
+                      {t('minimumAmountNote', { amount: getMinimumAmount(localNumber) })}
+                    </Text>
+                  </View>
+                )}
               </View>
             )}
 
@@ -762,7 +1386,8 @@ export default function MerchantTopupFlowScreen({ navigation }) {
                 summary={{
                   mobile: `${dial} ${formatLocal(localNumber)}`,
                   amount: amountAfn,
-                  operator: operator?.name || t('common.unknown')
+                  operator: operator?.name || t('common.unknown'),
+                  product: product,
                 }}
                 onEditNumber={() => jumpTo(BASE_STEPS.NUMBER)}
               />
@@ -786,7 +1411,18 @@ export default function MerchantTopupFlowScreen({ navigation }) {
         </KeyboardAvoidingView>
       )}
 
-      <ContactsModal />
+      <ContactsModal
+        contactsModalVisible={contactsModalVisible}
+        setContactsModalVisible={setContactsModalVisible}
+        contactsSlideAnim={contactsSlideAnim}
+        insets={insets}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        filteredContacts={filteredContacts}
+        handleContactSelect={handleContactSelect}
+        loadingContacts={loadingContacts}
+      />
+      
       <CountriesModal />
     </SafeAreaView>
   );
@@ -1042,46 +1678,6 @@ function StepNumber({
   );
 }
 
-function AmountInput({ value, onChangeText }) {
-  const { t } = useTranslation();
-  const [isFocused, setIsFocused] = useState(false);
-
-  return (
-    <View style={[
-      TopUpStyles.customRow,
-      {
-        borderColor: isFocused ? Colors.primary : '#2e2e2eff',
-        backgroundColor: '#FFFFFF',
-        shadowColor: Colors.primary,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: isFocused ? 0.15 : 0,
-        shadowRadius: isFocused ? 10 : 0,
-        elevation: isFocused ? 3 : 0,
-      }
-    ]}>
-      <Text style={TopUpStyles.currencyTag}>AFN</Text>
-      <TextInput
-        value={value}
-        onChangeText={onChangeText}
-        placeholder="0"
-        keyboardType="decimal-pad"
-        style={TopUpStyles.customInput}
-        onFocus={() => setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
-      />
-      {value && (
-        <TouchableOpacity
-          style={[TopUpStyles.clearBtn, { opacity: value ? 1 : 0.5 }]}
-          disabled={!value}
-          onPress={() => onChangeText("")}
-        >
-          <Ionicons name="close-circle" size={18} color="#A3A3A3" />
-        </TouchableOpacity>
-      )}
-    </View>
-  );
-}
-
 function StepPay({
   summary,
   onEditNumber,
@@ -1106,6 +1702,14 @@ function StepPay({
           <Text style={TopUpStyles.summaryKey}>{t('common.operator')}</Text>
           <Text style={TopUpStyles.summaryValue}>{summary.operator}</Text>
         </View>
+        {summary.product?.productName && (
+          <View style={TopUpStyles.summaryRow}>
+            <Text style={TopUpStyles.summaryKey}>Product</Text>
+            <Text style={TopUpStyles.summaryValue}>
+              {summary.product.productName?.en || summary.product.productName}
+            </Text>
+          </View>
+        )}
         <View style={TopUpStyles.summaryRow}>
           <Text style={TopUpStyles.summaryKey}>{t('amount')}</Text>
           <Text style={TopUpStyles.summaryValue}>{summary.amount} AFN</Text>
@@ -1138,3 +1742,116 @@ function StepPay({
   );
 }
 
+// Wrapper component with QueryClientProvider
+export default function MerchantTopupFlowScreenWrapper({ navigation }) {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <MerchantTopupFlowScreen navigation={navigation} />
+    </QueryClientProvider>
+  );
+}
+
+const styles = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalBackdrop: {
+    flex: 1,
+  },
+  modalCard: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'white',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  closeButton: {
+    padding: 4,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    margin: 20,
+    marginTop: 16,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    height: 48,
+  },
+  searchIcon: {
+    marginRight: 12,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#1F2937',
+    height: '100%',
+  },
+  contactItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  contactAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginEnd: 12,
+  },
+  contactInfo: {
+    flex: 1,
+  },
+  contactName: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  contactPhone: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  contactSeparator: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+    marginLeft: 72,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+  },
+  emptyText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#6B7280',
+  },
+  modalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+});

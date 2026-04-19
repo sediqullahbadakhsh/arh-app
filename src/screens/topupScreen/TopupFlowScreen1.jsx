@@ -1,3 +1,4 @@
+//screens/topupscreen/TopupFlowScreen1.jsx
 import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import {
   SafeAreaView,
@@ -90,6 +91,8 @@ const QUERY_KEYS = {
 };
 
 const useCountries = () => {
+  const { t } = useTranslation();
+  
   return useQuery({
     queryKey: QUERY_KEYS.COUNTRIES,
     queryFn: async () => {
@@ -97,6 +100,10 @@ const useCountries = () => {
       return response?.data || [];
     },
     staleTime: 30 * 60 * 1000,
+    onError: (error) => {
+      console.error('Error fetching countries:', error);
+      Alert.alert(t('common.error'), t('failedToLoadCountries'));
+    },
   });
 };
 
@@ -122,8 +129,9 @@ const useSlabs = () => {
   });
 };
 
-
 const usePromoCodeValidation = () => {
+  const { t } = useTranslation();
+  
   return useMutation({
     mutationFn: async ({ code, orderAmount }) => {
       const response = await validatePromoCode({
@@ -134,8 +142,11 @@ const usePromoCodeValidation = () => {
     },
     onSuccess: (data) => {
       if (!data.status) {
-        throw new Error(data.error || 'Invalid promo code');
+        throw new Error(data.error || t('promoCode.invalidCode'));
       }
+    },
+    onError: (error) => {
+      console.error('Promo code validation error:', error);
     },
   });
 };
@@ -155,12 +166,14 @@ const useRechargeMutation = () => {
 };
 
 const useContacts = () => {
+  const { t } = useTranslation();
+  
   return useQuery({
     queryKey: QUERY_KEYS.CONTACTS,
     queryFn: async () => {
       const { status } = await Contacts.requestPermissionsAsync();
       if (status !== 'granted') {
-        throw new Error('Contacts permission denied');
+        throw new Error(t('permissionDenied'));
       }
       
       const { data } = await Contacts.getContactsAsync({
@@ -172,7 +185,349 @@ const useContacts = () => {
     enabled: false,
     staleTime: Infinity,
     cacheTime: Infinity,
+    onError: (error) => {
+      console.error('Error loading contacts:', error);
+      Alert.alert(t('common.error'), t('failedToLoadContacts'));
+    },
   });
+};
+
+// Function to normalize phone numbers by removing country codes
+const normalizePhoneNumber = (phoneNumber, countryDialCode) => {
+  if (!phoneNumber) return "";
+  
+  // Remove all non-digit characters
+  let normalized = phoneNumber.replace(/\D/g, "");
+  
+  // Common country codes to remove (including +)
+  const countryCodes = [
+    '+1', '1',  // USA/Canada
+    '+44', '44', // UK
+    '+91', '91', // India
+    '+92', '92', // Pakistan
+    '+93', '93', // Afghanistan
+    '+94', '94', // Sri Lanka
+    '+95', '95', // Myanmar
+    '+96', '96', // 
+    '+97', '97', // UAE
+    '+98', '98', // Iran
+    '+99', '99', // 
+    '+20', '20', // Egypt
+    '+30', '30', // Greece
+    '+31', '31', // Netherlands
+    '+32', '32', // Belgium
+    '+33', '33', // France
+    '+34', '34', // Spain
+    '+39', '39', // Italy
+    '+40', '40', // Romania
+    '+41', '41', // Switzerland
+    '+43', '43', // Austria
+    '+45', '45', // Denmark
+    '+46', '46', // Sweden
+    '+47', '47', // Norway
+    '+48', '48', // Poland
+    '+49', '49', // Germany
+    '+51', '51', // Peru
+    '+52', '52', // Mexico
+    '+53', '53', // Cuba
+    '+54', '54', // Argentina
+    '+55', '55', // Brazil
+    '+56', '56', // Chile
+    '+57', '57', // Colombia
+    '+58', '58', // Venezuela
+    '+60', '60', // Malaysia
+    '+61', '61', // Australia
+    '+62', '62', // Indonesia
+    '+63', '63', // Philippines
+    '+64', '64', // New Zealand
+    '+65', '65', // Singapore
+    '+66', '66', // Thailand
+    '+81', '81', // Japan
+    '+82', '82', // South Korea
+    '+84', '84', // Vietnam
+    '+86', '86', // China
+    '+90', '90', // Turkey
+    '+212', '212', // Morocco
+    '+213', '213', // Algeria
+    '+216', '216', // Tunisia
+    '+218', '218', // Libya
+    '+220', '220', // Gambia
+    '+221', '221', // Senegal
+    '+222', '222', // Mauritania
+    '+223', '223', // Mali
+    '+224', '224', // Guinea
+    '+225', '225', // Ivory Coast
+    '+226', '226', // Burkina Faso
+    '+227', '227', // Niger
+    '+228', '228', // Togo
+    '+229', '229', // Benin
+    '+230', '230', // Mauritius
+    '+231', '231', // Liberia
+    '+232', '232', // Sierra Leone
+    '+233', '233', // Ghana
+    '+234', '234', // Nigeria
+    '+235', '235', // Chad
+    '+236', '236', // Central African Republic
+    '+237', '237', // Cameroon
+    '+238', '238', // Cape Verde
+    '+239', '239', // Sao Tome and Principe
+    '+240', '240', // Equatorial Guinea
+    '+241', '241', // Gabon
+    '+242', '242', // Republic of the Congo
+    '+243', '243', // Democratic Republic of the Congo
+    '+244', '244', // Angola
+    '+245', '245', // Guinea-Bissau
+    '+246', '246', // Diego Garcia
+    '+247', '247', // Ascension Island
+    '+248', '248', // Seychelles
+    '+249', '249', // Sudan
+    '+250', '250', // Rwanda
+    '+251', '251', // Ethiopia
+    '+252', '252', // Somalia
+    '+253', '253', // Djibouti
+    '+254', '254', // Kenya
+    '+255', '255', // Tanzania
+    '+256', '256', // Uganda
+    '+257', '257', // Burundi
+    '+258', '258', // Mozambique
+    '+260', '260', // Zambia
+    '+261', '261', // Madagascar
+    '+262', '262', // Reunion
+    '+263', '263', // Zimbabwe
+    '+264', '264', // Namibia
+    '+265', '265', // Malawi
+    '+266', '266', // Lesotho
+    '+267', '267', // Botswana
+    '+268', '268', // Eswatini
+    '+269', '269', // Comoros
+    '+290', '290', // Saint Helena
+    '+291', '291', // Eritrea
+    '+297', '297', // Aruba
+    '+298', '298', // Faroe Islands
+    '+299', '299', // Greenland
+    '+350', '350', // Gibraltar
+    '+351', '351', // Portugal
+    '+352', '352', // Luxembourg
+    '+353', '353', // Ireland
+    '+354', '354', // Iceland
+    '+355', '355', // Albania
+    '+356', '356', // Malta
+    '+357', '357', // Cyprus
+    '+358', '358', // Finland
+    '+359', '359', // Bulgaria
+    '+370', '370', // Lithuania
+    '+371', '371', // Latvia
+    '+372', '372', // Estonia
+    '+373', '373', // Moldova
+    '+374', '374', // Armenia
+    '+375', '375', // Belarus
+    '+376', '376', // Andorra
+    '+377', '377', // Monaco
+    '+378', '378', // San Marino
+    '+379', '379', // Vatican City
+    '+380', '380', // Ukraine
+    '+381', '381', // Serbia
+    '+382', '382', // Montenegro
+    '+383', '383', // Kosovo
+    '+385', '385', // Croatia
+    '+386', '386', // Slovenia
+    '+387', '387', // Bosnia and Herzegovina
+    '+389', '389', // North Macedonia
+    '+420', '420', // Czech Republic
+    '+421', '421', // Slovakia
+    '+423', '423', // Liechtenstein
+    '+500', '500', // Falkland Islands
+    '+501', '501', // Belize
+    '+502', '502', // Guatemala
+    '+503', '503', // El Salvador
+    '+504', '504', // Honduras
+    '+505', '505', // Nicaragua
+    '+506', '506', // Costa Rica
+    '+507', '507', // Panama
+    '+508', '508', // Saint Pierre and Miquelon
+    '+509', '509', // Haiti
+    '+590', '590', // Guadeloupe
+    '+591', '591', // Bolivia
+    '+592', '592', // Guyana
+    '+593', '593', // Ecuador
+    '+594', '594', // French Guiana
+    '+595', '595', // Paraguay
+    '+596', '596', // Martinique
+    '+597', '597', // Suriname
+    '+598', '598', // Uruguay
+    '+599', '599', // Caribbean Netherlands
+    '+670', '670', // East Timor
+    '+672', '672', // Australian External Territories
+    '+673', '673', // Brunei
+    '+674', '674', // Nauru
+    '+675', '675', // Papua New Guinea
+    '+676', '676', // Tonga
+    '+677', '677', // Solomon Islands
+    '+678', '678', // Vanuatu
+    '+679', '679', // Fiji
+    '+680', '680', // Palau
+    '+681', '681', // Wallis and Futuna
+    '+682', '682', // Cook Islands
+    '+683', '683', // Niue
+    '+685', '685', // Samoa
+    '+686', '686', // Kiribati
+    '+687', '687', // New Caledonia
+    '+688', '688', // Tuvalu
+    '+689', '689', // French Polynesia
+    '+690', '690', // Tokelau
+    '+691', '691', // Micronesia
+    '+692', '692', // Marshall Islands
+    '+850', '850', // North Korea
+    '+852', '852', // Hong Kong
+    '+853', '853', // Macau
+    '+855', '855', // Cambodia
+    '+856', '856', // Laos
+    '+880', '880', // Bangladesh
+    '+886', '886', // Taiwan
+    '+960', '960', // Maldives
+    '+961', '961', // Lebanon
+    '+962', '962', // Jordan
+    '+963', '963', // Syria
+    '+964', '964', // Iraq
+    '+965', '965', // Kuwait
+    '+966', '966', // Saudi Arabia
+    '+967', '967', // Yemen
+    '+968', '968', // Oman
+    '+970', '970', // Palestine
+    '+971', '971', // United Arab Emirates
+    '+972', '972', // Israel
+    '+973', '973', // Bahrain
+    '+974', '974', // Qatar
+    '+975', '975', // Bhutan
+    '+976', '976', // Mongolia
+    '+977', '977', // Nepal
+    '+992', '992', // Tajikistan
+    '+993', '993', // Turkmenistan
+    '+994', '994', // Azerbaijan
+    '+995', '995', // Georgia
+    '+996', '996', // Kyrgyzstan
+    '+998', '998', // Uzbekistan
+  ];
+  
+  // Sort country codes by length (longest first) to avoid partial matches
+  const sortedCountryCodes = [...countryCodes].sort((a, b) => b.length - a.length);
+  
+  // Remove country codes
+  for (const code of sortedCountryCodes) {
+    if (normalized.startsWith(code)) {
+      normalized = normalized.substring(code.length);
+      break;
+    }
+  }
+  
+  // Remove leading zeros (common after country code removal)
+  normalized = normalized.replace(/^0+/, '');
+  
+  return normalized;
+};
+
+const ContactsModal = ({ 
+  contactsModalVisible, 
+  setContactsModalVisible, 
+  contactsSlideAnim, 
+  insets, 
+  searchQuery, 
+  setSearchQuery, 
+  filteredContacts, 
+  handleContactSelect,
+  loadingContacts
+}) => {
+  const { t } = useTranslation();
+  
+  return (
+    <Modal
+      visible={contactsModalVisible}
+      transparent={true}
+      animationType="none"
+      statusBarTranslucent={true}
+      onRequestClose={() => setContactsModalVisible(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <TouchableOpacity 
+          style={styles.modalBackdrop}
+          activeOpacity={1}
+          onPress={() => setContactsModalVisible(false)}
+        />
+        <Animated.View 
+          style={[
+            styles.modalCard,
+            { 
+              transform: [{ translateY: contactsSlideAnim }],
+              height: '80%',
+              marginBottom: -insets.bottom
+            }
+          ]}
+        >
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>{t("selectContact")}</Text>
+            <TouchableOpacity 
+              onPress={() => setContactsModalVisible(false)}
+              style={styles.closeButton}
+            >
+              <Ionicons name="close" size={24} color="#666" />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.searchContainer}>
+            <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
+            <TextInput
+              placeholder={t("searchContacts")}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              style={styles.searchInput}
+              placeholderTextColor="#999"
+            />
+          </View>
+
+          {loadingContacts ? (
+            <View style={styles.emptyContainer}>
+              <ActivityIndicator size="large" color={Colors.primary} />
+              <Text style={styles.emptyText}>{t("loadingContacts")}</Text>
+            </View>
+          ) : filteredContacts.length > 0 ? (
+            <FlatList
+              data={filteredContacts}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.contactItem}
+                  onPress={() => {
+                    if (item.phoneNumbers && item.phoneNumbers.length > 0) {
+                      // Pass the phone number to handleContactSelect
+                      handleContactSelect(item.phoneNumbers[0].number);
+                    }
+                  }}
+                >
+                  <View style={styles.contactAvatar}>
+                    <Text style={{ color: 'white', fontWeight: 'bold' }}>
+                      {item.name ? item.name.charAt(0).toUpperCase() : '?'}
+                    </Text>
+                  </View>
+                  <View style={styles.contactInfo}>
+                    <Text style={styles.contactName}>{item.name}</Text>
+                    {item.phoneNumbers && item.phoneNumbers.length > 0 && (
+                      <Text style={styles.contactPhone}>{item.phoneNumbers[0].number}</Text>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              )}
+              ItemSeparatorComponent={() => <View style={styles.contactSeparator} />}
+            />
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="people-outline" size={48} color="#999" />
+              <Text style={styles.emptyText}>{t("noContactsFound")}</Text>
+            </View>
+          )}
+        </Animated.View>
+      </View>
+    </Modal>
+  );
 };
 
 const PromoCodeModal = React.memo(({ 
@@ -206,18 +561,18 @@ const PromoCodeModal = React.memo(({
       statusBarTranslucent={true}
       onRequestClose={handleClose}
     >
-      <View style={modalStyles.modalOverlay}>
-        <View style={modalStyles.modalContent}>
-          <View style={modalStyles.modalHeader}>
-            <Text style={modalStyles.modalTitle}>{t('promoCode.applyPromo')}</Text>
-            <TouchableOpacity onPress={handleClose} style={modalStyles.closeButton}>
-              <Text style={modalStyles.closeButtonText}>×</Text>
+      <View style={styles.modalOverlay}>
+        <View style={styles.promoModalContent}>
+          <View style={styles.promoModalHeader}>
+            <Text style={styles.promoModalTitle}>{t('promoCode.applyPromo')}</Text>
+            <TouchableOpacity onPress={handleClose} style={styles.promoCloseButton}>
+              <Text style={styles.promoCloseButtonText}>×</Text>
             </TouchableOpacity>
           </View>
 
-          <View style={modalStyles.promoInputContainer}>
+          <View style={styles.promoInputContainer}>
             <TextInput
-              style={modalStyles.promoInput}
+              style={styles.promoInput}
               placeholder={t('promoCode.enterCodePlaceholder')}
               value={promoCode}
               onChangeText={handleTextChange}
@@ -228,25 +583,25 @@ const PromoCodeModal = React.memo(({
           </View>
 
           {promoError ? (
-            <View style={modalStyles.errorContainer}>
-              <Text style={modalStyles.errorText}>{promoError}</Text>
+            <View style={styles.promoErrorContainer}>
+              <Text style={styles.promoErrorText}>{promoError}</Text>
             </View>
           ) : null}
 
-          <View style={modalStyles.modalButtons}>
+          <View style={styles.promoModalButtons}>
             <TouchableOpacity 
-              style={[modalStyles.modalButton, modalStyles.cancelButton]} 
+              style={[styles.promoModalButton, styles.promoCancelButton]} 
               onPress={handleClose}
               disabled={validatingPromo}
             >
-              <Text style={modalStyles.cancelButtonText}>{t('cancel')}</Text>
+              <Text style={styles.promoCancelButtonText}>{t('cancel')}</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
               style={[
-                modalStyles.modalButton, 
-                modalStyles.applyButton, 
-                (!promoCode.trim() || validatingPromo) && modalStyles.disabledButton
+                styles.promoModalButton, 
+                styles.promoApplyButton, 
+                (!promoCode.trim() || validatingPromo) && styles.promoDisabledButton
               ]} 
               onPress={handleApply}
               disabled={!promoCode.trim() || validatingPromo}
@@ -254,7 +609,7 @@ const PromoCodeModal = React.memo(({
               {validatingPromo ? (
                 <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
-                <Text style={modalStyles.applyButtonText}>{t('promoCode.apply')}</Text>
+                <Text style={styles.promoApplyButtonText}>{t('promoCode.apply')}</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -314,7 +669,6 @@ function TopupFlowScreen({ navigation, route }) {
   const dial = DIAL_CODES[country?.countryCode] || "";
   const operator = guessOperator(country?.countryCode, localNumber.replace(/\D/g, ""));
 
-
   const startPollingOrderStatus = async (orderId) => {
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
@@ -360,8 +714,14 @@ function TopupFlowScreen({ navigation, route }) {
   };
 
   const calculateTotalAfnAmount = (baseAfn, productItem = null) => {
-    const baseAmount = parseFloat(baseAfn) || 0;
     const targetProduct = productItem || product;
+    
+    // If we have product with totalAmountInProductCurrency, use that
+    if (targetProduct?.totalAmountInProductCurrency) {
+      return parseFloat(targetProduct.totalAmountInProductCurrency);
+    }
+    
+    const baseAmount = parseFloat(baseAfn) || 0;
     
     if (!targetProduct) {
       return baseAmount;
@@ -369,21 +729,28 @@ function TopupFlowScreen({ navigation, route }) {
 
     let totalAmount = baseAmount;
     
-    if (targetProduct.slabDetails?.percentage) {
-      totalAmount += baseAmount * (targetProduct.slabDetails.percentage / 100);
+    if (targetProduct.slabPercentage) {
+      totalAmount += baseAmount * (targetProduct.slabPercentage / 100);
     }
     
-    if (targetProduct.serviceSlabDetails?.percentage) {
-      totalAmount += baseAmount * (targetProduct.serviceSlabDetails.percentage / 100);
+    if (targetProduct.serviceSlabPercentage) {
+      totalAmount += baseAmount * (targetProduct.serviceSlabPercentage / 100);
     }
     
     return totalAmount;
   };
 
   const calculateUsdAmount = (afnAmount, productItem = null) => {
+    const targetProduct = productItem || product;
+    
+    // If we have product with totalAmountInUSD, use that
+    if (targetProduct?.totalAmountInUSD) {
+      return parseFloat(targetProduct.totalAmountInUSD);
+    }
+    
     if (!exchangeRate || !afnAmount) return 0;
     
-    const totalAfn = calculateTotalAfnAmount(afnAmount, productItem);
+    const totalAfn = calculateTotalAfnAmount(afnAmount, targetProduct);
     const usdAmount = totalAfn * exchangeRate;
     return parseFloat(usdAmount.toFixed(2));
   };
@@ -401,24 +768,45 @@ function TopupFlowScreen({ navigation, route }) {
     const targetProduct = productItem || product;
     let totalFee = 0;
     
-    if (targetProduct?.slabDetails?.percentage) {
-      totalFee += baseAmount * (targetProduct.slabDetails.percentage / 100);
+    if (targetProduct?.slabPercentage) {
+      totalFee += baseAmount * (targetProduct.slabPercentage / 100);
     }
     
-    if (targetProduct?.serviceSlabDetails?.percentage) {
-      totalFee += baseAmount * (targetProduct.serviceSlabDetails.percentage / 100);
+    if (targetProduct?.serviceSlabPercentage) {
+      totalFee += baseAmount * (targetProduct.serviceSlabPercentage / 100);
     }
     
     return parseFloat(totalFee.toFixed(2));
   };
 
   const getActualAfnAmount = () => {
-    if (product && product.price) {
-      return parseFloat(product.price);
+    console.log("getActualAfnAmount debug:", {
+      product,
+      productPrice: product?.price,
+      productBasePrice: product?.basePrice,
+      customAfn
+    });
+    
+    if (product) {
+      // First check for customAmount (for custom topups)
+      if (product.customAmount && !isNaN(parseFloat(product.customAmount))) {
+        return parseFloat(product.customAmount);
+      }
+      // Then check for price
+      if (product.price && !isNaN(parseFloat(product.price))) {
+        return parseFloat(product.price);
+      }
+      // Then check for basePrice
+      if (product.basePrice && !isNaN(parseFloat(product.basePrice))) {
+        return parseFloat(product.basePrice);
+      }
     }
+    
+    // Fallback to customAfn input
     if (customAfn && !isNaN(parseFloat(customAfn))) {
       return parseFloat(customAfn);
     }
+    
     return 0;
   };
 
@@ -459,7 +847,14 @@ function TopupFlowScreen({ navigation, route }) {
 
   // Update final amount
   useEffect(() => {
-    const originalUsd = calculateUsdAmount(getActualAfnAmount());
+    let originalUsd = 0;
+    
+    if (product?.totalAmountInUSD) {
+      originalUsd = parseFloat(product.totalAmountInUSD);
+    } else {
+      originalUsd = calculateUsdAmount(getActualAfnAmount());
+    }
+    
     const newFinalAmount = Math.max(0, originalUsd - discountAmount);
     setFinalAmount(parseFloat(newFinalAmount.toFixed(2)));
   }, [usd, discountAmount, product, customAfn, exchangeRate]);
@@ -573,14 +968,26 @@ function TopupFlowScreen({ navigation, route }) {
     setPromoError("");
 
     try {
-      const orderAmount = getActualAfnAmount();
+      let orderAmount = getActualAfnAmount();
+      
+      if (product?.totalAmountInUSD) {
+        const totalUsd = parseFloat(product.totalAmountInUSD);
+        orderAmount = exchangeRate ? totalUsd / exchangeRate : orderAmount;
+      }
+      
       const response = await promoCodeValidation.mutateAsync({
         code: promoCode.trim(),
         orderAmount: orderAmount
       });
 
       let discount = 0;
-      const baseUsdAmount = calculateUsdAmount(getActualAfnAmount());
+      let baseUsdAmount = 0;
+      
+      if (product?.totalAmountInUSD) {
+        baseUsdAmount = parseFloat(product.totalAmountInUSD);
+      } else {
+        baseUsdAmount = calculateUsdAmount(getActualAfnAmount());
+      }
       
       if (response.discount_type === 'percentage') {
         discount = (baseUsdAmount * response.discount_value) / 100;
@@ -653,7 +1060,7 @@ function TopupFlowScreen({ navigation, route }) {
     }
   }, [route.params?.resendOrder]);
 
-  // Mobile number validation
+
   const validateMobileNumber = (number, dialCode = "+93") => {
     const cleanNumber = number.replace(/\D/g, "");
     
@@ -700,7 +1107,7 @@ function TopupFlowScreen({ navigation, route }) {
     };
   };
 
-  // Navigation
+
   const canNext =
     (step === BASE_STEPS.COUNTRY && !!country) ||
     (step === BASE_STEPS.NUMBER && localNumber.replace(/\D/g, "").length === 9 && validateMobileNumber(localNumber).isValid) ||
@@ -717,10 +1124,40 @@ function TopupFlowScreen({ navigation, route }) {
 
   const jumpTo = (i) => setStep(i);
 
-  // Reset local number when country changes
   useEffect(() => {
     setLocalNumber("");
   }, [country?.countryCode]);
+
+  const handleContactSelect = useCallback((phoneNumber) => {
+    if (!phoneNumber) {
+      Alert.alert(t('error'), t('invalidPhoneNumber'));
+      return;
+    }
+
+    console.log("Selected contact phone number:", phoneNumber);
+    
+
+    let normalizedNumber = normalizePhoneNumber(phoneNumber, dial.replace('+', ''));
+    
+    console.log("Normalized number after removing country codes:", normalizedNumber);
+    
+    normalizedNumber = normalizedNumber.replace(/^0+/, '');
+    
+    console.log("Final normalized number:", normalizedNumber);
+    
+    if (normalizedNumber.length < 7) {
+      Alert.alert(t('error'), t('invalidPhoneNumberLength'));
+      return;
+    }
+
+    setLocalNumber(normalizedNumber);
+
+    setContactsModalVisible(false);
+    setSearchQuery('');
+    
+
+   
+  }, [dial, t]);
 
   // Handle popular amount selection
   const handleSelectPopularAmount = (selectedAmount) => {
@@ -749,15 +1186,25 @@ function TopupFlowScreen({ navigation, route }) {
       return;
     }
 
-    if (afn <= 0) {
+    // Get amounts directly from product or custom input
+    let afnAmount = 0;
+    let originalUsdAmount = 0;
+    
+    if (product) {
+      afnAmount = parseFloat(product.basePrice) || parseFloat(product.price) || 0;
+      originalUsdAmount = parseFloat(product.totalAmountInUSD) || 0;
+    } else if (customAfn && !isNaN(parseFloat(customAfn))) {
+      afnAmount = parseFloat(customAfn);
+      originalUsdAmount = calculateUsdAmount(afnAmount);
+    }
+
+    if (afnAmount <= 0) {
       Alert.alert("Invalid Amount", "Please enter a valid amount greater than 0");
       return;
     }
 
-    const originalUsdAmount = calculateUsdAmount(afn);
-
     const payload = {
-      amount: afn,
+      amount: afnAmount,
       companyId: "",
       countryId: country?.id,
       currency: "AFN",
@@ -769,23 +1216,24 @@ function TopupFlowScreen({ navigation, route }) {
       cardAmount: finalAmount,
       confirmNow: true,
       paymentMethodId: paymentMethodId,
-      customAmount: customAfn || afn,
+      customAmount: customAfn || afnAmount,
       serviceType: serviceType,
       promo_code: appliedPromoCode?.code || null,
-      finalDiscountAmount: finalAmount,
+      finalDiscountAmount: discountAmount,
       promodiscountamoun: discountAmount,
     };
+
+    console.log("Recharge payload:", payload);
 
     try {
       const response = await rechargeMutation.mutateAsync(payload);
       
       if (response.status === "queued" || response.status === "processing" || response.success) {
-        // Set order details IMMEDIATELY with orderId - same as bundle activation
         const newOrderDetails = {
           orderId: response.orderId,
           txnNumber: response.txnNumber || `TXN-${Date.now()}`,
           mobile: `${dial} ${formatLocal(localNumber)}`,
-          amountAfn: afn,
+          amountAfn: afnAmount,
           usdAmount: finalAmount,
           originalUsdAmount: originalUsdAmount,
           discountAmount: discountAmount,
@@ -800,12 +1248,9 @@ function TopupFlowScreen({ navigation, route }) {
         setOrderDetails(newOrderDetails);
         setOrderStatus(ORDER_STATUS.QUEUED);
         
-      
         if (response.orderId) {
           await startPollingOrderStatus(response.orderId);
         }
-        
-       
       } else if (response.status === "requires_action") {
         const { error } = await confirmPayment(response.nextAction.clientSecret);
         if (error) {
@@ -815,7 +1260,7 @@ function TopupFlowScreen({ navigation, route }) {
             orderId: response.orderId,
             txnNumber: response.txnNumber || `TXN-${Date.now()}`,
             mobile: `${dial} ${formatLocal(localNumber)}`,
-            amountAfn: afn,
+            amountAfn: afnAmount,
             usdAmount: finalAmount,
             originalUsdAmount: originalUsdAmount,
             discountAmount: discountAmount,
@@ -830,7 +1275,6 @@ function TopupFlowScreen({ navigation, route }) {
           setOrderDetails(newOrderDetails);
           setOrderStatus(ORDER_STATUS.QUEUED);
           
-       
           if (response.orderId) {
             await startPollingOrderStatus(response.orderId);
           }
@@ -844,7 +1288,7 @@ function TopupFlowScreen({ navigation, route }) {
       setOrderStatus(ORDER_STATUS.FAILED);
       setOrderDetails({
         mobile: `${dial} ${formatLocal(localNumber)}`,
-        amountAfn: serviceType === 'bundle' ? (product?.price || 0) : afn,
+        amountAfn: serviceType === 'bundle' ? (product?.price || 0) : afnAmount,
         usdAmount: finalAmount,
         originalUsdAmount: originalUsdAmount,
         discountAmount: discountAmount,
@@ -860,33 +1304,63 @@ function TopupFlowScreen({ navigation, route }) {
     }
   };
 
-
   const getPaymentSummaryForBundle = () => {
-    const baseAfn = serviceType === 'bundle' && product ? parseFloat(product.price) : afn;
-    const baseAmount = calculateBaseAmount(baseAfn);
-    const feeAmount = calculateFeeAmount(baseAfn);
-    const totalUsd = calculateUsdAmount(baseAfn);
+    console.log("getPaymentSummaryForBundle debug:", {
+      product,
+      price: product?.price,
+      basePriceInUSD: product?.basePriceInUSD,
+      totalAmountInUSD: product?.totalAmountInUSD,
+      serviceSlabPercentage: product?.serviceSlabPercentage,
+      finalAmount,
+      discountAmount
+    });
     
-    const slabPercent = product?.slabDetails?.percentage || 0;
-    const serviceSlabPercent = product?.serviceSlabDetails?.percentage || 0;
+    // Get values directly from product
+    let afnAmount = 0;
+    let baseUsd = 0;
+    let totalUsd = 0;
+    let feeUsd = 0;
+    
+    if (product) {
+      afnAmount = parseFloat(product.price) || parseFloat(product.basePrice) || 0;
+      baseUsd = parseFloat(product.basePriceInUSD) || calculateBaseAmount(afnAmount);
+      totalUsd = parseFloat(product.totalAmountInUSD) || calculateUsdAmount(afnAmount);
+      
+      // Calculate fee: totalAmountInUSD - basePriceInUSD
+      feeUsd = Math.max(0, totalUsd - baseUsd);
+    }
+    
+    const slabPercent = product?.slabPercentage || 0;
+    const serviceSlabPercent = product?.serviceSlabPercentage || 0;
+    
+    console.log("Bundle Payment Summary Values:", {
+      afnAmount,
+      baseUsd,
+      totalUsd,
+      feeUsd,
+      slabPercent,
+      serviceSlabPercent,
+      finalAmount,
+      discountAmount
+    });
     
     return {
       mobile: `${dial} ${formatLocal(localNumber)}`,
-      usd: totalUsd,
-      afn: baseAfn,
-      totalAfn: calculateTotalAfnAmount(baseAfn),
-      exchangeRate,
+      afn: afnAmount,
+      totalAfn: product?.totalAmountInProductCurrency || afnAmount,
+      baseAmount: baseUsd,
+      feeAmount: feeUsd,
+      totalAmount: totalUsd,
       slabPercentage: slabPercent,
       serviceSlabPercentage: serviceSlabPercent,
-      baseAmount: baseAmount,
-      feeAmount: feeAmount,
-      totalAmount: totalUsd,
+      exchangeRate,
       product: product,
       serviceType: serviceType,
       finalAmount: finalAmount,
       discountAmount: discountAmount,
       appliedPromoCode: appliedPromoCode,
-      onApplyPromoCode: handleApplyPromoCode,
+      
+      onApplyPromoCode: openPromoModal,
       onRemovePromoCode: handleRemovePromoCode,
       openPromoModal: openPromoModal,
       closePromoModal: closePromoModal,
@@ -896,54 +1370,70 @@ function TopupFlowScreen({ navigation, route }) {
   };
 
   const getPaymentSummaryForRecharge = () => {
-    let baseAfn = 0;
-    let baseAmount = 0;
-    let feeAmount = 0;
+    console.log("getPaymentSummaryForRecharge debug:", {
+      product,
+      basePrice: product?.basePrice,
+      basePriceInUSD: product?.basePriceInUSD,
+      totalAmountInUSD: product?.totalAmountInUSD,
+      serviceSlabPercentage: product?.serviceSlabPercentage,
+      customAfn,
+      finalAmount,
+      discountAmount
+    });
+    
+    // Get values directly from product
+    let afnAmount = 0;
+    let baseUsd = 0;
     let totalUsd = 0;
-    let totalAfn = 0;
-
-    if (serviceType === 'bundle' && product) {
-      baseAfn = parseFloat(product.price) || 0;
-      baseAmount = calculateBaseAmount(baseAfn);
-      feeAmount = calculateFeeAmount(baseAfn, product);
-      totalUsd = calculateUsdAmount(baseAfn, product);
-      totalAfn = calculateTotalAfnAmount(baseAfn, product);
-    } else if (serviceType === 'recharge') {
-      if (product && product.id) {
-        baseAfn = parseFloat(product.price) || 0;
-        baseAmount = calculateBaseAmount(baseAfn);
-        feeAmount = calculateFeeAmount(baseAfn, product);
-        totalUsd = calculateUsdAmount(baseAfn, product);
-        totalAfn = calculateTotalAfnAmount(baseAfn, product);
-      } else {
-        baseAfn = getActualAfnAmount();
-        baseAmount = calculateBaseAmount(baseAfn);
-        feeAmount = calculateFeeAmount(baseAfn);
-        totalUsd = calculateUsdAmount(baseAfn);
-        totalAfn = calculateTotalAfnAmount(baseAfn);
-      }
+    let feeUsd = 0;
+    
+    if (product) {
+      // Use product values directly
+      afnAmount = parseFloat(product.basePrice) || 0;
+      baseUsd = parseFloat(product.basePriceInUSD) || 0;
+      totalUsd = parseFloat(product.totalAmountInUSD) || 0;
+      
+      // Calculate fee: totalAmountInUSD - basePriceInUSD
+      feeUsd = Math.max(0, totalUsd - baseUsd);
+    } else if (customAfn && !isNaN(parseFloat(customAfn))) {
+      // For custom amounts without product
+      afnAmount = parseFloat(customAfn);
+      baseUsd = calculateBaseAmount(afnAmount);
+      totalUsd = calculateUsdAmount(afnAmount);
+      feeUsd = calculateFeeAmount(afnAmount);
     }
-
-    const slabPercent = product?.slabDetails?.percentage || 0;
-    const serviceSlabPercent = product?.serviceSlabDetails?.percentage || 0;
+    
+    const slabPercent = product?.slabPercentage || slabPercentage;
+    const serviceSlabPercent = product?.serviceSlabPercentage || 0;
+    
+    console.log("Payment Summary Values:", {
+      afnAmount,
+      baseUsd,
+      totalUsd,
+      feeUsd,
+      slabPercent,
+      serviceSlabPercent,
+      finalAmount,
+      discountAmount
+    });
     
     return {
       mobile: `${dial} ${formatLocal(localNumber)}`,
-      usd: totalUsd,
-      afn: baseAfn,
-      totalAfn: totalAfn,
-      exchangeRate,
+      afn: afnAmount,
+      totalAfn: product?.totalAmountInProductCurrency || afnAmount,
+      baseAmount: baseUsd,
+      feeAmount: feeUsd,
+      totalAmount: totalUsd,
       slabPercentage: slabPercent,
       serviceSlabPercentage: serviceSlabPercent,
-      baseAmount: baseAmount,
-      feeAmount: feeAmount,
-      totalAmount: totalUsd,
+      exchangeRate,
       product: product,
       serviceType: serviceType,
       finalAmount: finalAmount,
       discountAmount: discountAmount,
       appliedPromoCode: appliedPromoCode,
-      onApplyPromoCode: handleApplyPromoCode,
+      
+      onApplyPromoCode: openPromoModal,
       onRemovePromoCode: handleRemovePromoCode,
       openPromoModal: openPromoModal,
       closePromoModal: closePromoModal,
@@ -969,7 +1459,6 @@ function TopupFlowScreen({ navigation, route }) {
     setPromoError("");
     setPromoModalVisible(false);
     
-    // Clear polling interval
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
       pollingRef.current = null;
@@ -979,26 +1468,6 @@ function TopupFlowScreen({ navigation, route }) {
       lottieRef.current.reset();
     }
   };
-
-  // Contact selection
-  const handleContactSelect = (phoneNumber) => {
-    if (!phoneNumber) {
-      Alert.alert(t('error'), t('invalidPhoneNumber'));
-      return;
-    }
-
-    let number = phoneNumber.replace(/\D/g, "");
-
-    const countryDialCode = country?.dialCode?.replace('+', '') || DIAL_CODES[country?.countryCode]?.replace('+', '') || '';
-    if (countryDialCode && number.startsWith(countryDialCode)) {
-      number = number.substring(countryDialCode.length);
-    }
-    number = number.replace(/^0+/, '');
-    setLocalNumber(number);
-    setContactsModalVisible(false);
-    setSearchQuery('');
-  };
-
 
   const getStatusMessage = () => {
     switch (orderStatus) {
@@ -1100,109 +1569,22 @@ function TopupFlowScreen({ navigation, route }) {
     }
   };
 
-  // Modals
-  const ContactsModal = () => {
-    const { t } = useTranslation();
-    
-    return (
-      <Modal
-        visible={contactsModalVisible}
-        transparent={true}
-        animationType="none"
-        statusBarTranslucent={true}
-        onRequestClose={() => setContactsModalVisible(false)}
-      >
-        <View style={modalStyles.modalOverlay}>
-          <TouchableOpacity 
-            style={modalStyles.modalBackdrop}
-            activeOpacity={1}
-            onPress={() => setContactsModalVisible(false)}
-          />
-          <Animated.View 
-            style={[
-              modalStyles.modalCard,
-              { 
-                transform: [{ translateY: contactsSlideAnim }],
-                height: '80%',
-                marginBottom: -insets.bottom
-              }
-            ]}
-          >
-            <View style={modalStyles.modalHeader}>
-              <Text style={modalStyles.modalTitle}>{t('selectContact')}</Text>
-              <TouchableOpacity 
-                onPress={() => setContactsModalVisible(false)}
-                style={modalStyles.closeButton}
-              >
-                <Ionicons name="close" size={24} color="#666" />
-              </TouchableOpacity>
-            </View>
 
-            <View style={modalStyles.searchContainer}>
-              <Ionicons name="search" size={20} color="#999" style={modalStyles.searchIcon} />
-              <TextInput
-                placeholder={t('searchContacts')}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                style={modalStyles.searchInput}
-                placeholderTextColor="#999"
-              />
-            </View>
-
-            {loadingContacts ? (
-              <View style={modalStyles.emptyContainer}>
-                <ActivityIndicator size="large" color={Colors.primary} />
-                <Text style={modalStyles.emptyText}>{t('loadingContacts')}</Text>
-              </View>
-            ) : filteredContacts.length > 0 ? (
-              <FlatList
-                data={filteredContacts}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={modalStyles.contactItem}
-                    onPress={() => {
-                      if (item.phoneNumbers && item.phoneNumbers.length > 0) {
-                        handleContactSelect(item.phoneNumbers[0].number);
-                      }
-                    }}
-                  >
-                    <View style={modalStyles.contactAvatar}>
-                      <Text style={modalStyles.contactAvatarText}>
-                        {item.name ? item.name.charAt(0).toUpperCase() : '?'}
-                      </Text>
-                    </View>
-                    <View style={modalStyles.contactInfo}>
-                      <Text style={modalStyles.contactName}>{item.name}</Text>
-                      {item.phoneNumbers && item.phoneNumbers.length > 0 && (
-                        <Text style={modalStyles.contactPhone}>{item.phoneNumbers[0].number}</Text>
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                )}
-                ItemSeparatorComponent={() => <View style={modalStyles.contactSeparator} />}
-              />
-            ) : (
-              <View style={modalStyles.emptyContainer}>
-                <Ionicons name="people-outline" size={48} color="#999" />
-                <Text style={modalStyles.emptyText}>{t('noContactsFound')}</Text>
-              </View>
-            )}
-          </Animated.View>
-        </View>
-      </Modal>
-    );
-  };
+const filteredCountries = useMemo(() => {
+  let availableCountries = countries.filter(c => 
+    c.countryCode !== 'IR' && c.countryName !== 'Iran'
+  );
+  
+  if (!countrySearch) return availableCountries;
+  
+  return availableCountries.filter(c =>
+    c.countryName?.toLowerCase().includes(countrySearch.toLowerCase()) ||
+    c.countryCode?.toLowerCase().includes(countrySearch.toLowerCase())
+  );
+}, [countries, countrySearch]);
 
   const CountriesModal = () => {
     const { t } = useTranslation();
-    
-    const filteredCountries = countrySearch
-      ? countries.filter(c =>
-        c.countryName.toLowerCase().includes(countrySearch.toLowerCase()) ||
-        c.countryCode.toLowerCase().includes(countrySearch.toLowerCase())
-      )
-      : countries;
     
     return (
       <Modal
@@ -1212,15 +1594,15 @@ function TopupFlowScreen({ navigation, route }) {
         statusBarTranslucent={true}
         onRequestClose={() => setCountryOpen(false)}
       >
-        <View style={modalStyles.modalOverlay}>
+        <View style={styles.modalOverlay}>
           <TouchableOpacity 
-            style={modalStyles.modalBackdrop}
+            style={styles.modalBackdrop}
             activeOpacity={1}
             onPress={() => setCountryOpen(false)}
           />
           <Animated.View 
             style={[
-              modalStyles.modalCard,
+              styles.modalCard,
               { 
                 transform: [{ translateY: countriesSlideAnim }],
                 height: '80%',
@@ -1228,31 +1610,31 @@ function TopupFlowScreen({ navigation, route }) {
               }
             ]}
           >
-            <View style={modalStyles.modalHeader}>
-              <Text style={modalStyles.modalTitle}>{t('selectCountry')}</Text>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{t('selectCountry')}</Text>
               <TouchableOpacity 
                 onPress={() => setCountryOpen(false)}
-                style={modalStyles.closeButton}
+                style={styles.closeButton}
               >
                 <Ionicons name="close" size={24} color="#666" />
               </TouchableOpacity>
             </View>
 
-            <View style={modalStyles.searchContainer}>
-              <Ionicons name="search" size={20} color="#999" style={modalStyles.searchIcon} />
+            <View style={styles.searchContainer}>
+              <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
               <TextInput
                 placeholder={t('searchCountries')}
                 value={countrySearch}
                 onChangeText={setCountrySearch}
-                style={modalStyles.searchInput}
+                style={styles.searchInput}
                 placeholderTextColor="#999"
               />
             </View>
 
             {loadingCountries ? (
-              <View style={modalStyles.emptyContainer}>
+              <View style={styles.emptyContainer}>
                 <ActivityIndicator size="large" color={Colors.primary} />
-                <Text style={modalStyles.emptyText}>{t('loadingCountries')}</Text>
+                <Text style={styles.emptyText}>{t("loadingCountries")}</Text>
               </View>
             ) : (
               <FlatList
@@ -1260,7 +1642,7 @@ function TopupFlowScreen({ navigation, route }) {
                 keyExtractor={(item) => item.id}
                 renderItem={({ item }) => (
                   <TouchableOpacity
-                    style={modalStyles.modalRow}
+                    style={styles.modalRow}
                     onPress={() => {
                       setCountry(item);
                       setCountryOpen(false);
@@ -1280,7 +1662,7 @@ function TopupFlowScreen({ navigation, route }) {
                     </View>
                   </TouchableOpacity>
                 )}
-                ItemSeparatorComponent={() => <View style={modalStyles.contactSeparator} />}
+                ItemSeparatorComponent={() => <View style={styles.contactSeparator} />}
               />
             )}
           </Animated.View>
@@ -1293,8 +1675,6 @@ function TopupFlowScreen({ navigation, route }) {
     const receiptCaptureRef = useRef(null);
     const [hasMediaPermission, setHasMediaPermission] = useState(null);
     const [isCapturing, setIsCapturing] = useState(false);
-
-   
 
     const captureReceipt = async () => {
       try {
@@ -1419,69 +1799,69 @@ Thank you for using our service!
     };
 
     const ReceiptContent = React.forwardRef((props, ref) => (
-      <View ref={ref} style={receiptStyles.receiptCaptureContainer}>
-        <View style={receiptStyles.captureHeader}>
+      <View ref={ref} style={styles.receiptCaptureContainer}>
+        <View style={styles.captureHeader}>
           <Image
             source={require('../../../assets/logoV.png')} 
-            style={receiptStyles.captureLogo}
+            style={styles.captureLogo}
             resizeMode="contain"
           />
-          <Text style={receiptStyles.captureTitle}>TRANSACTION RECEIPT</Text>
+          <Text style={styles.captureTitle}>TRANSACTION RECEIPT</Text>
         </View>
 
-        <View style={receiptStyles.captureStatusSection}>
-          <Text style={receiptStyles.captureStatusTitle}>
+        <View style={styles.captureStatusSection}>
+          <Text style={styles.captureStatusTitle}>
             {getStatusTitle()}
           </Text>
         </View>
 
-        <View style={receiptStyles.captureDetails}>
-          <View style={receiptStyles.captureDetailRow}>
-            <Text style={receiptStyles.captureDetailLabel}>Transaction ID:</Text>
-            <Text style={receiptStyles.captureDetailValue}>{orderDetails?.txnNumber}</Text>
+        <View style={styles.captureDetails}>
+          <View style={styles.captureDetailRow}>
+            <Text style={styles.captureDetailLabel}>Transaction ID:</Text>
+            <Text style={styles.captureDetailValue}>{orderDetails?.txnNumber}</Text>
           </View>
           
-          <View style={receiptStyles.captureDetailRow}>
-            <Text style={receiptStyles.captureDetailLabel}>Date & Time:</Text>
-            <Text style={receiptStyles.captureDetailValue}>
+          <View style={styles.captureDetailRow}>
+            <Text style={styles.captureDetailLabel}>Date & Time:</Text>
+            <Text style={styles.captureDetailValue}>
               {new Date(orderDetails?.date).toLocaleString()}
             </Text>
           </View>
           
-          <View style={receiptStyles.captureDetailRow}>
-            <Text style={receiptStyles.captureDetailLabel}>Receiver:</Text>
-            <Text style={receiptStyles.captureDetailValue}>{orderDetails?.mobile}</Text>
+          <View style={styles.captureDetailRow}>
+            <Text style={styles.captureDetailLabel}>Receiver:</Text>
+            <Text style={styles.captureDetailValue}>{orderDetails?.mobile}</Text>
           </View>
 
           {orderDetails?.productName && (
-            <View style={receiptStyles.captureDetailRow}>
-              <Text style={receiptStyles.captureDetailLabel}>Bundle Plan:</Text>
-              <Text style={receiptStyles.captureDetailValue}>
+            <View style={styles.captureDetailRow}>
+              <Text style={styles.captureDetailLabel}>Bundle Plan:</Text>
+              <Text style={styles.captureDetailValue}>
                 {orderDetails?.productName?.en || orderDetails?.productName}
               </Text>
             </View>
           )}
 
-          <View style={receiptStyles.captureDetailRow}>
-            <Text style={receiptStyles.captureDetailLabel}>Status:</Text>
-            <Text style={[receiptStyles.captureDetailValue, { color: getStatusColor() }]}>
+          <View style={styles.captureDetailRow}>
+            <Text style={styles.captureDetailLabel}>Status:</Text>
+            <Text style={[styles.captureDetailValue, { color: getStatusColor() }]}>
               {getStatusTitle()}
             </Text>
           </View>
         </View>
 
-        <View style={receiptStyles.captureAmountSection}>
-          <Text style={receiptStyles.captureAmountLabel}>TOTAL AMOUNT</Text>
-          <Text style={receiptStyles.captureAmountValue}>
+        <View style={styles.captureAmountSection}>
+          <Text style={styles.captureAmountLabel}>TOTAL AMOUNT</Text>
+          <Text style={styles.captureAmountValue}>
             {orderDetails?.amountAfn} AFN
           </Text>
-          <Text style={receiptStyles.captureAmountSubValue}>
+          <Text style={styles.captureAmountSubValue}>
             ${orderDetails?.usdAmount} USD
           </Text>
         </View>
 
-        <View style={receiptStyles.captureFooter}>
-          <Text style={receiptStyles.captureFooterText}>Thank you for using our service!</Text>
+        <View style={styles.captureFooter}>
+          <Text style={styles.captureFooterText}>Thank you for using our service!</Text>
         </View>
       </View>
     ));
@@ -1661,6 +2041,7 @@ Thank you for using our service!
                 localNumber={localNumber}
                 dial={dial}
                 onBundleActivated={handleBundleActivated}
+                goNext={goNext}
               />
             )}
 
@@ -1697,6 +2078,7 @@ Thank you for using our service!
                   onPress={step === lastStep ? recharge : goNext}
                   style={{ marginTop: 24, opacity: canNext ? 1 : 0.5 }}
                   loading={loading}
+                  disabled={step === lastStep && !paymentMethodId}
                 />
                 {step > 0 && (
                   <PrimaryButton
@@ -1711,8 +2093,20 @@ Thank you for using our service!
         </KeyboardAvoidingView>
       )}
 
-      <ContactsModal />
+      <ContactsModal
+        contactsModalVisible={contactsModalVisible}
+        setContactsModalVisible={setContactsModalVisible}
+        contactsSlideAnim={contactsSlideAnim}
+        insets={insets}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        filteredContacts={filteredContacts}
+        handleContactSelect={handleContactSelect}
+        loadingContacts={loadingContacts}
+      />
+      
       <CountriesModal />
+      
       <PromoCodeModal
         visible={promoModalVisible}
         onClose={closePromoModal}
@@ -1726,7 +2120,6 @@ Thank you for using our service!
   );
 }
 
-// Wrap the component with QueryClientProvider in your App or parent component
 export default function TopupFlowScreenWrapper({ navigation, route }) {
   return (
     <QueryClientProvider client={queryClient}>
@@ -1735,12 +2128,10 @@ export default function TopupFlowScreenWrapper({ navigation, route }) {
   );
 }
 
-const modalStyles = {
+const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center', 
-    alignItems: 'center',
   },
   modalBackdrop: {
     flex: 1,
@@ -1751,230 +2142,247 @@ const modalStyles = {
     left: 0,
     right: 0,
     backgroundColor: 'white',
-    borderTopLeftRadius: scale.hp(2.5),
-    borderTopRightRadius: scale.hp(2.5),
-    paddingTop: scale.hp(2),
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 20,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: scale.wp(5),
-    paddingBottom: scale.hp(2),
+    paddingHorizontal: 20,
+    paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
   },
   modalTitle: {
-    fontSize: scale.hp(2.25),
+    fontSize: 18,
     fontWeight: '600',
     color: '#1F2937',
   },
   closeButton: {
-    padding: scale.hp(0.5),
+    padding: 4,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F3F4F6',
-    margin: scale.wp(5),
-    marginTop: scale.hp(2),
-    paddingHorizontal: scale.wp(4),
-    borderRadius: scale.hp(1.5),
-    height: scale.hp(6),
+    margin: 20,
+    marginTop: 16,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    height: 48,
   },
   searchIcon: {
-    marginEnd: scale.wp(3),
+    marginRight: 12,
   },
   searchInput: {
     flex: 1,
-    fontSize: scale.hp(2),
+    fontSize: 16,
     color: '#1F2937',
     height: '100%',
   },
   contactItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: scale.wp(5),
-    paddingVertical: scale.hp(1.5),
+    paddingHorizontal: 20,
+    paddingVertical: 12,
   },
   contactAvatar: {
-    width: scale.wp(10),
-    height: scale.wp(10),
-    borderRadius: scale.wp(5),
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: Colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginEnd: scale.wp(3),
-  },
-  contactAvatarText: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: scale.hp(2),
+    marginEnd: 12,
   },
   contactInfo: {
     flex: 1,
   },
   contactName: {
-    fontSize: scale.hp(2),
+    fontSize: 16,
     fontWeight: '500',
     color: '#1F2937',
-    marginBottom: scale.hp(0.25),
+    marginBottom: 4,
   },
   contactPhone: {
-    fontSize: scale.hp(1.75),
+    fontSize: 14,
     color: '#6B7280',
   },
   contactSeparator: {
     height: 1,
     backgroundColor: '#F3F4F6',
-    marginLeft: scale.wp(18),
+    marginLeft: 72,
   },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: scale.hp(7.5),
+    paddingVertical: 60,
   },
   emptyText: {
-    marginTop: scale.hp(1.5),
-    fontSize: scale.hp(2),
+    marginTop: 12,
+    fontSize: 16,
     color: '#6B7280',
   },
   modalRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: scale.wp(5),
-    paddingVertical: scale.hp(2),
+    paddingHorizontal: 20,
+    paddingVertical: 16,
   },
-  modalContent: {
+  
+  // Promo Modal Styles
+  promoModalContent: {
     backgroundColor: '#FFFFFF',
-    borderRadius: scale.hp(2),
-    padding: scale.hp(2.5),
-    width: '100%',
-    maxWidth: scale.wp(90),
+    borderRadius: 16,
+    padding: 24,
+    width: '90%',
+    maxWidth: 400,
+    alignSelf: 'center',
+    marginTop: 'auto',
+    marginBottom: 'auto',
+  },
+  promoModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  promoModalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  promoCloseButton: {
+    padding: 4,
+  },
+  promoCloseButtonText: {
+    fontSize: 24,
+    color: '#666',
   },
   promoInputContainer: {
-    marginBottom: scale.hp(2),
+    marginBottom: 16,
   },
   promoInput: {
     borderWidth: 2,
     borderColor: '#E0E0E0',
-    borderRadius: scale.hp(1),
-    padding: scale.hp(1.5),
-    fontSize: scale.hp(1.75),
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
     letterSpacing: 1,
     backgroundColor: '#F8F9FA',
   },
-  errorContainer: {
+  promoErrorContainer: {
     backgroundColor: '#FEF2F2',
-    padding: scale.hp(1),
-    borderRadius: scale.hp(0.75),
-    marginBottom: scale.hp(2),
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
     borderLeftWidth: 4,
     borderLeftColor: '#EF4444',
   },
-  errorText: {
+  promoErrorText: {
     color: '#DC2626',
-    fontSize: scale.hp(1.5),
+    fontSize: 14,
     fontWeight: '500',
   },
-  modalButtons: {
+  promoModalButtons: {
     flexDirection: 'row',
-    gap: scale.wp(3),
+    gap: 12,
   },
-  modalButton: {
+  promoModalButton: {
     flex: 1,
-    paddingVertical: scale.hp(1.5),
-    borderRadius: scale.hp(1),
+    paddingVertical: 14,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cancelButton: {
+  promoCancelButton: {
     backgroundColor: '#F3F4F6',
     borderWidth: 1,
     borderColor: '#D1D5DB',
   },
-  cancelButtonText: {
+  promoCancelButtonText: {
     color: Colors.textSecondary,
-    fontSize: scale.hp(1.75),
+    fontSize: 16,
     fontWeight: '600',
   },
-  applyButton: {
+  promoApplyButton: {
     backgroundColor: Colors.primary,
   },
-  disabledButton: {
+  promoDisabledButton: {
     backgroundColor: '#9CA3AF',
     opacity: 0.6,
   },
-  applyButtonText: {
+  promoApplyButtonText: {
     color: '#FFFFFF',
-    fontSize: scale.hp(1.75),
+    fontSize: 16,
     fontWeight: '600',
   },
-};
 
-const receiptStyles = StyleSheet.create({
+  // Receipt Styles
   receiptCaptureContainer: {
-    width: scale.wp(90),
+    width: 350,
     backgroundColor: '#ffffff',
-    padding: scale.hp(3),
-    borderRadius: scale.hp(1.5),
+    padding: 24,
+    borderRadius: 16,
     borderWidth: 2,
     borderColor: '#E5E7EB',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: scale.hp(0.5) },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
-    shadowRadius: scale.hp(1),
+    shadowRadius: 8,
     elevation: 5,
   },
   captureHeader: {
     alignItems: 'center',
-    marginBottom: scale.hp(2.5),
+    marginBottom: 20,
     borderBottomWidth: 2,
     borderBottomColor: Colors.primary,
-    paddingBottom: scale.hp(2),
+    paddingBottom: 16,
   },
   captureLogo: {
-    width: scale.wp(50),
-    height: scale.hp(6.25),
-    marginBottom: scale.hp(1.25),
+    width: 200,
+    height: 50,
+    marginBottom: 10,
   },
   captureTitle: {
-    fontSize: scale.hp(2.25),
+    fontSize: 20,
     fontWeight: 'bold',
     color: Colors.primary,
     textAlign: 'center',
   },
   captureStatusSection: {
     alignItems: 'center',
-    marginBottom: scale.hp(2.5),
+    marginBottom: 20,
   },
   captureStatusTitle: {
-    fontSize: scale.hp(2.5),
+    fontSize: 22,
     fontWeight: 'bold',
     color: Colors.textPrimary,
     textAlign: 'center',
   },
   captureDetails: {
-    marginBottom: scale.hp(2.5),
+    marginBottom: 20,
   },
   captureDetailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: scale.hp(1.25),
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
   },
   captureDetailLabel: {
-    fontSize: scale.hp(1.75),
+    fontSize: 14,
     color: '#6B7280',
     fontWeight: '600',
     flex: 1,
   },
   captureDetailValue: {
-    fontSize: scale.hp(1.75),
+    fontSize: 14,
     fontWeight: '600',
     color: Colors.textPrimary,
     flex: 1,
@@ -1983,38 +2391,38 @@ const receiptStyles = StyleSheet.create({
   captureAmountSection: {
     alignItems: 'center',
     backgroundColor: '#F8F9FA',
-    borderRadius: scale.hp(1),
-    padding: scale.hp(2.5),
-    marginBottom: scale.hp(2.5),
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
   captureAmountLabel: {
-    fontSize: scale.hp(2),
+    fontSize: 16,
     color: '#6B7280',
     fontWeight: '600',
-    marginBottom: scale.hp(1),
+    marginBottom: 8,
   },
   captureAmountValue: {
-    fontSize: scale.hp(3),
+    fontSize: 24,
     fontWeight: 'bold',
     color: Colors.textPrimary,
   },
   captureAmountSubValue: {
-    fontSize: scale.hp(2),
+    fontSize: 16,
     color: '#6B7280',
-    marginTop: scale.hp(0.5),
+    marginTop: 4,
   },
   captureFooter: {
     alignItems: 'center',
-    paddingTop: scale.hp(2),
+    paddingTop: 16,
     borderTopWidth: 1,
     borderTopColor: '#F3F4F6',
   },
   captureFooterText: {
-    fontSize: scale.hp(1.75),
+    fontSize: 14,
     color: '#6B7280',
     fontStyle: 'italic',
-    marginBottom: scale.hp(0.625),
+    marginBottom: 8,
   },
 });

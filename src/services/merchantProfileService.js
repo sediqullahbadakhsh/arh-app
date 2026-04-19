@@ -1,7 +1,7 @@
 import apiClient from "./apiClient";
 
 export const getCurrentMerchantProfile = async () => {
-  const lang = "en"; // Default to English for mobile app
+  const lang = "en";
   try {
     const res = await apiClient.get(`agents/profile/me?lang=${lang}`);
     console.log("Merchant profile response:", res.data);
@@ -17,13 +17,11 @@ export const updateMerchantProfile = async (payload) => {
   
   try {
     const formData = new FormData();
-    
-    // Append user data
+
     if (payload.username) formData.append('username', payload.username);
     if (payload.email) formData.append('email', payload.email);
     if (payload.mobileNumber) formData.append('mobileNumber', payload.mobileNumber);
     
-    // Append agent detail data
     if (payload.country) formData.append('country', payload.country);
     if (payload.province) formData.append('province', payload.province);
     if (payload.district) formData.append('district', payload.district);
@@ -31,9 +29,7 @@ export const updateMerchantProfile = async (payload) => {
     if (payload.alternativeContact) formData.append('alternativeContact', payload.alternativeContact);
     if (payload.messageLanguage) formData.append('messageLanguage', payload.messageLanguage);
     
-    // Handle profile picture
     if (payload.profile_picture && typeof payload.profile_picture === 'string') {
-      // For React Native, we need to handle the image URI
       const filename = payload.profile_picture.split('/').pop();
       const match = /\.(\w+)$/.exec(filename);
       const type = match ? `image/${match[1]}` : 'image/jpeg';

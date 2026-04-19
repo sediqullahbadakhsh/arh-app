@@ -678,6 +678,7 @@ const DetailItem = ({ label, value }) => (
 );
 
 const AttachmentItem = ({ fileName, index }) => {
+  const {t} = useTranslation();
   const IMG_BASE_URL = process.env.EXPO_PUBLIC_IMG_BASE_URL1;
   const fileUrl = `${IMG_BASE_URL}/uploads/salesRequest-attachments/${fileName}`;
   

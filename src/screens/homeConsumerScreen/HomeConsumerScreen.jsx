@@ -708,19 +708,18 @@ export default function HomeConsumerScreen({ navigation }) {
     }
   };
 
-  // Enhanced orders query with polling and automatic refetching
+ 
   const { data: ordersData, isLoading, isError, refetch } = useQuery({
     queryKey: ['recent-orders'],
     queryFn: () => getOrdersC({ page: 1, limit: 10, status: '' }),
-    refetchOnWindowFocus: true, // Refetch when app comes to foreground
-    staleTime: 30000, // Consider data stale after 30 seconds
+    refetchOnWindowFocus: true, 
+    staleTime: 30000, 
   });
-
+  console.log(ordersData, "this is data")
   useEffect(() => {
     fetchCustomerProfile();
   }, []);
 
-  // Add focus effect to automatically refetch when screen is focused
   useFocusEffect(
     useCallback(() => {
       let isActive = true;

@@ -160,9 +160,9 @@ const ProfileStyles = StyleSheet.create({
     backgroundColor: "#fff",
     borderTopLeftRadius: scale.hp(3.2),
     borderTopRightRadius: scale.hp(3.2),
-    minHeight: scale.hp(71.5),
+    minHeight: scale.hp(90.5),
     zIndex: 1000,
-    elevation: 8,
+
     shadowColor: "#000",
     shadowOpacity: 0.1,
     shadowRadius: scale.hp(1.55),
@@ -261,9 +261,6 @@ const ProfileStyles = StyleSheet.create({
     fontSize: scale.hp(2.1),
     color: Colors.textPrimary,
   },
-
-
-
   modalOverlay: {
     flex: 1,
     backgroundColor: 'transparent',
@@ -299,7 +296,7 @@ const ProfileStyles = StyleSheet.create({
   },
   pickerOptions: {
     padding: scale.hp(2.6),
-    paddingBottom: scale.hp(1.3),
+    paddingBottom: scale.hp(10),
   },
   optionButton: {
     flexDirection: 'row',

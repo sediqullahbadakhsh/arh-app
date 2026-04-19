@@ -1,38 +1,57 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import formatLocal from "../../utils/formatLocal";
 import { Image, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { Colors } from "../../theme/colors";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import TopUpStyles from "../topupScreen/TopupStyle";
-const OPERATOR_LOGOS = {
 
-  'AWCC': require('../../../assets/mnos/awcc.png'),
-  'Roshan': require('../../../assets/mnos/roshan.png'),
-  'MTN': require('../../../assets/mnos/mtn.png'),
-  'Salaam': require('../../../assets/mnos/salaam.png'),
-  'Etisalat': require('../../../assets/mnos/etisalat.png'),
+const OPERATOR_LOGOS = {
+  '70': require('../../../assets/mnos/awcc.png'),
+  '71': require('../../../assets/mnos/awcc.png'),
+  '77': require('../../../assets/mnos/mtn.png'),
+  '76': require('../../../assets/mnos/mtn.png'),
+  '73': require('../../../assets/mnos/etisalat.png'),
+  '74': require('../../../assets/mnos/salaam.png'),
+  '72': require('../../../assets/mnos/roshan.png'),
+  '79': require('../../../assets/mnos/roshan.png'),
+  '78': require('../../../assets/mnos/etisalat.png'),
   'default': require('../../../assets/mnos/awcc.png'),
 };
-const getOperatorLogo = (operatorName) => {
-  if (!operatorName) return OPERATOR_LOGOS.default;
-  
-  const normalizedName = operatorName.toLowerCase();
-  
-  if (normalizedName.includes('awcc')) return OPERATOR_LOGOS.AWCC;
-  if (normalizedName.includes('roshan')) return OPERATOR_LOGOS.Roshan;
-  if (normalizedName.includes('mtn')) return OPERATOR_LOGOS.MTN;
-  if (normalizedName.includes('salaam')) return OPERATOR_LOGOS.Salaam;
-  if (normalizedName.includes('etisalat')) return OPERATOR_LOGOS.Etisalat;
-  
-  return OPERATOR_LOGOS.default;
+
+const OPERATOR_NAMES = {
+  '70': 'AWCC',
+  '71': 'AWCC',
+  '72': 'MTN',
+  '73': 'Etisalat',
+  '74': 'Salaam',
+  '76': 'Roshan',
+  '77': 'Roshan',
+  '78': 'Etisalat',
+  '79': 'Salaam',
+  'default': 'Unknown Operator',
 };
 
-const VALID_PREFIXES = ['70','71', '72', '73', '74', '76', '77', '78', '79'];
+const getOperatorFromPrefix = (prefix) => {
+  return OPERATOR_NAMES[prefix] || OPERATOR_NAMES.default;
+};
+
+const getOperatorLogo = (prefix) => {
+  return OPERATOR_LOGOS[prefix] || OPERATOR_LOGOS.default;
+};
+
+const VALID_PREFIXES = ['70', '71', '72', '73', '74', '76', '77', '78', '79'];
+
 const validateMobileNumber = (number) => {
   const cleanNumber = number.replace(/\D/g, "");
   
-
+  if (cleanNumber.length === 0) {
+    return {
+      isValid: true,
+      message: ""
+    };
+  }
+  
   if (cleanNumber.length > 0 && !cleanNumber.startsWith('7')) {
     return {
       isValid: false,
@@ -47,7 +66,6 @@ const validateMobileNumber = (number) => {
     };
   }
   
-
   if (cleanNumber.length >= 2) {
     const prefix = cleanNumber.substring(0, 2);
     if (!VALID_PREFIXES.includes(prefix)) {
@@ -63,6 +81,7 @@ const validateMobileNumber = (number) => {
     message: ""
   };
 };
+
 function StepNumber({
   dial,
   country,
@@ -72,35 +91,57 @@ function StepNumber({
   operator,
   onEditCountry,
   openContacts,
+  onPrefixChange,
 }) {
   const { t } = useTranslation();
   const [isFocused, setIsFocused] = useState(false);
   const [validationError, setValidationError] = useState("");
+  const [currentPrefix, setCurrentPrefix] = useState(null);
+  const [operatorName, setOperatorName] = useState(null);
+  
   const formatted = formatLocal(value);
 
+  useEffect(() => {
+    if (value.length >= 2) {
+      const prefix = value.substring(0, 2);
+      setCurrentPrefix(prefix);
+      const operator = getOperatorFromPrefix(prefix);
+      setOperatorName(operator);
+      if (onPrefixChange) {
+        onPrefixChange(prefix);
+      }
+    } else {
+      setCurrentPrefix(null);
+      setOperatorName(null);
+      if (onPrefixChange) {
+        onPrefixChange(null);
+      }
+    }
+  }, [value, onPrefixChange]);
+
   const handleNumberChange = (input) => {
-
     const numericInput = input.replace(/\D/g, "");
-    
-
     const limitedInput = numericInput.slice(0, 9);
     
-  
     const validation = validateMobileNumber(limitedInput);
     
     if (!validation.isValid && limitedInput.length > 0) {
       const errorMessage = t(validation.message);
       setValidationError(errorMessage);
       
- 
       if (limitedInput.startsWith('75') || !limitedInput.startsWith('7')) {
+        onChange("");
+        setCurrentPrefix(null);
+        setOperatorName(null);
+        if (onPrefixChange) {
+          onPrefixChange(null);
+        }
         return;
       }
     } else {
       setValidationError("");
     }
     
-
     onChange(limitedInput);
   };
 
@@ -146,9 +187,9 @@ function StepNumber({
         }
       ]}>
         <View style={TopUpStyles.phonePrefix}>
-          {operator ? (
+          {currentPrefix ? (
             <Image
-              source={getOperatorLogo(operator.name)}
+              source={getOperatorLogo(currentPrefix)}
               style={{
                 width: 24,
                 height: 24,
@@ -196,56 +237,52 @@ function StepNumber({
       </View>
 
       {validationError ? (
-        <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center' }}>
+        <View style={{ 
+          marginTop: 8, 
+          flexDirection: 'row', 
+          alignItems: 'center',
+          backgroundColor: '#FEF2F2',
+          padding: 8,
+          borderRadius: 8,
+          borderWidth: 1,
+          borderColor: '#FECACA'
+        }}>
           <Ionicons name="warning-outline" size={16} color="#EF4444" />
           <Text style={{ 
             color: '#EF4444', 
             fontSize: 12, 
             fontFamily: 'dmsansRegular',
-            marginLeft: 4
+            marginLeft: 8,
+            flex: 1
           }}>
             {validationError}
           </Text>
         </View>
-      ) : (
-        <View style={{ marginTop: 10, minHeight: 24 }}>
+      ) : value.length >= 2 && !operatorName ? (
+        <View style={{ 
+          marginTop: 8, 
+          flexDirection: 'row', 
+          alignItems: 'center',
+          backgroundColor: '#FFFBEB',
+          padding: 8,
+          borderRadius: 8,
+          borderWidth: 1,
+          borderColor: '#FDE68A'
+        }}>
+          <Ionicons name="information-circle-outline" size={16} color="#F59E0B" />
+          <Text style={{ 
+            color: '#92400E', 
+            fontSize: 12, 
+            fontFamily: 'dmsansRegular',
+            marginLeft: 8,
+            flex: 1
+          }}>
+            {t('enterFullNumberForOperatorDetection')}
+          </Text>
         </View>
-      )}
-       <View style={styles.watermarkContainer}>
-              <Image 
-                source={require('../../../assets/logo4.png')} 
-                style={styles.watermarkLogo}
-                resizeMode="contain"
-              />
-            </View>
+      ) : null}
     </View>
   );
-}
-
-const styles = {
-  watermarkContainer: {
-    position: 'absolute',
-    top: 500,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: -1,
-  },
-  watermarkLogo: {
-    width: 270,
-    height: 270,
-    opacity: 0.1, 
-  }
-};
-
-function hexFade(hex, op) {
-  const n = hex.replace("#", "");
-  const r = parseInt(n.slice(0, 2), 16);
-  const g = parseInt(n.slice(2, 4), 16);
-  const b = parseInt(n.slice(4, 6), 16);
-  return `rgba(${r},${g},${b},${op})`;
 }
 
 export default StepNumber;

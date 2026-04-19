@@ -3,7 +3,6 @@ import api from "./apiClient";
 export const createPurchaseRequest = async (data, files = []) => {
   const formData = new FormData();
   
-  // Append files if available
   files.forEach(file => {
     formData.append('attachments', {
       uri: file.uri,
@@ -11,8 +10,7 @@ export const createPurchaseRequest = async (data, files = []) => {
       type: file.type || 'image/jpeg'
     });
   });
-  
-  // Append other form data
+
   Object.entries(data).forEach(([key, value]) => {
     formData.append(key, value);
   });

@@ -1,3 +1,4 @@
+//screens/topupscreen/StepPay.jsx
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { 
   Text, 
@@ -20,7 +21,6 @@ import { useTranslation } from "react-i18next";
 import { scale } from "../../utils/normalizeSize";
 import { Ionicons } from "@expo/vector-icons";
 
-
 if (Platform.OS === 'android') {
   if (UIManager.setLayoutAnimationEnabledExperimental) {
     UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -39,17 +39,25 @@ function StepPay({
   const [isCreatingPaymentMethod, setIsCreatingPaymentMethod] = useState(false);
   const [paymentMethodId, setPaymentMethodId] = useState(null);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
-  const [keyboardEndHeight, setKeyboardEndHeight] = useState(0);
   const scrollViewRef = useRef(null);
   const cardFieldRef = useRef(null);
 
   const {
+    mobile,
+    afn = 0,
+    totalAfn = 0,
+    baseAmount = 0,
+    feeAmount = 0,
+    totalAmount = 0,
+    slabPercentage = 0,
+    serviceSlabPercentage = 0,
     appliedPromoCode,
-    discountAmount,
-    finalAmount,
+    discountAmount = 0,
+    finalAmount = 0,
     onApplyPromoCode,
     onRemovePromoCode,
-    openPromoModal
+    openPromoModal,
+    product
   } = summary;
 
   const paymentMethods = [
@@ -76,10 +84,9 @@ function StepPay({
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      (e) => {
+      () => {
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         setKeyboardVisible(true);
-        setKeyboardEndHeight(e.endCoordinates.height);
         
         if (selectedPaymentMethod === 'card') {
           setTimeout(() => {
@@ -94,7 +101,6 @@ function StepPay({
       () => {
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         setKeyboardVisible(false);
-        setKeyboardEndHeight(0);
       }
     );
 
@@ -117,9 +123,11 @@ function StepPay({
   }, [scrollToCardField]);
 
   const getSummaryValue = (key, defaultValue = 0) => {
+    if (summary && typeof summary[key] === 'function') {
+      return summary[key]();
+    }
     return summary && summary[key] !== undefined ? summary[key] : defaultValue;
   };
-
 
   useEffect(() => {
     const createStripePaymentMethod = async () => {
@@ -171,7 +179,6 @@ function StepPay({
     setSelectedPaymentMethod(methodId);
     setPaymentMethodId(null);
     setCardDetails(null);
-    
 
     Keyboard.dismiss();
     
@@ -197,51 +204,54 @@ function StepPay({
   }, [onCardDetailsChange]);
 
   const getBaseAmount = () => {
-    if (summary?.calculateBaseAmount && typeof summary.calculateBaseAmount === 'function') {
-      return summary.calculateBaseAmount();
+    if (product?.basePriceInUSD) {
+      return parseFloat(product.basePriceInUSD);
     }
     return getSummaryValue('baseAmount', 0);
   };
 
-  const getFeeAmount = () => {
-    if (summary?.calculateFeeAmount && typeof summary.calculateFeeAmount === 'function') {
-      return summary.calculateFeeAmount();
-    }
-    return getSummaryValue('feeAmount', 0);
-  };
-
   const getAfnAmount = () => {
+    if (product?.basePrice) {
+      return parseFloat(product.basePrice);
+    }
     return getSummaryValue('afn', 0);
   };
 
-  const getTotalAfnAmount = () => {
-    return getSummaryValue('totalAfn', getSummaryValue('afn', 0));
+  const getTotalUsdAmount = () => {
+    if (product?.totalAmountInUSD) {
+      return parseFloat(product.totalAmountInUSD);
+    }
+    return getSummaryValue('totalAmount', 0);
   };
 
+  const getServiceFee = () => {
+    const baseAmount = getBaseAmount();
+    const totalAmount = getTotalUsdAmount();
+    
+    return Math.max(0, totalAmount - baseAmount);
+  };
 
-  const getContentPadding = () => {
-    if (keyboardVisible && selectedPaymentMethod === 'card') {
-      return { paddingBottom: keyboardEndHeight + 100 };
+  const getServiceSlabPercentage = () => {
+    if (product?.serviceSlabPercentage) {
+      return parseFloat(product.serviceSlabPercentage);
     }
-    return { paddingBottom: 40 };
+    return getSummaryValue('serviceSlabPercentage', 0);
   };
 
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: '#fff' }}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0}
     >
       <ScrollView
         ref={scrollViewRef}
         style={{ flex: 1 }}
-        contentContainerStyle={[
-          { 
-            paddingHorizontal: 16,
-            paddingTop: 12,
-          },
-          getContentPadding()
-        ]}
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingTop: 12,
+          paddingBottom: 20
+        }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         automaticallyAdjustContentInsets={false}
@@ -284,7 +294,7 @@ function StepPay({
             ))}
           </View>
           
-          {/* <View style={styles.promoSection}>
+          <View style={styles.promoSection}>
             {appliedPromoCode ? (
               <View style={styles.appliedPromoContainer}>
                 <View style={styles.appliedPromoInfo}>
@@ -293,7 +303,7 @@ function StepPay({
                     {t('promoCode.applied')}: {appliedPromoCode.code}
                   </Text>
                   <Text style={styles.discountText}>
-                    -${appliedPromoCode.discount_amount?.toFixed(2) || discountAmount.toFixed(2)}
+                    -${discountAmount.toFixed(2)}
                   </Text>
                 </View>
                 <TouchableOpacity 
@@ -318,7 +328,7 @@ function StepPay({
                 <Text style={styles.promoButtonText}>{t('promoCode.havePromoCode')}</Text>
               </TouchableOpacity>
             )}
-          </View> */}
+          </View>
 
           {selectedPaymentMethod === 'card' && (
             <View style={styles.cardDetailsContainer}>
@@ -426,26 +436,33 @@ function StepPay({
               <Text style={TopUpStyles.summaryKey}>{t('mobileNumber')}</Text>
               <Text style={TopUpStyles.summaryValue}>{getSummaryValue('mobile', 'N/A')}</Text>
             </View>
+            
             <View style={TopUpStyles.summaryRow}>
               <Text style={TopUpStyles.summaryKey}>{t('amountToSend')}</Text>
-              <Text style={TopUpStyles.summaryValue}>{getAfnAmount()} AFN</Text>
+              <Text style={TopUpStyles.summaryValue}>{getAfnAmount().toFixed(2)} AFN</Text>
             </View>
-            <View style={TopUpStyles.summaryRow}>
+            
+            {/* <View style={TopUpStyles.summaryRow}>
               <Text style={TopUpStyles.summaryKey}>{t('baseAmount')}</Text>
               <Text style={TopUpStyles.summaryValue}>${getBaseAmount().toFixed(2)} USD</Text>
-            </View>
-            {getSummaryValue('slabPercentage', 0) > 0 && (
+            </View> */}
+            
+            {/* {getServiceFee() > 0 && (
               <View style={TopUpStyles.summaryRow}>
-                <Text style={TopUpStyles.summaryKey}>{t('fee')}</Text>
-                <Text style={TopUpStyles.summaryValue}>${getFeeAmount().toFixed(2)} USD</Text>
+                <Text style={TopUpStyles.summaryKey}>
+                  {t('serviceFee')} ({getServiceSlabPercentage()}%)
+                </Text>
+                <Text style={TopUpStyles.summaryValue}>
+                  ${getServiceFee().toFixed(2)} USD
+                </Text>
               </View>
-            )}
+            )} */}
             
             {appliedPromoCode && (
               <View style={TopUpStyles.summaryRow}>
                 <Text style={TopUpStyles.summaryKey}>{t('promoCode.discount')}</Text>
                 <Text style={[TopUpStyles.summaryValue, { color: '#10B981' }]}>
-                  -${appliedPromoCode.discount_amount?.toFixed(2) || discountAmount.toFixed(2)} USD
+                  -${discountAmount.toFixed(2)} USD
                 </Text>
               </View>
             )}

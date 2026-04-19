@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   SafeAreaView,
   View,
@@ -14,11 +14,13 @@ import {
   Animated,
   Easing,
   Dimensions,
-  Share
+  Share,
+  ActivityIndicator
 } from "react-native";
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Colors } from "../../theme/colors";
 import ServiceHeader from "../../components/ServiceHeader";
 import InputField from "../../components/InputField";
@@ -60,11 +62,11 @@ const GAP = 16;
 export default function AgentEditScreen({ navigation, route }) {
   const { user } = useUser();
   const insets = useSafeAreaInsets();
-  const { t } = useTranslation();
-  const { agent, refreshAgentList } = route.params || {};
+  const { t, i18n } = useTranslation();
+  const queryClient = useQueryClient();
+  const { agent: initialAgent, onSuccess } = route.params || {};
+  
   const [step, setStep] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [updating, setUpdating] = useState(false);
   const [isSuccessVisible, setIsSuccessVisible] = useState(false);
   const [agentData, setAgentData] = useState(null);
 
@@ -97,12 +99,103 @@ export default function AgentEditScreen({ navigation, route }) {
 
   const [modalSlideAnim] = useState(new Animated.Value(screenHeight));
 
+  const getLocalizedValue = (value, language = i18n.language) => {
+    if (!value) return "";
+    
+    if (typeof value === 'object') {
+      const langMap = {
+        'en': 'en',
+        'fa': 'dr',
+        'ps': 'ps'
+      };
+      const langKey = langMap[language] || 'en';
+      return value[langKey] || value['en'] || value['dr'] || value['ps'] || "";
+    }
+    
+    return value;
+  };
+
+  const { 
+    data: agent,
+    isLoading: loadingAgent,
+    error: agentError 
+  } = useQuery({
+    queryKey: ['agent', initialAgent?.user?.uid],
+    queryFn: async () => {
+      if (!initialAgent?.user?.uid) return initialAgent;
+      const response = await getAgentById(initialAgent.user.uid);
+      return response?.data || initialAgent;
+    },
+    enabled: !!initialAgent?.user?.uid,
+    initialData: initialAgent,
+  });
+
+  const { 
+    data: countriesData = [],
+    isLoading: loadingCountries,
+    error: countriesError 
+  } = useQuery({
+    queryKey: ['countries'],
+    queryFn: async () => {
+      const res = await getCountries();
+      return res?.data || [];
+    },
+    staleTime: 10 * 60 * 1000, 
+    cacheTime: 30 * 60 * 1000, 
+  });
+
+ const updateAgentMutation = useMutation({
+  mutationFn: async (payload) => {
+    const agentId = agent?.userUid || initialAgent?.user?.uid;
+    if (!agentId) {
+      throw new Error("Agent ID is required");
+    }
+    return await updateAgentDetails(agentId, payload);
+  },
+  onSuccess: (response) => {
+    queryClient.invalidateQueries(['agents']);
+    queryClient.invalidateQueries(['agent', agent?.user?.uid]);
+    
+    onSuccess?.();
+    
+    const updatedAgentData = {
+      agentName: `${firstName} ${lastName}`.trim(),
+      email: email.trim(),
+      mobileNumber: mobileNumber.trim(),
+      accountType: getSelectedValue("accountType"),
+      status: getSelectedValue("status"),
+      location: `${getLocalizedValue(district?.districtName)}, ${getLocalizedValue(province?.provinceName)}, ${getLocalizedValue(country?.countryName)}`,
+      address: address.trim(),
+      language: getSelectedValue("lang"),
+      timestamp: new Date().toISOString(),
+      agentId: agent?.uid || agent?.userUid || `AG${Date.now()}`,
+    };
+    
+    setAgentData(updatedAgentData);
+    setIsSuccessVisible(true);
+  },
+  onError: (error) => {
+    console.error("Update agent error:", error);
+    Alert.alert(
+      t('error'), 
+      error.response?.data?.error || t('updateAgentFailed')
+    );
+  },
+});
+
   useEffect(() => {
     if (agent) {
       loadAgentData();
     }
-    getAllCountries();
-  }, [agent]);
+    
+    if (countriesData.length > 0) {
+      const processedCountries = countriesData.map(country => ({
+        ...country,
+        displayName: getLocalizedValue(country.countryName)
+      }));
+      setCountries(processedCountries);
+    }
+  }, [agent, countriesData, i18n.language]);
 
   useEffect(() => {
     if (country?.id) {
@@ -153,42 +246,41 @@ export default function AgentEditScreen({ navigation, route }) {
     setCommissionRate(agent.commissionRateDetails?.percentage?.toString() || '');
     
     if (agent.countryDetails) {
-      setCountry(agent.countryDetails);
+      setCountry({
+        ...agent.countryDetails,
+        displayName: getLocalizedValue(agent.countryDetails.countryName)
+      });
     }
     if (agent.provinceDetails) {
-      setProvince(agent.provinceDetails);
+      setProvince({
+        ...agent.provinceDetails,
+        displayName: getLocalizedValue(agent.provinceDetails.provinceName)
+      });
     }
     if (agent.districtDetails) {
-      setDistrict(agent.districtDetails);
+      setDistrict({
+        ...agent.districtDetails,
+        displayName: getLocalizedValue(agent.districtDetails.districtName)
+      });
     }
 
-    if (agent.user?.profile_picture) {
+    if (agent.user?.profilePicture) {
       const IMG_BASE_URL = "http://3.67.144.22/uploads/profile_pictures/"; 
-      setProfilePicture(`${IMG_BASE_URL}${agent.user.profile_picture}`);
-    }
-  };
-
-  const getAllCountries = async () => {
-    try {
-      const res = await getCountries();
-      setCountries(res?.data || []);
-      
-      if (agent?.countryDetails) {
-        const agentCountry = res?.data?.find(c => c.id === agent.countryDetails.id);
-        if (agentCountry) setCountry(agentCountry);
-      }
-    } catch (error) {
-      console.error("Error fetching countries:", error);
+      setProfilePicture(`${IMG_BASE_URL}${agent.user.profilePicture}`);
     }
   };
 
   const getAllProvinces = async (countryId) => {
     try {
       const res = await getProvinces(countryId);
-      setProvinces(res?.data || []);
+      const processedProvinces = (res?.data || []).map(province => ({
+        ...province,
+        displayName: getLocalizedValue(province.provinceName)
+      }));
+      setProvinces(processedProvinces);
       
       if (agent?.provinceDetails && countryId === agent.countryDetails?.id) {
-        const agentProvince = res?.data?.find(p => p.id === agent.provinceDetails.id);
+        const agentProvince = processedProvinces.find(p => p.id === agent.provinceDetails.id);
         if (agentProvince) setProvince(agentProvince);
       }
     } catch (error) {
@@ -199,10 +291,14 @@ export default function AgentEditScreen({ navigation, route }) {
   const getAllDistricts = async (provinceId) => {
     try {
       const res = await getDistricts(provinceId);
-      setDistricts(res?.data || []);
+      const processedDistricts = (res?.data || []).map(district => ({
+        ...district,
+        displayName: getLocalizedValue(district.districtName)
+      }));
+      setDistricts(processedDistricts);
       
       if (agent?.districtDetails && provinceId === agent.provinceDetails?.id) {
-        const agentDistrict = res?.data?.find(d => d.id === agent.districtDetails.id);
+        const agentDistrict = processedDistricts.find(d => d.id === agent.districtDetails.id);
         if (agentDistrict) setDistrict(agentDistrict);
       }
     } catch (error) {
@@ -251,11 +347,11 @@ export default function AgentEditScreen({ navigation, route }) {
   const getSelectedValue = (type) => {
     switch (type) {
       case "country":
-        return country?.countryName;
+        return country?.displayName || getLocalizedValue(country?.countryName);
       case "province":
-        return province?.provinceName;
+        return province?.displayName || getLocalizedValue(province?.provinceName);
       case "district":
-        return district?.districtName;
+        return district?.displayName || getLocalizedValue(district?.districtName);
       case "lang":
         return LANGS.find(l => l.value === messageLanguage)?.label;
       case "status":
@@ -271,13 +367,18 @@ export default function AgentEditScreen({ navigation, route }) {
     let data = modal.data;
     if (modal.searchQuery) {
       const query = modal.searchQuery.toLowerCase();
-      data = data.filter(item => 
-        item.countryName?.toLowerCase().includes(query) ||
-        item.provinceName?.toLowerCase().includes(query) ||
-        item.districtName?.toLowerCase().includes(query) ||
-        item.label?.toLowerCase().includes(query) ||
-        item.value?.toLowerCase().includes(query)
-      );
+      data = data.filter(item => {
+        const displayName = item.displayName || 
+                          getLocalizedValue(item.countryName) || 
+                          getLocalizedValue(item.provinceName) || 
+                          getLocalizedValue(item.districtName) || 
+                          item.label || 
+                          "";
+        return displayName.toLowerCase().includes(query) ||
+               item.countryCode?.toLowerCase().includes(query) ||
+               item.value?.toLowerCase().includes(query) ||
+               item.code?.toLowerCase().includes(query);
+      });
     }
     return data;
   };
@@ -381,8 +482,6 @@ export default function AgentEditScreen({ navigation, route }) {
     if (!validateCommissionRate()) return;
 
     try {
-      setUpdating(true);
-      
       const payload = {
         username: `${firstName} ${lastName}`.trim(),
         email: email.trim(),
@@ -397,23 +496,11 @@ export default function AgentEditScreen({ navigation, route }) {
         accountType: accountType,
       };
 
-      await updateAgentDetails(agent.user_id, payload);
-      
-      const updatedAgentData = {
-        agentName: `${firstName} ${lastName}`.trim(),
-        email: email.trim(),
-        mobileNumber: mobileNumber.trim(),
-        accountType: getSelectedValue("accountType"),
-        status: getSelectedValue("status"),
-        location: `${district?.districtName}, ${province?.provinceName}, ${country?.countryName}`,
-        address: address.trim(),
-        language: getSelectedValue("lang"),
-        timestamp: new Date().toISOString(),
-        agentId: agent.user_id || `AG${Date.now()}`,
-      };
-      
-      setAgentData(updatedAgentData);
-      setIsSuccessVisible(true);
+      if (commissionRate) {
+        payload.commissionRate = parseFloat(commissionRate);
+      }
+
+      updateAgentMutation.mutate(payload);
       
     } catch (error) {
       console.error("Update agent error:", error);
@@ -421,14 +508,11 @@ export default function AgentEditScreen({ navigation, route }) {
         t('error'), 
         error.response?.data?.error || t('updateAgentFailed')
       );
-    } finally {
-      setUpdating(false);
     }
   };
 
   const handleSuccessClose = () => {
     setIsSuccessVisible(false);
-    refreshAgentList?.();
     navigation.goBack();
   };
 
@@ -514,35 +598,44 @@ ${t('agentProfileUpdated')} ✅`;
     );
   };
 
-  const renderModalItem = ({ item }) => (
-    <TouchableOpacity 
-      style={styles.modalRow} 
-      onPress={() => handleSelect(item)}
-      activeOpacity={0.7}
-    >
-      {modal.type === "country" && renderFlag(item.countryCode)}
-      
-      <View style={{ flex: 1 }}>
-        <Text style={styles.modalItemTitle}>
-          {item.countryName || item.provinceName || item.districtName || item.label}
-        </Text>
-        {modal.type === "country" && item.countryCode && (
-          <Text style={styles.modalItemSubtitle}>
-            {item.countryCode}
+  const renderModalItem = ({ item }) => {
+    const displayName = item.displayName || 
+                       getLocalizedValue(item.countryName) || 
+                       getLocalizedValue(item.provinceName) || 
+                       getLocalizedValue(item.districtName) || 
+                       item.label || 
+                       "";
+    
+    return (
+      <TouchableOpacity 
+        style={styles.modalRow} 
+        onPress={() => handleSelect(item)}
+        activeOpacity={0.7}
+      >
+        {modal.type === "country" && renderFlag(item.countryCode)}
+        
+        <View style={{ flex: 1 }}>
+          <Text style={styles.modalItemTitle}>
+            {displayName}
           </Text>
+          {modal.type === "country" && item.countryCode && (
+            <Text style={styles.modalItemSubtitle}>
+              {item.countryCode}
+            </Text>
+          )}
+          {modal.type === "lang" && item.code && (
+            <Text style={styles.modalItemSubtitle}>
+              {item.code.toUpperCase()}
+            </Text>
+          )}
+        </View>
+        
+        {isItemSelected(item) && (
+          <Ionicons name="checkmark-circle" size={22} color={Colors.primary} />
         )}
-        {modal.type === "lang" && item.code && (
-          <Text style={styles.modalItemSubtitle}>
-            {item.code.toUpperCase()}
-          </Text>
-        )}
-      </View>
-      
-      {isItemSelected(item) && (
-        <Ionicons name="checkmark-circle" size={22} color={Colors.primary} />
-      )}
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   const isItemSelected = (item) => {
     switch (modal.type) {
@@ -581,6 +674,54 @@ ${t('agentProfileUpdated')} ✅`;
         return t('select');
     }
   };
+
+  if (loadingAgent) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
+        <ServiceHeader title={t('editAgent')} onBack={() => navigation.goBack()} />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={styles.loadingText}>{t('loadingAgentDetails')}</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (agentError) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
+        <ServiceHeader title={t('editAgent')} onBack={() => navigation.goBack()} />
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={48} color="#DC2626" />
+          <Text style={styles.errorText}>{t('failedToLoadAgent')}</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.retryButtonText}>{t('goBack')}</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!agent) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
+        <ServiceHeader title={t('editAgent')} onBack={() => navigation.goBack()} />
+        <View style={styles.errorContainer}>
+          <Ionicons name="person-outline" size={48} color="#9E9E9E" />
+          <Text style={styles.errorText}>{t('agentInfoNotAvailable')}</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.retryButtonText}>{t('goBack')}</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
@@ -625,6 +766,7 @@ ${t('agentProfileUpdated')} ✅`;
                 onChangeText={setFirstName}
                 placeholder={t('enterFirstName')}
                 required
+                editable={!updateAgentMutation.isLoading}
               />
               <LabeledInput
                 label={t('lastName')}
@@ -632,6 +774,7 @@ ${t('agentProfileUpdated')} ✅`;
                 onChangeText={setLastName}
                 placeholder={t('enterLastName')}
                 required
+                editable={!updateAgentMutation.isLoading}
               />
               <LabeledInput
                 label={t('email')}
@@ -641,6 +784,7 @@ ${t('agentProfileUpdated')} ✅`;
                 keyboardType="email-address"
                 autoCapitalize="none"
                 required
+                editable={!updateAgentMutation.isLoading}
               />
               <LabeledInput
                 label={t('mobileNumber')}
@@ -649,6 +793,7 @@ ${t('agentProfileUpdated')} ✅`;
                 placeholder={t('enterMobileNumber')}
                 keyboardType="phone-pad"
                 required
+                editable={!updateAgentMutation.isLoading}
               />
               <LabeledInput
                 label={t('alternativeContact')}
@@ -656,12 +801,14 @@ ${t('agentProfileUpdated')} ✅`;
                 onChangeText={setAlternativeContact}
                 placeholder={t('enterAlternativeContact')}
                 keyboardType="phone-pad"
+                editable={!updateAgentMutation.isLoading}
               />
 
               <PrimaryButton
                 label={t('continue')}
                 onPress={next}
                 style={styles.fullButton}
+                disabled={updateAgentMutation.isLoading}
               />
             </>
           )}
@@ -676,18 +823,21 @@ ${t('agentProfileUpdated')} ✅`;
                 onPress={() => openModal("country", t('selectCountry'), countries)}
                 leftIcon={renderFlag(country?.countryCode)}
                 required
+                disabled={updateAgentMutation.isLoading}
               />
               <DropField
                 label={t('province')}
                 value={getSelectedValue("province")}
                 onPress={() => openModal("province", t('selectProvince'), provinces)}
                 required
+                disabled={updateAgentMutation.isLoading}
               />
               <DropField
                 label={t('district')}
                 value={getSelectedValue("district")}
                 onPress={() => openModal("district", t('selectDistrict'), districts)}
                 required
+                disabled={updateAgentMutation.isLoading}
               />
               <LabeledInput
                 label={t('fullAddress')}
@@ -695,12 +845,14 @@ ${t('agentProfileUpdated')} ✅`;
                 onChangeText={setAddress}
                 placeholder={t('enterFullAddress')}
                 required
+                editable={!updateAgentMutation.isLoading}
               />
               <DropField
                 label={t('messageLanguage')}
                 value={getSelectedValue("lang")}
                 onPress={() => openModal("lang", t('selectLanguage'), LANGS)}
                 required
+                disabled={updateAgentMutation.isLoading}
               />
 
               <View style={styles.rowButtons}>
@@ -708,11 +860,13 @@ ${t('agentProfileUpdated')} ✅`;
                   label={t('back')}
                   onPress={back}
                   style={styles.halfButton}
+                  disabled={updateAgentMutation.isLoading}
                 />
                 <PrimaryButton
                   label={t('continue')}
                   onPress={next}
                   style={styles.halfButton}
+                  disabled={updateAgentMutation.isLoading}
                 />
               </View>
             </>
@@ -725,14 +879,17 @@ ${t('agentProfileUpdated')} ✅`;
                 <InfoRow label={t('name')} value={`${firstName} ${lastName}`} />
                 <InfoRow label={t('email')} value={email} />
                 <InfoRow label={t('mobile')} value={mobileNumber} />
-                <InfoRow label={t('country')} value={country?.countryName} />
-                <InfoRow label={t('province')} value={province?.provinceName} />
-                <InfoRow label={t('district')} value={district?.districtName} />
+                <InfoRow label={t('country')} value={getSelectedValue("country")} />
+                <InfoRow label={t('province')} value={getSelectedValue("province")} />
+                <InfoRow label={t('district')} value={getSelectedValue("district")} />
                 <InfoRow label={t('address')} value={address} />
                 <InfoRow label={t('language')} value={getSelectedValue("lang")} />
                 <InfoRow label={t('accountType')} value={getSelectedValue("accountType")} />
                 <InfoRow label={t('status')} value={getSelectedValue("status")} />
-                <InfoRow label={t('commissionRate')} value={commissionRate ? `${commissionRate}%` : t('notSet')} />
+                <InfoRow 
+                  label={t('commissionRate')} 
+                  value={commissionRate ? `${commissionRate}%` : t('notSet')} 
+                />
               </View>
 
               <View style={styles.rowButtons}>
@@ -740,13 +897,13 @@ ${t('agentProfileUpdated')} ✅`;
                   label={t('back')}
                   onPress={back}
                   style={styles.halfButton}
-                  disabled={updating}
+                  disabled={updateAgentMutation.isLoading}
                 />
                 <PrimaryButton
-                  label={updating ? t('updating') : t('updateAgent')}
+                  label={updateAgentMutation.isLoading ? t('updating') : t('updateAgent')}
                   onPress={submit}
                   style={styles.halfButton}
-                  disabled={updating}
+                  disabled={updateAgentMutation.isLoading}
                 />
               </View>
             </>
@@ -825,7 +982,7 @@ ${t('agentProfileUpdated')} ✅`;
   );
 }
 
-function LabeledInput({ label, placeholder, required, ...rest }) {
+function LabeledInput({ label, placeholder, required, editable = true, ...rest }) {
   const { t } = useTranslation();
   
   return (
@@ -834,12 +991,16 @@ function LabeledInput({ label, placeholder, required, ...rest }) {
         {required && <Text style={{ color: "#F44336" }}>* </Text>}
         {label}
       </Text>
-      <InputField placeholder={placeholder} {...rest} />
+      <InputField 
+        placeholder={placeholder} 
+        editable={editable}
+        {...rest} 
+      />
     </View>
   );
 }
 
-function DropField({ label, value, onPress, leftIcon, required }) {
+function DropField({ label, value, onPress, leftIcon, required, disabled = false }) {
   const { t } = useTranslation();
   
   const getPlaceholderText = () => {
@@ -864,9 +1025,10 @@ function DropField({ label, value, onPress, leftIcon, required }) {
         {label}
       </Text>
       <TouchableOpacity
-        style={styles.dropField}
+        style={[styles.dropField, disabled && { opacity: 0.5 }]}
         onPress={onPress}
         activeOpacity={0.8}
+        disabled={disabled}
       >
         <View style={styles.selectedContent}>
           {leftIcon && <View style={{ marginRight: 12 }}>{leftIcon}</View>}
@@ -874,7 +1036,7 @@ function DropField({ label, value, onPress, leftIcon, required }) {
             {value || getPlaceholderText()}
           </Text>
         </View>
-        <Ionicons name="chevron-down" size={20} color="#7A7A7A" />
+        <Ionicons name="chevron-down" size={20} color={disabled ? "#CCC" : "#7A7A7A"} />
       </TouchableOpacity>
     </View>
   );
@@ -910,6 +1072,41 @@ const styles = StyleSheet.create({
     paddingTop: scale.hp(2.6),
     paddingBottom: scale.hp(18),
     backgroundColor: Colors.white,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: scale.hp(5.2),
+  },
+  loadingText: {
+    marginTop: scale.hp(1.55),
+    color: Colors.textSecondary,
+    fontSize: scale.hp(1.8),
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: scale.hp(5.2),
+  },
+  errorText: {
+    fontSize: scale.hp(1.8),
+    color: Colors.textSecondary,
+    marginTop: scale.hp(1.55),
+    textAlign: "center",
+  },
+  retryButton: {
+    marginTop: scale.hp(2.1),
+    backgroundColor: Colors.primary,
+    paddingHorizontal: scale.wp(4.9),
+    paddingVertical: scale.hp(1.3),
+    borderRadius: scale.hp(1.05),
+  },
+  retryButtonText: {
+    color: "#fff",
+    fontSize: scale.hp(1.8),
+    fontWeight: "600",
   },
   sectionTitle: {
     fontSize: scale.hp(2.3),
