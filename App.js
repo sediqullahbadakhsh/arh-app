@@ -129,7 +129,7 @@ function MainAppContent() {
         <QueryClientProvider client={new QueryClient()}>
             <SafeAreaProvider>
                 <StripeProvider
-                    publishableKey={process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || "pk_test_51RxnvBKOx8MiO1ejmrVjvOoop4cA1ANX3lDRPOTy1cu95T1f4qRWnM6GmnoQnAK5RDxtVsNVmH3eKdny6PWyswn300iWaALjXq"}
+                    publishableKey={"pk_live_51PjnW7Dm4BYR9WtRSJE00wPLN2IcZnGsFz3hICqy4rmJc7CuSgm4ZeHaxOeCgN2lj6ST2vWEKEYChsQJC7V0JShi00bIrFHtrs"}
                 >
                     <UserProvider>
                           
