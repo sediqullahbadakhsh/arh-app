@@ -1,3 +1,4 @@
+// ProfileScreenMerchant.js - Complete Updated Version with Delete Account
 import React, { useState, useEffect } from "react";
 import {
   SafeAreaView,
@@ -16,15 +17,20 @@ import { Colors } from "../theme/colors";
 import * as ImagePicker from "expo-image-picker";
 import { useAuth } from "../auth/AuthProvider";
 import { getCurrentMerchantProfile, updateMerchantProfile } from "../services/merchantProfileService";
+import { deleteAgentAccount } from "../services/authApi";
 import { useTranslation } from "react-i18next";
 import { scale } from "../utils/normalizeSize";
 import { useLanguage } from '../context/LanguageContext';
+import DeleteAccountModal from "../components/DeleteAccountModal";
+
 export default function ProfileScreenMerchant({ navigation }) {
   const { user, logout } = useAuth();
   const [avatar, setAvatar] = useState(null);
   const [merchantData, setMerchantData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const { t } = useTranslation();
 
   const fetchMerchantProfile = async () => {
@@ -111,6 +117,38 @@ export default function ProfileScreenMerchant({ navigation }) {
     }
   };
 
+  const handleDeleteAccount = async () => {
+    try {
+      setDeleting(true);
+      const response = await deleteAgentAccount();
+      
+      if (response.status) {
+        setShowDeleteModal(false);
+        Alert.alert(
+          t('accountDeleted'),
+          t('accountDeletedMessage'),
+          [
+            {
+              text: t('ok'),
+              onPress: async () => {
+                await logout();
+                navigation.reset({ index: 0, routes: [{ name: "Login" }] });
+              }
+            }
+          ],
+          { cancelable: false }
+        );
+      } else {
+        Alert.alert(t('error'), response.error || t('failedToDeleteAccount'));
+      }
+    } catch (error) {
+      console.error("Delete account error:", error);
+      Alert.alert(t('error'), t('failedToDeleteAccount'));
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const goSupport = () => navigation.navigate("SupportScreen", { title: t('support') });
   const goReverseStockReport = () => navigation.navigate("ReverseStockReportScreen", { title: t('reverseStockReports') });
   const goReverseStock = () => navigation.navigate("ReverseStockScreen", { title: t('reverseStock') });
@@ -173,7 +211,7 @@ export default function ProfileScreenMerchant({ navigation }) {
           </View>
 
           <View style={styles.card}>
-            {[1, 2, 3, 4, 5, 6, 7].map((item) => (
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((item) => (
               <View key={item} style={styles.skeletonRow}>
                 <View style={styles.skeletonRowLeft}>
                   <View style={styles.skeletonIconContainer} />
@@ -197,6 +235,14 @@ export default function ProfileScreenMerchant({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <DeleteAccountModal
+        visible={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDeleteAccount}
+        loading={deleting}
+        userType="agent"
+      />
+      
       <LinearGradient
         colors={["#9F0901", "#E20E02"]}
         start={{ x: 0, y: 0 }}
@@ -233,6 +279,7 @@ export default function ProfileScreenMerchant({ navigation }) {
         <View style={styles.decoration1}></View>
         <View style={styles.decoration2}></View>
       </LinearGradient>
+      
       <View style={styles.menuWrapper}>
         <ScrollView showsVerticalScrollIndicator={false}>
           <View style={styles.body}>
@@ -249,6 +296,7 @@ export default function ProfileScreenMerchant({ navigation }) {
                 subtitle={t('viewUpdateProfile')}
                 onPress={goProfileDetails}
               />
+              
               <ProfileRow
                 icon={
                   <Ionicons
@@ -261,6 +309,7 @@ export default function ProfileScreenMerchant({ navigation }) {
                 subtitle={t('manageLanguage')}
                 onPress={goManageLanguage}
               />
+              
               <ProfileRow
                 icon={
                   <Ionicons
@@ -273,6 +322,7 @@ export default function ProfileScreenMerchant({ navigation }) {
                 subtitle={t('setupSecurity')}
                 onPress={goSecurity}
               />
+              
               <ProfileRow
                 icon={
                   <Ionicons name="swap-horizontal-outline" size={22} color={Colors.primary} />
@@ -281,6 +331,7 @@ export default function ProfileScreenMerchant({ navigation }) {
                 subtitle={t('manageReverseStock')}
                 onPress={goReverseStock}
               />
+              
               <ProfileRow
                 icon={
                   <Ionicons name="document-text-outline" size={22} color={Colors.primary} />
@@ -289,14 +340,7 @@ export default function ProfileScreenMerchant({ navigation }) {
                 subtitle={t('viewReverseStock')}
                 onPress={goReverseStockReport}
               />
-              {/* <ProfileRow
-                icon={
-                  <Ionicons name="refresh-circle-outline" size={22} color={Colors.primary} />
-                }
-                title={t('aboutApp')}
-                subtitle={t('appFeaturesInfo')}
-                onPress={goAboutApp}
-              /> */}
+           
               <ProfileRow
                 icon={
                   <Ionicons name="headset-outline" size={22} color={Colors.primary} />
@@ -305,6 +349,7 @@ export default function ProfileScreenMerchant({ navigation }) {
                 subtitle={t('contactSupport')}
                 onPress={goContactUs}
               />
+              
               <ProfileRow
                 icon={
                   <Ionicons name="information-circle-outline" size={22} color={Colors.primary} />
@@ -313,6 +358,26 @@ export default function ProfileScreenMerchant({ navigation }) {
                 subtitle={t('companyInfo')}
                 onPress={goAboutUs}
               />
+
+              {/* Delete Account Option */}
+              <View style={styles.divider} />
+              
+              <ProfileRow
+                icon={
+                  <Ionicons
+                    name="trash-outline"
+                    size={22}
+                    color="#CD0202"
+                  />
+                }
+                title={t('deleteAccount')}
+                subtitle={t('deleteAccountWarning')}
+                onPress={() => setShowDeleteModal(true)}
+                isDestructive
+              />
+
+              <View style={styles.divider} />
+
               <ProfileRow
                 icon={
                   <Ionicons
@@ -333,24 +398,43 @@ export default function ProfileScreenMerchant({ navigation }) {
   );
 }
 
-function ProfileRow({ icon, title, subtitle, onPress }) {
-    const { isRTL } = useLanguage();
+function ProfileRow({ icon, title, subtitle, onPress, isDestructive = false }) {
+  const { isRTL } = useLanguage();
   return (
     <TouchableOpacity
-      style={styles.row}
+      style={[
+        styles.row,
+        isDestructive && styles.destructiveRow
+      ]}
       onPress={onPress}
     >
       <View style={styles.rowLeft}>
-        <View style={styles.rowIcon}>{icon}</View>
+        <View style={[
+          styles.rowIcon,
+          isDestructive && styles.destructiveIcon
+        ]}>
+          {icon}
+        </View>
         <View>
-          <Text style={styles.rowTitle}>{title}</Text>
-          <Text style={styles.rowSubtitle}>{subtitle}</Text>
+          <Text style={[
+            styles.rowTitle,
+            isDestructive && styles.destructiveText
+          ]}>
+            {title}
+          </Text>
+          <Text style={[
+            styles.rowSubtitle,
+            isDestructive && styles.destructiveSubtitle
+          ]}>
+            {subtitle}
+          </Text>
         </View>
       </View>
       {isRTL ? (
-        <Ionicons name="chevron-back" size={18} color="#BDBDBD" />
-      ) : (  <Ionicons name="chevron-forward" size={18} color="#BDBDBD" />)}
-    
+        <Ionicons name="chevron-back" size={18} color={isDestructive ? "#CD0202" : "#BDBDBD"} />
+      ) : (
+        <Ionicons name="chevron-forward" size={18} color={isDestructive ? "#CD0202" : "#BDBDBD"} />
+      )}
     </TouchableOpacity>
   );
 }
@@ -488,9 +572,12 @@ const styles = StyleSheet.create({
     borderRadius: scale.hp(1.3),
     backgroundColor: '#fff',
   },
+  destructiveRow: {
+    borderColor: '#FFE5E5',
+    backgroundColor: '#FFFAFA',
+  },
   rowLeft: {
     flexDirection: "row",
-    
     alignItems: "center",
     flex: 1,
   },
@@ -503,15 +590,30 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginEnd: scale.wp(3.1),
   },
+  destructiveIcon: {
+    backgroundColor: '#FFF0F0',
+  },
   rowTitle: {
     color: Colors.textPrimary,
     fontSize: scale.hp(1.95),
     fontWeight: "500",
   },
+  destructiveText: {
+    color: '#CD0202',
+  },
   rowSubtitle: {
     color: "#9E9E9E",
     fontSize: scale.hp(1.4),
     marginTop: scale.hp(0.26),
+  },
+  destructiveSubtitle: {
+    color: '#FF6B6B',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#F3F3F3',
+    marginVertical: scale.hp(1.3),
+    marginHorizontal: scale.wp(4.2),
   },
   skeletonAvatar: {
     backgroundColor: '#E0E0E0',

@@ -591,7 +591,6 @@ ${t('receipt.thankYou')}
             <Text style={styles.captureDetailLabel}>{t('receipt.transactionId')}:</Text>
             <Text style={styles.captureDetailValue}>{transaction.txnNumber || transaction.id || 'N/A'}</Text>
           </View>
-          
           <View style={styles.captureDetailRow}>
             <Text style={styles.captureDetailLabel}>{t('receipt.dateTime')}:</Text>
             <Text style={styles.captureDetailValue}>{formatDate(transaction.createdAt)}</Text>
@@ -722,7 +721,12 @@ ${t('receipt.thankYou')}
                   {transaction.txnNumber || transaction.id || 'N/A'}
                 </Text>
               </View>
-              
+               <View style={styles.receiptDetailItem}>
+                <Text style={styles.receiptDetailLabel}>{t('receipt.receiver')}</Text>
+                <Text style={styles.receiptDetailValue} numberOfLines={1} ellipsizeMode="middle">
+                  {transaction.receiver || 'N/A'}
+                </Text>
+              </View>
               <View style={styles.receiptDetailItem}>
                 <Text style={styles.receiptDetailLabel}>{t('receipt.dateTime')}</Text>
                 <Text style={styles.receiptDetailValue}>

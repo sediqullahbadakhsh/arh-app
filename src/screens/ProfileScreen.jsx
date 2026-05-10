@@ -1,3 +1,4 @@
+// ProfileScreen.js - Complete Updated Version with Delete Account
 import React, { useState, useEffect } from "react";
 import {
   SafeAreaView,
@@ -15,10 +16,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../theme/colors";
 import * as ImagePicker from "expo-image-picker";
 import { useAuth } from "../auth/AuthProvider";
-import { getCustomerProfile, updateCustomerProfile } from "../services/authApi";
+import { getCustomerProfile, updateCustomerProfile, deleteCustomerAccount } from "../services/authApi";
 import { useTranslation } from "react-i18next";
 import { useLanguage } from '../context/LanguageContext';
 import ValidationModal from "../components/ValidationModal";
+import DeleteAccountModal from "../components/DeleteAccountModal";
 import { useModal } from "../hooks/useModal";
 import { scale } from "../utils/normalizeSize";
 
@@ -29,7 +31,10 @@ export default function ProfileScreen({ navigation }) {
   const [customerData, setCustomerData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const {showModal, modal, hideModal} = useModal();
+  
   const fetchCustomerProfile = async () => {
     try {
       setFetching(true);
@@ -113,6 +118,38 @@ export default function ProfileScreen({ navigation }) {
     }
   };
 
+  const handleDeleteAccount = async () => {
+    try {
+      setDeleting(true);
+      const response = await deleteCustomerAccount();
+      
+      if (response.status) {
+        setShowDeleteModal(false);
+        Alert.alert(
+          t('accountDeleted'),
+          t('accountDeletedMessage'),
+          [
+            {
+              text: t('ok'),
+              onPress: async () => {
+                await logout();
+                navigation.reset({ index: 0, routes: [{ name: "Login" }] });
+              }
+            }
+          ],
+          { cancelable: false }
+        );
+      } else {
+        Alert.alert(t('error'), response.error || t('failedToDeleteAccount'));
+      }
+    } catch (error) {
+      console.error("Delete account error:", error);
+      Alert.alert(t('error'), t('failedToDeleteAccount'));
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const goProfileDetails = () =>
     navigation.navigate("profileDetails", { title: t('profileDetails') });
   const goManageLanguage = () =>
@@ -144,12 +181,6 @@ export default function ProfileScreen({ navigation }) {
 
   const SkeletonLoader = () => (
     <SafeAreaView style={styles.safeArea}>
-           <ValidationModal
-              visible={modal.visible}
-              title={modal.title}
-              message={modal.message}
-              onClose={hideModal}
-            />
       <LinearGradient
         colors={["#9F0901", "#E20E02"]}
         start={{ x: 0, y: 0 }}
@@ -174,7 +205,7 @@ export default function ProfileScreen({ navigation }) {
           </View>
 
           <View style={styles.skeletonCard}>
-            {[1, 2, 3, 4, 5, 6, 7].map((item) => (
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((item) => (
               <View key={item} style={styles.skeletonRow}>
                 <View style={styles.skeletonRowLeft}>
                   <View style={styles.skeletonIconContainer} />
@@ -198,6 +229,21 @@ export default function ProfileScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <ValidationModal
+        visible={modal.visible}
+        title={modal.title}
+        message={modal.message}
+        onClose={hideModal}
+      />
+      
+      <DeleteAccountModal
+        visible={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDeleteAccount}
+        loading={deleting}
+        userType="customer"
+      />
+      
       <LinearGradient
         colors={["#9F0901", "#E20E02"]}
         start={{ x: 0, y: 0 }}
@@ -290,22 +336,15 @@ export default function ProfileScreen({ navigation }) {
                 subtitle={t('services.title')}
                 onPress={goMerchant}
               />
+              
               <ProfileRow
-  icon={
-    <Ionicons name="pricetag-outline" size={22} color={Colors.primary} />
-  }
-  title={t('promoCodes')}
-  subtitle={t('services.title')}
-  onPress={() => navigation.navigate('PromoCodes')}
-/>
-              {/* <ProfileRow
                 icon={
-                  <Ionicons name="refresh-circle-outline" size={22} color={Colors.primary} />
+                  <Ionicons name="pricetag-outline" size={22} color={Colors.primary} />
                 }
-                title={t('aboutApp')}
+                title={t('promoCodes')}
                 subtitle={t('services.title')}
-                onPress={goAboutApp}
-              /> */}
+                onPress={() => navigation.navigate('PromoCodes')}
+              />
               
               <ProfileRow
                 icon={
@@ -324,6 +363,25 @@ export default function ProfileScreen({ navigation }) {
                 subtitle={t('services.title')}
                 onPress={goAboutUs}
               />
+
+              {/* Delete Account Option */}
+              <View style={styles.divider} />
+              
+              <ProfileRow
+                icon={
+                  <Ionicons
+                    name="trash-outline"
+                    size={22}
+                    color="#CD0202"
+                  />
+                }
+                title={t('deleteAccount')}
+                subtitle={t('deleteAccountWarning')}
+                onPress={() => setShowDeleteModal(true)}
+                isDestructive
+              />
+
+              <View style={styles.divider} />
 
               <ProfileRow
                 icon={
@@ -345,24 +403,43 @@ export default function ProfileScreen({ navigation }) {
   );
 }
 
-function ProfileRow({ icon, title, subtitle, onPress }) {
+function ProfileRow({ icon, title, subtitle, onPress, isDestructive = false }) {
   const { isRTL } = useLanguage();
   return (
     <TouchableOpacity
-      style={styles.row}
+      style={[
+        styles.row,
+        isDestructive && styles.destructiveRow
+      ]}
       onPress={onPress}
     >
       <View style={styles.rowLeft}>
-        <View style={styles.rowIcon}>{icon}</View>
+        <View style={[
+          styles.rowIcon,
+          isDestructive && styles.destructiveIcon
+        ]}>
+          {icon}
+        </View>
         <View>
-          <Text style={styles.rowTitle}>{title}</Text>
-          <Text style={styles.rowSubtitle}>{subtitle}</Text>
+          <Text style={[
+            styles.rowTitle,
+            isDestructive && styles.destructiveText
+          ]}>
+            {title}
+          </Text>
+          <Text style={[
+            styles.rowSubtitle,
+            isDestructive && styles.destructiveSubtitle
+          ]}>
+            {subtitle}
+          </Text>
         </View>
       </View>
       {isRTL ? (
-             <Ionicons name="chevron-back" size={18} color="#BDBDBD" />
-           ) : (  <Ionicons name="chevron-forward" size={18} color="#BDBDBD" />)}
-         
+        <Ionicons name="chevron-back" size={18} color={isDestructive ? "#CD0202" : "#BDBDBD"} />
+      ) : (
+        <Ionicons name="chevron-forward" size={18} color={isDestructive ? "#CD0202" : "#BDBDBD"} />
+      )}
     </TouchableOpacity>
   );
 }
@@ -500,6 +577,10 @@ const styles = StyleSheet.create({
     borderRadius: scale.hp(1.3),
     backgroundColor: '#fff',
   },
+  destructiveRow: {
+    borderColor: '#FFE5E5',
+    backgroundColor: '#FFFAFA',
+  },
   rowLeft: {
     flexDirection: "row",
     alignItems: "center",
@@ -514,15 +595,30 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginEnd: scale.wp(3.1),
   },
+  destructiveIcon: {
+    backgroundColor: '#FFF0F0',
+  },
   rowTitle: {
     color: Colors.textPrimary,
     fontSize: scale.hp(1.95),
     fontWeight: "500",
   },
+  destructiveText: {
+    color: '#CD0202',
+  },
   rowSubtitle: {
     color: "#9E9E9E",
     fontSize: scale.hp(1.55),
     marginTop: scale.hp(0.26),
+  },
+  destructiveSubtitle: {
+    color: '#FF6B6B',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#F3F3F3',
+    marginVertical: scale.hp(1.3),
+    marginHorizontal: scale.wp(4.2),
   },
   skeletonAvatar: {
     backgroundColor: '#E0E0E0',

@@ -1497,7 +1497,7 @@ const getOperatorLogo = (operatorName) => {
   return OPERATOR_LOGOS.default;
 };
 
-const VALID_PREFIXES = ['71', '72', '73', '74', '76', '77', '78', '79'];
+const VALID_PREFIXES = ['71', '70', '72', '73', '74', '76', '77', '78', '79'];
 
 const validateMobileNumber = (number) => {
   const cleanNumber = number.replace(/\D/g, "");

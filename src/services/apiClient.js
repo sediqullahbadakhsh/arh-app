@@ -2,7 +2,7 @@ import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 
-export const API_BASE = process.env.EXPO_PUBLIC_API_URL || "https://prod-admin.yes-charge.com/backend/v1";
+export const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http://3.67.144.22/backend/v1";
 
 const IS_PRODUCTION = !__DEV__;
 const DEBUG_NET = true;

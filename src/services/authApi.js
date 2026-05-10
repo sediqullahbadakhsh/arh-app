@@ -19,7 +19,25 @@ export const signupOtpGenerate = ({ email }) =>
 export const signupOtpVerify = ({ otp }) =>
   api.post("/customer/verify-otp", { otp }).then((r) => r.data);
 
+export const deleteCustomerAccount = async () => {
+  try {
+    const response = await api.delete("/customer/delete-account");
+    return response.data;
+  } catch (error) {
+    console.error("Delete customer account error:", error);
+    throw error;
+  }
+};
 
+export const deleteAgentAccount = async () => {
+  try {
+    const response = await api.delete("/agent/delete-account");
+    return response.data;
+  } catch (error) {
+    console.error("Delete agent account error:", error);
+    throw error;
+  }
+};
 export const getCustomerProfile = async () => {
   try {
     const response = await api.get("/customer/me");
